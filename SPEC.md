@@ -1,0 +1,431 @@
+# tvshow — Specification
+
+A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
+
+> Status: foundational draft. Locked sections are decided. Open Questions need further carving before code.
+
+---
+
+## 1. Mission and Non-Goals
+
+### 1.1 Mission
+Build a hostable application stack:
+- **Client (`tvshow`)** — a TurboVision-style desktop application that fetches HTTP resources, parses a defined subset of HTML/CSS, and renders them into a character cell grid with full TurboVision look-and-feel (MDI, menus, dialogs, scrollbars).
+- **Server (`tvshow-srv`)** — a minimal demo HTTP server that ships sample pages and form endpoints. Used for development, demos, and integration tests.
+
+The result must be a sound base for test-first development. Render path must be a pure function so layouts can be asserted by golden-grid tests without spawning a terminal.
+
+### 1.2 Non-Goals (v1)
+- JavaScript execution.
+- CSS Grid, animations, transitions, transforms, gradients, shadows.
+- HTTPS (planned, gated on TLS dependency decision — see Open Q-7).
+- Cookies, persistent sessions, auth (Open Q-9).
+- Real images. Only `alt` text in v1; ASCII-art renderer is an interface stub for later.
+- Web compatibility with arbitrary public sites. We render *our* HTML subset cleanly; real-world pages may degrade.
+
+---
+
+## 2. Locked Decisions
+
+| Axis | Decision |
+|------|----------|
+| Language / runtime | C++ (C++20) with `magiblot/tvision` |
+| HTML scope | Defined subset + forms (see §6) |
+| Wire protocol | Real HTTP/1.1 |
+| Interactivity | Links + forms + tabs (MDI windows) |
+| HTML parser | `gumbo-parser` |
+| HTTP client | `cpp-httplib` (header-only) |
+| Test framework | `doctest` (header-only) |
+| Tab UX | TurboVision MDI child windows (`TWindow` per document) |
+| Layout unit mapping | px → cells: **8 px = 1 column, 16 px = 1 row** |
+| Image fallback | `[alt]` text in v1; pluggable interface for ASCII-art renderer later |
+| Color depth | Truecolor with 256-color and 16-color fallback, autodetected |
+| CSS parser | `katana-parser` (full CSS3 grammar; we act on subset of properties) |
+| Server scope | Client + minimal demo server using `cpp-httplib` |
+| Build system | CMake (≥ 3.20), Ninja preferred |
+
+---
+
+## 3. High-Level Architecture
+
+```
+   ┌─────────┐       HTTP/1.1      ┌────────────┐
+   │ tvshow  │  ─────────────────▶ │ tvshow-srv │
+   │ client  │  ◀───────────────── │   demo     │
+   └────┬────┘    HTML + CSS       └────────────┘
+        │
+        │  pipeline (pure functions, one direction):
+        │
+        │   bytes ─▶ DOM ─▶ CSSOM ─▶ Styled DOM ─▶ Box Tree ─▶ CharGrid
+        │                                                       │
+        │                                                       ▼
+        │                                            tvision TDrawBuffer
+        │                                                       │
+        ▼                                                       ▼
+    Input (keys, mouse) ◀──── focus / hit-test ◀──────── TWindow paint
+```
+
+### 3.1 Pipeline Stages (pure unless noted)
+| Stage | Input | Output | Pure? |
+|-------|-------|--------|-------|
+| `net` | URL | bytes + headers | No (I/O — mock in tests) |
+| `dom` | bytes + content-type | DOM tree (our types) | Yes |
+| `css` | stylesheet text | CSSOM (rules, selectors, declarations) | Yes |
+| `style` | DOM + CSSOM list (cascade order) | Styled DOM (each node has computed style) | Yes |
+| `layout` | Styled DOM + Viewport (cols × rows) | Box Tree (positions in cells) | Yes |
+| `render` | Box Tree | CharGrid (cell = char + `TColorAttr`) | Yes |
+| `paint` | CharGrid + `TDrawBuffer` | drawn TWindow rows | No (tvision side effect) |
+| `input` | key/mouse event + focus state | Action (navigate, focus, submit) | Yes |
+
+**Test seam:** every Yes-row is unit-tested with deterministic input/output. Golden tests assert on `CharGrid` snapshots (text + attribute map) — no terminal needed.
+
+---
+
+## 4. Module Layout
+
+```
+tvshow/
+├── CMakeLists.txt
+├── SPEC.md
+├── CLAUDE.md
+├── README.md
+├── cmake/                 # toolchain helpers, FetchContent wrappers
+├── third_party/           # vendored or FetchContent'd:
+│   ├── tvision/
+│   ├── gumbo-parser/
+│   ├── katana-parser/
+│   ├── cpp-httplib/       (header-only)
+│   └── doctest/           (header-only)
+├── client/
+│   ├── include/tvshow/    # public headers per module
+│   └── src/
+│       ├── main.cpp
+│       ├── app/           # TApplication subclass, menu bar, status line, MDI desktop
+│       ├── net/           # HttpClient interface + cpp-httplib impl
+│       ├── dom/           # Gumbo → DOM adapter, our DOM types
+│       ├── css/           # Katana → CSSOM adapter, selector matching, cascade, specificity
+│       ├── style/         # computed-style resolver
+│       ├── layout/        # block / inline / flex flow into Box tree (cell coords)
+│       ├── render/        # Box tree → CharGrid (chars + TColorAttr)
+│       ├── paint/         # CharGrid → TDrawBuffer (tvision-side)
+│       ├── ui/            # TBrowserWindow : TWindow, TTabManager, TAddressBar dialog
+│       ├── input/         # key/mouse → action mapper, link/form focus traversal
+│       ├── history/       # per-tab back/forward stack
+│       ├── images/        # ImageRenderer interface (v1: AltTextRenderer)
+│       └── util/          # url, percent encoding, charset, logging
+├── server/
+│   ├── src/main.cpp       # cpp-httplib router
+│   └── pages/             # sample .html / .css for demos and tests
+├── tests/
+│   ├── unit/              # one dir per pure module
+│   ├── golden/            # *.html → *.grid expected snapshots
+│   └── integration/       # spin server + run client request, compare grid
+└── docs/
+    └── decisions/         # ADRs for non-trivial design changes (mirrors ai-wkf)
+```
+
+---
+
+## 5. Build, Run, Test
+
+### 5.1 Build
+```
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+```
+
+Targets:
+- `tvshow` — client binary
+- `tvshow-srv` — demo server binary
+- `tvshow-tests` — unit + golden test runner (doctest)
+- `tvshow-itests` — integration tests (server + client harness)
+
+### 5.2 Run
+```
+./build/server/tvshow-srv --port 8080
+./build/client/tvshow http://localhost:8080/index.html
+```
+
+### 5.3 Test
+```
+ctest --test-dir build --output-on-failure
+```
+
+Test discipline: tests are written **before** the implementation for any pure module. UI/paint layers are kept thin so most logic lives in test-first stages.
+
+### 5.4 Dependency Strategy
+- Header-only libs (`cpp-httplib`, `doctest`) committed under `third_party/`.
+- Compiled libs (`tvision`, `gumbo-parser`, `katana-parser`) pulled via CMake `FetchContent` and pinned to a specific commit. Mirrored under `third_party/` only if upstream becomes unreliable.
+
+---
+
+## 6. HTML Subset (v1)
+
+### 6.1 Document
+`<!doctype html>`, `<html>`, `<head>`, `<title>`, `<meta charset>`, `<link rel="stylesheet" href>`, `<style>`, `<body>`.
+
+### 6.2 Block flow
+`div`, `p`, `h1`–`h6`, `hr`, `pre`, `blockquote`, `section`, `article`, `header`, `footer`, `nav`, `main`, `ul`, `ol`, `li`.
+
+### 6.3 Inline
+`span`, `a`, `b`, `strong`, `i`, `em`, `u`, `code`, `br`, `small`.
+
+### 6.4 Forms
+`form` (action, method GET/POST, enctype `application/x-www-form-urlencoded`), `input` (type=text|password|checkbox|radio|submit|hidden), `textarea`, `select` + `option`, `button`, `label`.
+
+### 6.5 Images
+`<img src alt width height>` — v1 renders `[alt]`, reserves `width × height` (mapped through px→cell ratio) so layout matches future ASCII-art renderer.
+
+### 6.6 Out of subset
+`script`, `iframe`, `video`, `audio`, `canvas`, `svg`, `table`* — parsed and skipped (children rendered as if their parent were `div`). Tables are deferred to v1.1 (Open Q-13).
+
+---
+
+## 7. CSS Subset (v1)
+
+### 7.1 Sources
+1. User-agent default stylesheet (built into client).
+2. `<link rel="stylesheet">` external sheets (HTTP-fetched).
+3. `<style>` blocks.
+4. Inline `style="..."`.
+
+Cascade order, specificity, and `!important` follow CSS spec. Katana provides selector ASTs; our matcher implements descendant, child, class, id, tag, attribute existence, `:hover` (Open Q-10), `:focus`.
+
+### 7.2 Honored Properties
+| Group | Properties |
+|-------|-----------|
+| Color | `color`, `background-color`, `background` (color shorthand only) |
+| Text | `font-weight` (normal/bold), `font-style` (normal/italic), `text-decoration` (none/underline), `text-align` (left/right/center), `white-space` (normal/pre/nowrap) |
+| Box | `width`, `height`, `min-width`, `max-width` (px, %, ch), `margin`, `padding`, `border`, `border-style`, `border-color`, `border-width` |
+| Display | `display: block | inline | inline-block | flex | none` |
+| Flex | `flex-direction`, `justify-content`, `align-items`, `gap` (single value), `flex-grow`, `flex-shrink`, `flex-basis` |
+| Other | `visibility`, `overflow` (visible/hidden/scroll/auto) |
+
+`px`, `%`, `em` (relative to parent font size = 1 cell row by default), `ch` (= 1 column), `rem` (= 1 row).
+
+### 7.3 Unit Mapping
+- `1px = 1/8 col horizontally, 1/16 row vertically`. Round half-up.
+- `1ch = 1 col`, `1em = 1 row` (font size has no effect — terminals are mono-cell).
+- `%` resolved against containing block's content area.
+
+### 7.4 Ignored Properties
+Anything not in §7.2 — parsed (so `style="..."` doesn't error) but not applied.
+
+---
+
+## 8. Color and Style Mapping
+
+### 8.1 Color Resolution
+1. Parse CSS color (named, `#rgb`, `#rrggbb`, `rgb()`, `rgba()` — alpha discarded for v1).
+2. Detection at startup: `$COLORTERM` (`truecolor`/`24bit`) → truecolor; else parse `tput colors` → 256 or 16.
+3. Truecolor mode: emit `TColorRGB`.
+4. 256 mode: convert RGB to nearest xterm 256-cube index.
+5. 16 mode: convert RGB to nearest CGA palette entry.
+
+All conversion lives in `util::Color`, tested with table-driven cases.
+
+### 8.2 Style Attributes (TColorAttr style flags)
+| CSS | tvision flag |
+|-----|-------------|
+| `font-weight: bold` | `slBold` |
+| `font-style: italic` | `slItalic` |
+| `text-decoration: underline` | `slUnderline` |
+| `text-decoration: line-through` | `slStrike` |
+| `:focus` (link/form) | `slReverse` (or theme color) |
+
+---
+
+## 9. Borders and Box-Drawing
+
+CSS `border-style` → box-drawing chars:
+
+| border-style | Corners + edges |
+|--------------|-----------------|
+| `none` | no border, no cells reserved |
+| `solid` (default) | `┌┐└┘─│` |
+| `double` | `╔╗╚╝═║` |
+| `dashed` | `┌┐└┘╌╎` |
+| `dotted` | falls back to `solid` (terminals lack dotted) |
+| `ridge` / `groove` / `inset` / `outset` | falls back to `solid` |
+
+Border colors honored via `TColorAttr`. Border width is always 1 cell (CSS width values > 0 collapse to 1; 0 collapses to `none`).
+
+---
+
+## 10. Layout Engine
+
+### 10.1 Block Formatting Context
+Standard CSS block flow. Block boxes stack vertically; inline boxes flow horizontally and wrap at cell boundaries. Margin collapsing implemented for adjacent block-level siblings (vertical margins only).
+
+### 10.2 Inline Formatting Context
+Line boxes built greedily. `white-space: pre` preserves newlines and runs of spaces. `white-space: nowrap` disables wrapping — overflow handled per `overflow` property.
+
+### 10.3 Flex
+v1 supports `flex-direction: row | column`, `justify-content: flex-start | flex-end | center | space-between | space-around`, `align-items: flex-start | flex-end | center | stretch`, `gap`, `flex-grow`, `flex-shrink`, `flex-basis`. No wrapping (`flex-wrap: nowrap` only).
+
+### 10.4 Viewport and Resize
+Viewport = inner content area of the active `TBrowserWindow` (after subtracting frame, scrollbars, address line). On terminal resize, the active document is re-laid-out from the cached Styled DOM (no re-fetch).
+
+---
+
+## 11. UI Model (TurboVision)
+
+### 11.1 Application
+`TvshowApplication : TApplication` builds the standard menu bar + status line + desktop. Single instance per process.
+
+### 11.2 Menu bar
+- **≡ tvshow** — About, Quit
+- **File** — New Tab (Ctrl-T), Open URL (Ctrl-L), Reload (F5), Close Tab (Ctrl-W)
+- **Navigate** — Back (Alt-←), Forward (Alt-→), Stop (Esc), Home
+- **View** — Toggle Address Bar, Toggle Status, Cascade, Tile
+- **Window** — list of open tabs
+
+### 11.3 Browser Window (Tab)
+`TBrowserWindow : TWindow` is one tab. Per-window state: current URL, document, history stack, scroll offset, focused element id. Multiple `TBrowserWindow` instances live in the desktop as MDI children.
+
+### 11.4 Address Bar
+v1: modal `TInputDialog` opened via Ctrl-L. (Open Q-1: persistent top bar later.)
+
+### 11.5 Status Line
+Shows: current URL on hover, focused link target, loading/error state, key hints (`F5 Reload  Alt-← Back  Ctrl-L URL`).
+
+---
+
+## 12. Input Model
+
+### 12.1 Focus
+A document maintains an ordered list of *focusable* elements: links (`<a href>`) and form controls. Tab / Shift-Tab cycle. Visual focus = `slReverse` or theme-dependent attribute.
+
+### 12.2 Activation
+- Enter on focused link → navigate (push history).
+- Enter on submit button or `submit`-type input → form submit.
+- Space toggles checkbox/radio.
+- Mouse click maps screen cell → element via hit-test on Box Tree; same actions follow.
+
+### 12.3 Scrolling
+Native `TScrollBar`. PageUp/Down, arrow keys, Home/End. `#fragment` URLs scroll to anchor (Open Q-11 for smooth/instant policy).
+
+---
+
+## 13. Forms
+
+### 13.1 Submission
+On submit:
+1. Walk form's controls → build name/value pairs.
+2. Encode per `enctype` (v1: `application/x-www-form-urlencoded` only).
+3. GET → append query string to action URL, navigate.
+4. POST → HTTP POST with body, navigate to response (status 2xx renders body; 3xx follows redirect; 4xx/5xx renders error page).
+
+### 13.2 Field Rendering
+- `text` / `password` — bordered single-line edit.
+- `textarea` — bordered multi-line edit, scrolls on overflow.
+- `checkbox` — `[ ]` / `[x]`.
+- `radio` — `( )` / `(•)`.
+- `select` — closed: `[ Value ▾ ]`; open: dropdown list dialog.
+- `button` — `[ Label ]`, focusable.
+- `hidden` — not rendered, value submitted.
+
+---
+
+## 14. History
+
+Per-tab back/forward stack, classic browser semantics. Navigation pushes; Back/Forward shifts current pointer without truncating until a new navigation occurs at a non-end position (then forward stack is dropped).
+
+---
+
+## 15. Networking
+
+### 15.1 Requests
+`net::HttpClient` interface; default impl uses `cpp-httplib`. Tests inject a fake. Supports:
+- GET / POST.
+- Status follow for `301/302/303/307/308` up to 5 hops.
+- `text/html`, `text/css`, `text/plain` content types in v1.
+- Charset: parse from `Content-Type` (`charset=`) and meta tag; assume UTF-8 if absent. Internal string type is UTF-8 throughout (`std::string`); tvision Unicode code path used for paint.
+
+### 15.2 Errors
+Network and HTTP errors render an internal error page (UA-styled HTML). Status line shows compact reason.
+
+### 15.3 HTTPS
+Out of v1. Adding TLS = pulling OpenSSL into `cpp-httplib`. Decision deferred (Open Q-7).
+
+---
+
+## 16. Demo Server
+
+`tvshow-srv` ships:
+- `/` — landing page that lists all sample pages.
+- `/pages/typography.html` — headings, paragraphs, inline styles.
+- `/pages/layout.html` — block, flex examples.
+- `/pages/forms.html` — every supported control. Submit POSTs to `/echo` which renders the parsed form.
+- `/pages/colors.html` — color depth showcase.
+- `/pages/borders.html` — border styles.
+- `/pages/errors/404` — used by integration tests.
+
+Used by integration tests to verify end-to-end golden grids.
+
+---
+
+## 17. Test Strategy (Test-First)
+
+### 17.1 Layered
+1. **Unit (per module, pure):** doctest cases live next to code. Each pure module has 100% line coverage as a goal.
+2. **Golden (`tests/golden/`):** for each fixture `case.html` (+ optional `case.css`), a `case.grid` snapshot stores the expected `CharGrid` (chars on first half, attribute codes on second half, separated by a marker). Test driver re-runs the pipeline and diffs.
+3. **Integration (`tests/integration/`):** spawn `tvshow-srv` on an ephemeral port, run client request via library API (no terminal), compare to golden grid.
+
+### 17.2 Determinism
+The pipeline is deterministic given (input bytes, viewport size, color depth, terminal capabilities). All non-determinism (timing, network) is behind the `net` module. Color autodetection is stubbed in tests.
+
+### 17.3 CI
+`ctest --output-on-failure` in CMake build. PR cannot merge with red tests. (Open Q-15 — choice of CI host.)
+
+---
+
+## 18. Logging and Diagnostics
+
+`util::log` writes to `~/.cache/tvshow/log` by default; `--log-level` flag controls verbosity. Optional debug overlay (Ctrl-D) draws box outlines on top of the rendered page (Open Q-12 — final debug overlay design).
+
+---
+
+## 19. Coding Standards
+
+- C++20. No exceptions across module boundaries; use `std::expected`-shaped result types where errors are expected (or `tl::expected` shim if compiler lacks `<expected>`).
+- Headers under `client/include/tvshow/<module>/`; one public header per module surface.
+- No globals; tvision's `TApplication` is the only singleton.
+- Format with `clang-format` (config in repo root). Lint with `clang-tidy` (config in repo root).
+- ADRs in `docs/decisions/` for any structural change beyond this SPEC.
+
+---
+
+## 20. Open Questions (Carve Next)
+
+| # | Topic | Need |
+|---|-------|------|
+| Q-1 | Address bar UX | Modal `Ctrl-L` v1 vs persistent top line at the cost of one row of viewport |
+| Q-2 | Bookmarks / homepage / start page | Format (file? config? UI menu) |
+| Q-3 | Resize behavior for flex layouts when viewport too narrow | Truncate vs horizontal scrollbar vs reflow |
+| Q-4 | UA default stylesheet — how opinionated | Mimic browser defaults vs minimal |
+| Q-5 | Selection / clipboard support | v1 yes/no |
+| Q-6 | Mouse support level | Click only, or wheel + drag-to-resize windows |
+| Q-7 | HTTPS via cpp-httplib + OpenSSL | v1 / v1.1 / v2 |
+| Q-8 | Charset support beyond UTF-8 | Need `iconv` dep? |
+| Q-9 | Cookies / sessions | v1 / later |
+| Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
+| Q-11 | Anchor navigation animation policy | Instant vs smooth |
+| Q-12 | Debug overlay (Ctrl-D) detail | Box outlines, focus order, box dims, all? |
+| Q-13 | `<table>` support | v1.1 priority? Subset (no colspan)? |
+| Q-14 | Error page styling | UA-themed or plain |
+| Q-15 | CI host | GitHub Actions / GitLab / local only |
+| Q-16 | License | MIT / Apache-2 / proprietary |
+| Q-17 | tvision pin | Specific commit / release tag |
+| Q-18 | Image renderer plug interface | Function signature for the future ASCII-art renderer |
+| Q-19 | Config file location and format | `~/.config/tvshow/config.toml`? CLI flags only? |
+| Q-20 | Form `enctype: multipart/form-data` | v1 / later (tied to file upload, which needs a file dialog) |
+
+---
+
+## 21. Versioning of This Spec
+
+This document is the contract for v1. Any change to a Locked Decision (§2) or to subsets (§6, §7) requires:
+1. ADR in `docs/decisions/`.
+2. SPEC update in the same commit.
+3. Test updates reflecting the new behavior.
