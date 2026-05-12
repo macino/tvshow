@@ -1,0 +1,27 @@
+---
+# Applies only to our sources (third_party + tvision excluded via per-target
+# disable; we only run clang-tidy against client/ and server/).
+Checks: >
+  bugprone-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  performance-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  misc-*,
+  -misc-non-private-member-variables-in-classes
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(client|server)/(include|src)/.*'
+FormatStyle: file
+CheckOptions:
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '2'

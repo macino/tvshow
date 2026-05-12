@@ -1,0 +1,16 @@
+build/
+build-*/
+.cache/
+compile_commands.json
+
+# editor
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# task scratch (per ai-wkf / EXECUTION §11)
+tasks/
+
+# logs
+*.log

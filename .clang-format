@@ -1,0 +1,35 @@
+---
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+DerivePointerAlignment: false
+PointerAlignment: Left
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"tvshow/'
+    Priority: 1
+  - Regex: '^<tvision/'
+    Priority: 2
+  - Regex: '^<[a-z_]+>'
+    Priority: 4
+  - Regex: '^<.*\.h(pp)?>'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 5
+SortIncludes: CaseSensitive
+SpaceAfterTemplateKeyword: true
+SpacesBeforeTrailingComments: 2
+NamespaceIndentation: None
+FixNamespaceComments: true
