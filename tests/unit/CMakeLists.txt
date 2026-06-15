@@ -4,6 +4,7 @@ add_executable(tvshow-tests
     layout/types_test.cpp
     util/url_test.cpp
     net/http_client_test.cpp
+    dom/parser_test.cpp
 )
 
 target_link_libraries(tvshow-tests
