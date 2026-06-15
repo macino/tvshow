@@ -32,13 +32,11 @@ std::string fmt_num(double v) {
 }
 
 // Wrappers for KatanaValue union access — isolated to keep NOLINT out of logic.
-// NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
 const char* kval_string(const KatanaValue& v) noexcept {
-    return v.string;
+    return v.string;  // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
-// NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
 double kval_double(const KatanaValue& v) noexcept {
-    return v.fValue;
+    return v.fValue;  // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
 
 // Serialize one KatanaValue to a CSS value string.
