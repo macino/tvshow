@@ -6,6 +6,7 @@ add_library(tvshow_core STATIC
     src/net/fake_http_client.cpp
     src/dom/node.cpp
     src/dom/parser.cpp
+    src/css/parser.cpp
 )
 
 target_include_directories(tvshow_core
@@ -18,6 +19,7 @@ target_include_directories(tvshow_core
 target_link_libraries(tvshow_core
     PUBLIC
         gumbo::gumbo
+        katana::katana
     PRIVATE
         tvshow_warnings
 )

@@ -9,6 +9,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(Warnings)
 include(Tvision)
 include(Gumbo)
+include(Katana)
 include(Doctest)
 
 enable_testing()
