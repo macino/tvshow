@@ -31,4 +31,9 @@ if(TVSHOW_SANITIZE)
   target_link_options(tvshow_warnings INTERFACE
     -fsanitize=${_tvshow_sanitize_flag}
   )
+  # GCC does not preload the ASan runtime automatically; static linking avoids
+  # the "does not come first in initial library list" error at run time.
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(tvshow_warnings INTERFACE -static-libasan -static-libubsan)
+  endif()
 endif()

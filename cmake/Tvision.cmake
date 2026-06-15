@@ -19,5 +19,9 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(tvision)
 
+# Mark tvision headers as system includes so our -Wshadow/-Wall flags don't
+# fire on tvision's own code when our files include it.
+set_target_properties(tvision PROPERTIES SYSTEM TRUE)
+
 # Re-assert our setting in case the dependency toggled it.
 set(TVSHOW_WARNINGS_AS_ERRORS "${_tvshow_saved_werror}")

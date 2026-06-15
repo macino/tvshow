@@ -15,9 +15,7 @@ step "2/7  build debug (warnings-as-errors)"
 cmake --build --preset debug
 
 step "3/7  clang-format dry-run"
-mapfile -t fmt_files < <(git ls-files \
-    'client/*.cpp' 'client/*.hpp' \
-    'server/*.cpp' 'server/*.hpp')
+mapfile -t fmt_files < <(git ls-files | grep -E '\.(cpp|hpp)$' | grep -v '^third_party/')
 if [[ ${#fmt_files[@]} -gt 0 ]]; then
     clang-format --dry-run -Werror "${fmt_files[@]}"
 else
@@ -25,9 +23,10 @@ else
 fi
 
 step "4/7  clang-tidy"
-if [[ ${#fmt_files[@]} -gt 0 ]]; then
+mapfile -t tidy_files < <(git ls-files | grep -E '\.(cpp|hpp)$' | grep -E '^(client|server)/')
+if [[ ${#tidy_files[@]} -gt 0 ]]; then
     run-clang-tidy -p build/debug -quiet -warnings-as-errors='*' \
-        "${fmt_files[@]}" \
+        "${tidy_files[@]}" \
         | tee /tmp/tvshow-tidy.out
     if grep -E '(warning|error):' /tmp/tvshow-tidy.out >/dev/null; then
         echo "clang-tidy reported issues" >&2
