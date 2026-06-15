@@ -275,17 +275,19 @@ std::optional<CharGrid> CharGrid::from_string(std::string_view s) {
 
     CharGrid grid(cols, rows);
 
-    for (int r = 0; r < rows; ++r)
+    for (int r = 0; r < rows; ++r) {
         if (!parse_char_row(s, grid.cells_, cols, r))
             return std::nullopt;
+    }
 
     if (!s.starts_with("===\n"))
         return std::nullopt;
     s.remove_prefix(4);
 
-    for (int r = 0; r < rows; ++r)
+    for (int r = 0; r < rows; ++r) {
         if (!parse_attr_row(s, grid.cells_, cols, r))
             return std::nullopt;
+    }
 
     return grid;
 }

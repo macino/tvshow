@@ -37,7 +37,7 @@ TEST_CASE("Rect: empty when size is zero") {
 }
 
 TEST_CASE("Rect: contains") {
-    Rect r{{2, 3}, {4, 5}};
+    const Rect r{{2, 3}, {4, 5}};
     CHECK(r.contains({2, 3}));        // top-left corner
     CHECK(r.contains({5, 7}));        // bottom-right - 1
     CHECK_FALSE(r.contains({6, 7}));  // one past right
@@ -67,7 +67,7 @@ TEST_CASE("layout aliases: Viewport is Size") {
 
 TEST_CASE("layout aliases: CellRect is Rect") {
     static_assert(std::is_same_v<CellRect, Rect>);
-    CellRect cr{{0, 0}, {80, 24}};
+    const CellRect cr{{0, 0}, {80, 24}};
     CHECK_FALSE(cr.empty());
     CHECK(cr.contains({0, 0}));
     CHECK(cr.contains({79, 23}));

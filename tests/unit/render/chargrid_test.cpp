@@ -1,4 +1,5 @@
 #include "tvshow/render/chargrid.hpp"
+#include "tvshow/types.hpp"
 
 #include <doctest/doctest.h>
 
@@ -10,13 +11,13 @@ using tvshow::render::CharGrid;
 using tvshow::render::ColorAttr;
 
 TEST_CASE("CharGrid: construction") {
-    CharGrid g(10, 3);
+    const CharGrid g(10, 3);
     CHECK(g.cols() == 10);
     CHECK(g.rows() == 3);
 }
 
 TEST_CASE("CharGrid: default cell is space with default colors") {
-    CharGrid g(5, 2);
+    const CharGrid g(5, 2);
     const Cell& c = g.at({0, 0});
     CHECK(c.cp == U' ');
     CHECK(c.attr.fg == 0xFFFFFFU);
@@ -41,7 +42,7 @@ TEST_CASE("CharGrid: put and at round-trip") {
 
 TEST_CASE("CharGrid: other cells unchanged after put") {
     CharGrid g(3, 3);
-    ColorAttr attr;
+    const ColorAttr attr;
     g.put({1, 1}, U'A', attr);
     CHECK(g.at({0, 0}).cp == U' ');
     CHECK(g.at({2, 2}).cp == U' ');
@@ -50,11 +51,11 @@ TEST_CASE("CharGrid: other cells unchanged after put") {
 
 TEST_CASE("CharGrid: out-of-range put throws") {
     CharGrid g(4, 4);
-    ColorAttr attr;
-    Point left{-1, 0};
-    Point top{0, -1};
-    Point right{4, 0};
-    Point bottom{0, 4};
+    const ColorAttr attr;
+    const Point left{-1, 0};
+    const Point top{0, -1};
+    const Point right{4, 0};
+    const Point bottom{0, 4};
     CHECK_THROWS_AS(g.put(left, U'X', attr), std::out_of_range);
     CHECK_THROWS_AS(g.put(top, U'X', attr), std::out_of_range);
     CHECK_THROWS_AS(g.put(right, U'X', attr), std::out_of_range);
@@ -63,16 +64,16 @@ TEST_CASE("CharGrid: out-of-range put throws") {
 
 TEST_CASE("CharGrid: out-of-range at throws") {
     const CharGrid g(4, 4);
-    Point left{-1, 0};
-    Point right{4, 0};
-    Point bottom{0, 4};
+    const Point left{-1, 0};
+    const Point right{4, 0};
+    const Point bottom{0, 4};
     CHECK_THROWS_AS((void)g.at(left), std::out_of_range);
     CHECK_THROWS_AS((void)g.at(right), std::out_of_range);
     CHECK_THROWS_AS((void)g.at(bottom), std::out_of_range);
 }
 
 TEST_CASE("CharGrid: to_string / from_string round-trip (all-default)") {
-    CharGrid g(3, 2);
+    const CharGrid g(3, 2);
     auto s = g.to_string();
     auto g2 = CharGrid::from_string(s);
     REQUIRE(g2.has_value());
@@ -110,7 +111,7 @@ TEST_CASE("CharGrid: to_string / from_string round-trip (styled cells)") {
 }
 
 TEST_CASE("CharGrid: to_string header format") {
-    CharGrid g(10, 4);
+    const CharGrid g(10, 4);
     auto s = g.to_string();
     CHECK(s.starts_with("COLS=10 ROWS=4\n"));
 }

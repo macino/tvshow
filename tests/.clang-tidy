@@ -1,0 +1,9 @@
+---
+# Inherits root .clang-tidy but disables checks that produce false positives
+# from doctest macro expansion (TEST_CASE, CHECK, REQUIRE, etc.).
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-avoid-do-while,
+  -misc-use-anonymous-namespace,
+  -bugprone-unchecked-optional-access,
+  -readability-function-cognitive-complexity
