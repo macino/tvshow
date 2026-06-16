@@ -5,6 +5,8 @@
 #define Uses_TKeys
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/engine.hpp"
+#include "tvshow/layout/form.hpp"
+#include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
 #include "tvshow/paint/paint.hpp"
 #include "tvshow/render/chargrid.hpp"
@@ -18,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace tvshow::app {
 
@@ -26,13 +29,32 @@ BrowserView::BrowserView(const TRect& bounds, Page page) : TView(bounds), page_(
     options |= ofSelectable;
     eventMask |= evKeyDown;
     links_ = layout::collect_links(page_.box);
+    form_controls_ = layout::collect_form_controls(page_.box);
     history_.push_back(page_.url);
 }
 
+int BrowserView::total_focusables() const {
+    return static_cast<int>(links_.size() + form_controls_.size());
+}
+
+bool BrowserView::is_link_focused() const {
+    return focused_ >= 0 && focused_ < static_cast<int>(links_.size());
+}
+
+const layout::FormFocus* BrowserView::focused_fc() const {
+    const int fc_idx = focused_ - static_cast<int>(links_.size());
+    if (fc_idx >= 0 && fc_idx < static_cast<int>(form_controls_.size())) {
+        return &form_controls_[static_cast<size_t>(fc_idx)];
+    }
+    return nullptr;
+}
+
 render::CharGrid BrowserView::render_grid() const {
-    render::CharGrid grid = render::render(page_.box);
-    if (focused_ >= 0 && focused_ < static_cast<int>(links_.size())) {
-        render::apply_focus(grid, links_[focused_].spans);
+    render::CharGrid grid = render::render(page_.box, form_values_);
+    if (is_link_focused()) {
+        render::apply_focus(grid, links_[static_cast<size_t>(focused_)].spans);
+    } else if (const layout::FormFocus* fc = focused_fc()) {
+        render::apply_focus(grid, {fc->span});
     }
     return grid;
 }
@@ -56,7 +78,8 @@ void BrowserView::changeBounds(const TRect& bounds) {
 void BrowserView::relayout() {
     page_.box = layout::layout(*page_.tree, {size.x, size.y});
     links_ = layout::collect_links(page_.box);
-    if (focused_ >= static_cast<int>(links_.size())) {
+    form_controls_ = layout::collect_form_controls(page_.box);
+    if (focused_ >= total_focusables()) {
         focused_ = -1;
     }
 }
@@ -72,6 +95,8 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
     }
     page_ = std::move(*page);
     links_ = layout::collect_links(page_.box);
+    form_controls_ = layout::collect_form_controls(page_.box);
+    form_values_ = {};
     focused_ = -1;
     if (push_history) {
         history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_pos_) + 1,
@@ -83,10 +108,10 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
 }
 
 void BrowserView::focus_next(int direction) {
-    if (links_.empty()) {
+    const int n = total_focusables();
+    if (n == 0) {
         return;
     }
-    const int n = static_cast<int>(links_.size());
     if (focused_ < 0) {
         focused_ = direction > 0 ? 0 : n - 1;
     } else {
@@ -95,13 +120,47 @@ void BrowserView::focus_next(int direction) {
     drawView();
 }
 
+void BrowserView::handle_form_input(unsigned keyCode) {
+    const layout::FormFocus* fc = focused_fc();
+    if (fc == nullptr) {
+        return;
+    }
+    const unsigned char_code = keyCode & 0xFFU;
+    if (fc->kind == layout::FormControlKind::Text ||
+        fc->kind == layout::FormControlKind::Password) {
+        auto& val = form_values_.text[fc->node];
+        if (char_code == 0x08U) {
+            if (!val.empty()) {
+                val.pop_back();
+            }
+        } else {
+            val += static_cast<char>(char_code);
+        }
+        drawView();
+    } else if (char_code == 0x20U) {
+        // Space toggles checkbox / selects radio.
+        if (fc->kind == layout::FormControlKind::Checkbox) {
+            auto it = form_values_.checked.find(fc->node);
+            const bool was = (it != form_values_.checked.end())
+                                 ? it->second
+                                 : (fc->node->attr("checked").data() != nullptr);
+            form_values_.checked[fc->node] = !was;
+            drawView();
+        } else if (fc->kind == layout::FormControlKind::Radio) {
+            form_values_.checked[fc->node] = true;
+            drawView();
+        }
+    }
+}
+
 void BrowserView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
     if (event.what != evKeyDown) {
         return;
     }
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access) — TEvent is a tvision union.
-    switch (event.keyDown.keyCode) {
+    const unsigned keyCode = event.keyDown.keyCode;
+    switch (keyCode) {
     case kbTab:
         focus_next(1);
         clearEvent(event);
@@ -111,8 +170,9 @@ void BrowserView::handleEvent(TEvent& event) {
         clearEvent(event);
         break;
     case kbEnter:
-        if (focused_ >= 0 && focused_ < static_cast<int>(links_.size())) {
-            navigate(util::resolve_url(page_.url, links_[focused_].href), true);
+        if (is_link_focused()) {
+            navigate(util::resolve_url(page_.url, links_[static_cast<size_t>(focused_)].href),
+                     true);
         }
         clearEvent(event);
         break;
@@ -130,8 +190,16 @@ void BrowserView::handleEvent(TEvent& event) {
         }
         clearEvent(event);
         break;
-    default:
+    default: {
+        const unsigned char_code = keyCode & 0xFFU;
+        const bool is_backspace = char_code == 0x08U;
+        const bool is_printable = char_code >= 0x20U && char_code < 0x7FU;
+        if (focused_fc() != nullptr && (is_backspace || is_printable)) {
+            handle_form_input(keyCode);
+            clearEvent(event);
+        }
         break;
+    }
     }
 }
 

@@ -10,6 +10,7 @@ add_executable(tvshow-tests
     layout/engine_test.cpp
     layout/inline_text_test.cpp
     layout/links_test.cpp
+    layout/form_test.cpp
     render/render_test.cpp
     paint/paint_test.cpp
 )

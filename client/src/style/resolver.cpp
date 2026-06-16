@@ -201,6 +201,11 @@ i { display: inline; font-style: italic; }
 em { display: inline; font-style: italic; }
 pre { display: block; white-space: pre; }
 code { display: inline; white-space: pre; }
+form { display: block; }
+input { display: inline-block; }
+button { display: inline-block; }
+textarea { display: block; }
+select { display: inline-block; }
 )css";
 
 }  // namespace

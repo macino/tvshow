@@ -2,8 +2,10 @@
 
 #define Uses_TView
 #include "tvshow/app/page.hpp"
+#include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
 #include "tvshow/render/chargrid.hpp"
+#include "tvshow/render/render.hpp"
 
 #include <tvision/tv.h>
 
@@ -14,11 +16,9 @@
 
 namespace tvshow::app {
 
-// Hosts one loaded Page: renders it, tracks the focused link (SPEC §12.1
-// Tab/Shift-Tab cycling), and resolves/navigates Enter-on-link, maintaining
-// a simple per-window history stack for Alt-Left/Alt-Right. Still
-// file://-only (HTTP fetch lands in M12) and still a plain TView (the full
-// TBrowserWindow : TWindow refactor in SPEC §11.3 lands in M16).
+// Hosts one loaded Page: renders it, tracks the focused link or form control
+// (SPEC §12.1 / §13.2 Tab/Shift-Tab cycling), and resolves/navigates
+// Enter-on-link, maintaining a simple per-window history stack.
 class BrowserView : public TView {
 public:
     BrowserView(const TRect& bounds, Page page);
@@ -35,15 +35,22 @@ public:
 private:
     Page page_;
     std::vector<layout::Link> links_;
-    int focused_ = -1;  // index into links_, or -1 if nothing focused
+    std::vector<layout::FormFocus> form_controls_;
+    render::FormValues form_values_;
+    int focused_ = -1;  // index into links_ + form_controls_ (0..n-1), or -1
 
     std::vector<std::string> history_;
     size_t history_pos_ = 0;
+
+    [[nodiscard]] int total_focusables() const;
+    [[nodiscard]] bool is_link_focused() const;
+    [[nodiscard]] const layout::FormFocus* focused_fc() const;
 
     void relayout();
     [[nodiscard]] render::CharGrid render_grid() const;
     void navigate(const std::string& url, bool push_history);
     void focus_next(int direction);
+    void handle_form_input(unsigned keyCode);
 };
 
 }  // namespace tvshow::app

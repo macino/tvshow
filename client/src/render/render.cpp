@@ -1,6 +1,8 @@
 #include "tvshow/render/render.hpp"
 
+#include "tvshow/dom/node.hpp"
 #include "tvshow/layout/box.hpp"
+#include "tvshow/layout/form.hpp"
 #include "tvshow/layout/inline_text.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/render/chargrid.hpp"
@@ -9,7 +11,9 @@
 #include "tvshow/types.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace tvshow::render {
@@ -140,29 +144,185 @@ void paint_text(CharGrid& grid, const layout::CellRect& content_box, const style
     }
 }
 
+// ── form controls ─────────────────────────────────────────────────────────────
+
+// Bounds-checked cell writer with an absolute origin baked in.
+struct GridPen {
+    CharGrid* grid;
+    int x0;
+    int y0;
+
+    void put(Point rel, char32_t cp) const {
+        const Point abs{x0 + rel.col, y0 + rel.row};
+        if (abs.col >= 0 && abs.col < grid->cols() && abs.row >= 0 && abs.row < grid->rows()) {
+            grid->put(abs, cp, grid->at(abs).attr);
+        }
+    }
+};
+
+// Boolean HTML attribute presence: attr() returns null data_ptr when absent.
+bool has_bool_attr(const dom::Node& node, std::string_view name) noexcept {
+    return node.attr(name).data() != nullptr;
+}
+
+std::string_view resolve_text_value(const dom::Node& node, const FormValues& fv) noexcept {
+    const auto it = fv.text.find(&node);
+    return (it != fv.text.end()) ? std::string_view(it->second) : node.attr("value");
+}
+
+bool resolve_checked(const dom::Node& node, const FormValues& fv) noexcept {
+    const auto it = fv.checked.find(&node);
+    return (it != fv.checked.end()) ? it->second : has_bool_attr(node, "checked");
+}
+
+void paint_text_field(const GridPen& pen, int w, const dom::Node& node, const FormValues& fv,
+                      bool password) {
+    if (w < 2) {
+        return;
+    }
+    pen.put({0, 0}, U'[');
+    pen.put({w - 1, 0}, U']');
+    const std::string_view val = resolve_text_value(node, fv);
+    int col = 1;
+    for (size_t i = 0; i < val.size() && col < w - 1; ++col, ++i) {
+        pen.put({col, 0},
+                password ? U'*' : static_cast<char32_t>(static_cast<unsigned char>(val[i])));
+    }
+    for (; col < w - 1; ++col) {
+        pen.put({col, 0}, U' ');
+    }
+}
+
+void paint_checkbox(const GridPen& pen, const dom::Node& node, const FormValues& fv) {
+    pen.put({0, 0}, U'[');
+    pen.put({1, 0}, resolve_checked(node, fv) ? U'x' : U' ');
+    pen.put({2, 0}, U']');
+}
+
+void paint_radio(const GridPen& pen, const dom::Node& node, const FormValues& fv) {
+    pen.put({0, 0}, U'(');
+    pen.put({1, 0}, resolve_checked(node, fv) ? U'•' : U' ');  // U+2022 BULLET •
+    pen.put({2, 0}, U')');
+}
+
+void paint_submit(const GridPen& pen, int w, const dom::Node& node) {
+    if (w < 2) {
+        return;
+    }
+    const std::string_view dom_label = node.attr("value");
+    const std::string_view label = dom_label.empty() ? std::string_view("Submit") : dom_label;
+    pen.put({0, 0}, U'[');
+    pen.put({1, 0}, U' ');
+    int col = 2;
+    for (size_t i = 0; i < label.size() && col < w - 1; ++col, ++i) {
+        pen.put({col, 0}, static_cast<char32_t>(static_cast<unsigned char>(label[i])));
+    }
+    pen.put({w - 1, 0}, U']');
+}
+
+void paint_textarea(const GridPen& pen, int w, int h) {
+    if (w < 2 || h < 2) {
+        return;
+    }
+    pen.put({0, 0}, U'┌');
+    for (int c = 1; c < w - 1; ++c) {
+        pen.put({c, 0}, U'─');
+    }
+    pen.put({w - 1, 0}, U'┐');
+    for (int r = 1; r < h - 1; ++r) {
+        pen.put({0, r}, U'│');
+        for (int c = 1; c < w - 1; ++c) {
+            pen.put({c, r}, U' ');
+        }
+        pen.put({w - 1, r}, U'│');
+    }
+    pen.put({0, h - 1}, U'└');
+    for (int c = 1; c < w - 1; ++c) {
+        pen.put({c, h - 1}, U'─');
+    }
+    pen.put({w - 1, h - 1}, U'┘');
+}
+
+void paint_select(const GridPen& pen, int w) {
+    if (w < 3) {
+        return;
+    }
+    pen.put({0, 0}, U'[');
+    for (int c = 1; c < w - 2; ++c) {
+        pen.put({c, 0}, U' ');
+    }
+    pen.put({w - 2, 0}, U'▾');  // U+25BE BLACK DOWN-POINTING SMALL TRIANGLE ▾
+    pen.put({w - 1, 0}, U']');
+}
+
+void paint_form_control(CharGrid& grid, const layout::Box& box, const dom::Node& node,
+                        const FormValues& fv) {
+    const layout::FormControlKind kind = layout::form_control_kind(node);
+    if (kind == layout::FormControlKind::None || kind == layout::FormControlKind::Hidden) {
+        return;
+    }
+    const GridPen pen{&grid, box.border_box.origin.col, box.border_box.origin.row};
+    const int w = box.border_box.size.cols;
+    const int h = box.border_box.size.rows;
+    switch (kind) {
+    case layout::FormControlKind::Text:
+        paint_text_field(pen, w, node, fv, false);
+        break;
+    case layout::FormControlKind::Password:
+        paint_text_field(pen, w, node, fv, true);
+        break;
+    case layout::FormControlKind::Checkbox:
+        paint_checkbox(pen, node, fv);
+        break;
+    case layout::FormControlKind::Radio:
+        paint_radio(pen, node, fv);
+        break;
+    case layout::FormControlKind::Submit:
+        paint_submit(pen, w, node);
+        break;
+    case layout::FormControlKind::Textarea:
+        paint_textarea(pen, w, h);
+        break;
+    case layout::FormControlKind::Select:
+        paint_select(pen, w);
+        break;
+    case layout::FormControlKind::None:
+    case layout::FormControlKind::Hidden:
+        break;
+    }
+}
+
 // ── box tree walk ────────────────────────────────────────────────────────────
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void paint_box(CharGrid& grid, const layout::Box& box) {
+void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv) {
     if (box.node == nullptr) {
         return;
     }
     const auto& st = box.node->style;
     if (st.visibility != style::Visibility::Hidden) {
         paint_background(grid, box.border_box, st.background);
+        if (box.node->node != nullptr) {
+            const layout::FormControlKind kind = layout::form_control_kind(*box.node->node);
+            if (kind != layout::FormControlKind::None && kind != layout::FormControlKind::Hidden) {
+                paint_form_control(grid, box, *box.node->node, fv);
+                // Form controls are leaf boxes — no children or text to recurse.
+                return;
+            }
+        }
         paint_border(grid, box.border_box, st.border);
         paint_text(grid, box.content_box, *box.node);
     }
     for (const auto& child : box.children) {
-        paint_box(grid, child);
+        paint_box(grid, child, fv);
     }
 }
 
 }  // namespace
 
-CharGrid render(const layout::Box& root) {
+CharGrid render(const layout::Box& root, const FormValues& fv) {
     CharGrid grid(std::max(root.border_box.size.cols, 1), std::max(root.border_box.size.rows, 1));
-    paint_box(grid, root);
+    paint_box(grid, root, fv);
     return grid;
 }
 

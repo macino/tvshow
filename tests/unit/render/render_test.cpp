@@ -268,3 +268,78 @@ TEST_CASE("apply_focus: clips spans that extend past the grid bounds") {
     tvshow::render::apply_focus(grid, {{{8, 4}, {20, 20}}});
     CHECK(grid.at({9, 4}).attr.fg != 0xFFFFFFU);
 }
+
+// ── form controls ─────────────────────────────────────────────────────────────
+
+TEST_CASE("render: text input draws brackets and initial value") {
+    auto [doc, tree] = make_tree(R"(<body><input type="text" value="hi"></body>)");
+    const Box box = layout(tree, {30, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({1, 0}).cp == U'h');
+    CHECK(grid.at({2, 0}).cp == U'i');
+    CHECK(grid.at({21, 0}).cp == U']');
+}
+
+TEST_CASE("render: text input with empty value draws blank field") {
+    auto [doc, tree] = make_tree(R"(<body><input type="text"></body>)");
+    const Box box = layout(tree, {30, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({1, 0}).cp == U' ');
+    CHECK(grid.at({21, 0}).cp == U']');
+}
+
+TEST_CASE("render: checkbox unchecked draws [ ]") {
+    auto [doc, tree] = make_tree(R"(<body><input type="checkbox"></body>)");
+    const Box box = layout(tree, {10, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({1, 0}).cp == U' ');
+    CHECK(grid.at({2, 0}).cp == U']');
+}
+
+TEST_CASE("render: checkbox checked draws [x]") {
+    auto [doc, tree] = make_tree(R"(<body><input type="checkbox" checked></body>)");
+    const Box box = layout(tree, {10, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({1, 0}).cp == U'x');
+    CHECK(grid.at({2, 0}).cp == U']');
+}
+
+TEST_CASE("render: radio button draws ( ) / (*)") {
+    {
+        auto [doc, tree] = make_tree(R"(<body><input type="radio"></body>)");
+        const Box box = layout(tree, {10, 3});
+        const CharGrid grid = tvshow::render::render(box);
+        CHECK(grid.at({0, 0}).cp == U'(');
+        CHECK(grid.at({1, 0}).cp == U' ');
+        CHECK(grid.at({2, 0}).cp == U')');
+    }
+    {
+        auto [doc, tree] = make_tree(R"(<body><input type="radio" checked></body>)");
+        const Box box = layout(tree, {10, 3});
+        const CharGrid grid = tvshow::render::render(box);
+        CHECK(grid.at({1, 0}).cp == U'•');  // •
+    }
+}
+
+TEST_CASE("render: submit button draws [ Label ]") {
+    auto [doc, tree] = make_tree(R"(<body><input type="submit" value="Go"></body>)");
+    const Box box = layout(tree, {20, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({2, 0}).cp == U'G');
+    CHECK(grid.at({3, 0}).cp == U'o');
+    CHECK(grid.at({4, 0}).cp == U']');
+}
+
+TEST_CASE("render: hidden input is not rendered") {
+    auto [doc, tree] = make_tree(R"(<body>x<input type="hidden" value="secret">y</body>)");
+    const Box box = layout(tree, {20, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    // hidden input occupies no space; 'x' and 'y' should be at cols 0 and 1
+    CHECK(grid.at({0, 0}).cp == U'x');
+    CHECK(grid.at({1, 0}).cp == U'y');
+}

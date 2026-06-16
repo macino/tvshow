@@ -2,6 +2,7 @@
 
 #include "tvshow/dom/node.hpp"
 #include "tvshow/layout/box.hpp"
+#include "tvshow/layout/form.hpp"
 #include "tvshow/layout/inline_text.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/style/tree.hpp"
@@ -130,6 +131,23 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
 
     for (const auto& child : sn.children) {
         if (child.node == nullptr || child.node->kind != dom::NodeKind::Element) {
+            continue;
+        }
+        // Form controls: leaf boxes with fixed sizes, no recursive layout.
+        const FormControlKind fck = form_control_kind(*child.node);
+        if (fck == FormControlKind::Hidden) {
+            continue;
+        }
+        if (fck != FormControlKind::None) {
+            const auto [cols, rows] = form_control_size(*child.node);
+            const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
+            y += cmar.top;
+            Box fc_box;
+            fc_box.node = &child;
+            fc_box.border_box = {{content_origin.col, y}, {cols, rows}};
+            fc_box.content_box = fc_box.border_box;
+            y += rows + cmar.bottom;
+            children.push_back(std::move(fc_box));
             continue;
         }
         const auto disp = child.style.display;
