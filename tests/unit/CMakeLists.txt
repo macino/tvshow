@@ -9,11 +9,14 @@ add_executable(tvshow-tests
     style/resolver_test.cpp
     layout/engine_test.cpp
     render/render_test.cpp
+    paint/paint_test.cpp
 )
 
 target_link_libraries(tvshow-tests
     PRIVATE
         tvshow_core
+        tvshow_paint
+        tvision
         tvshow_warnings
         doctest::doctest
 )
