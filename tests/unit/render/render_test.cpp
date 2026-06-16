@@ -86,11 +86,69 @@ TEST_CASE("render: background-color fills the border box") {
 // ── border ───────────────────────────────────────────────────────────────────
 
 TEST_CASE("render: border-style:solid draws box-drawing corners") {
-    auto [doc, tree] = make_tree("<body><div></div></body>", "div { border-style: solid; }");
+    auto [doc, tree] =
+        make_tree("<body><div></div></body>", "div { border-style: solid; height: 3em; }");
     const Box box = layout(tree, {10, 5});
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).cp == U'┌');
     CHECK(grid.at({9, 0}).cp == U'┐');
+    CHECK(grid.at({0, 4}).cp == U'└');
+    CHECK(grid.at({9, 4}).cp == U'┘');
+    CHECK(grid.at({1, 0}).cp == U'─');
+    CHECK(grid.at({0, 1}).cp == U'│');
+}
+
+TEST_CASE("render: border-style:double draws double-line glyphs") {
+    // height:3em makes the border box (3 content rows + 2 border rows) span
+    // the full 5-row viewport, so the bottom border lands on row 4.
+    auto [doc, tree] =
+        make_tree("<body><div></div></body>", "div { border-style: double; height: 3em; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'╔');
+    CHECK(grid.at({9, 0}).cp == U'╗');
+    CHECK(grid.at({0, 4}).cp == U'╚');
+    CHECK(grid.at({9, 4}).cp == U'╝');
+    CHECK(grid.at({1, 0}).cp == U'═');
+    CHECK(grid.at({0, 1}).cp == U'║');
+}
+
+TEST_CASE("render: border-style:dashed draws solid corners with dashed edges") {
+    auto [doc, tree] =
+        make_tree("<body><div></div></body>", "div { border-style: dashed; height: 3em; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'┌');
+    CHECK(grid.at({9, 0}).cp == U'┐');
+    CHECK(grid.at({1, 0}).cp == U'╌');
+    CHECK(grid.at({0, 1}).cp == U'╎');
+}
+
+TEST_CASE("render: border-style:dotted falls back to solid") {
+    auto [doc, tree] = make_tree("<body><div></div></body>", "div { border-style: dotted; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'┌');
+    CHECK(grid.at({1, 0}).cp == U'─');
+}
+
+TEST_CASE("render: border-width:0 collapses the border (no cells reserved)") {
+    auto [doc, tree] =
+        make_tree("<body><div>x</div></body>", "div { border-style: solid; border-width: 0; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    // With the border collapsed, the content starts at the border box's
+    // origin instead of being inset by one cell for the border glyphs.
+    CHECK(grid.at({0, 0}).cp == U'x');
+}
+
+TEST_CASE("render: border-color tints the border glyphs") {
+    auto [doc, tree] = make_tree("<body><div></div></body>",
+                                 "div { border-style: solid; border-color: #00ff00; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).attr.fg == 0x00FF00U);
+    CHECK(grid.at({1, 0}).attr.fg == 0x00FF00U);
 }
 
 // ── text ─────────────────────────────────────────────────────────────────────

@@ -286,3 +286,47 @@ TEST_CASE("style::resolve: color inherits from parent") {
     CHECK_FALSE(p->style.color.none);
     CHECK(p->style.color.r == 255);
 }
+
+// ── borders (SPEC §9) ────────────────────────────────────────────────────────
+
+TEST_CASE("style::resolve: border-style solid is kept by default") {
+    const auto doc = make_doc("<body><div></div></body>");
+    const auto sheet = tvshow::css::parse("div { border-style: solid; }");
+    REQUIRE(sheet.has_value());
+    const std::vector<Stylesheet> sheets{*sheet};
+    const auto tree = resolve(doc, sheets);
+    REQUIRE(tree.has_value());
+    const auto* div = find_tag(*tree, "div");
+    REQUIRE(div != nullptr);
+    for (const auto& side : div->style.border) {
+        CHECK(side.style == tvshow::style::BorderStyle::Solid);
+    }
+}
+
+TEST_CASE("style::resolve: border-width 0 collapses border-style to none") {
+    const auto doc = make_doc("<body><div></div></body>");
+    const auto sheet = tvshow::css::parse("div { border-style: solid; border-width: 0; }");
+    REQUIRE(sheet.has_value());
+    const std::vector<Stylesheet> sheets{*sheet};
+    const auto tree = resolve(doc, sheets);
+    REQUIRE(tree.has_value());
+    const auto* div = find_tag(*tree, "div");
+    REQUIRE(div != nullptr);
+    for (const auto& side : div->style.border) {
+        CHECK(side.style == tvshow::style::BorderStyle::None);
+    }
+}
+
+TEST_CASE("style::resolve: border-color is applied per side") {
+    const auto doc = make_doc("<body><div></div></body>");
+    const auto sheet = tvshow::css::parse("div { border-style: solid; border-color: #00ff00; }");
+    REQUIRE(sheet.has_value());
+    const std::vector<Stylesheet> sheets{*sheet};
+    const auto tree = resolve(doc, sheets);
+    REQUIRE(tree.has_value());
+    const auto* div = find_tag(*tree, "div");
+    REQUIRE(div != nullptr);
+    for (const auto& side : div->style.border) {
+        CHECK(side.color.g == 255);
+    }
+}

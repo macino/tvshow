@@ -613,6 +613,15 @@ ComputedStyle compute_style(const dom::Node& node, const ComputedStyle& parent_s
             apply_declaration(style, *m.decl);
         }
     }
+
+    // SPEC §9: border width is binary in a character grid — any explicit
+    // zero width collapses the border to `none` regardless of border-style.
+    for (auto& side : style.border) {
+        if (!side.width.is_auto && side.width.value == 0) {
+            side.style = BorderStyle::None;
+        }
+    }
+
     return style;
 }
 
