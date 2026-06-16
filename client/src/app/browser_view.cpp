@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace tvshow::app {
@@ -58,6 +59,10 @@ void BrowserView::relayout() {
     if (focused_ >= static_cast<int>(links_.size())) {
         focused_ = -1;
     }
+}
+
+void BrowserView::navigate_to(std::string_view url) {
+    navigate(std::string(url), true);
 }
 
 void BrowserView::navigate(const std::string& url, bool push_history) {

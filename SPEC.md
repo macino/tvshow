@@ -284,7 +284,7 @@ Viewport = inner content area of the active `TBrowserWindow` (after subtracting 
 `TBrowserWindow : TWindow` is one tab. Per-window state: current URL, document, history stack, scroll offset, focused element id. Multiple `TBrowserWindow` instances live in the desktop as MDI children.
 
 ### 11.4 Address Bar
-v1: modal `TInputDialog` opened via Ctrl-L. (Open Q-1: persistent top bar later.)
+Default: modal `TInputDialog` opened via Ctrl-L. `--address-bar=persistent` switches to a permanent one-row `TInputLine` at the top of each browser window, shrinking the content viewport by one row. Both modes accept a URL, validate it via `Url::parse`, and trigger navigation. (Q-1 resolved.)
 
 ### 11.5 Status Line
 Shows: current URL on hover, focused link target, loading/error state, key hints (`F5 Reload  Alt-← Back  Ctrl-L URL`).
@@ -400,7 +400,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 
 | # | Topic | Need |
 |---|-------|------|
-| Q-1 | Address bar UX | Modal `Ctrl-L` v1 vs persistent top line at the cost of one row of viewport |
+| Q-1 | Address bar UX | **Resolved**: modal default; `--address-bar=persistent` opt-in for permanent top bar. |
 | Q-2 | Bookmarks / homepage / start page | Format (file? config? UI menu) |
 | Q-3 | Resize behavior for flex layouts when viewport too narrow | Truncate vs horizontal scrollbar vs reflow |
 | Q-4 | UA default stylesheet — how opinionated | Mimic browser defaults vs minimal |

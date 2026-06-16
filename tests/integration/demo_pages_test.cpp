@@ -57,3 +57,20 @@ TEST_CASE("integration: https request fails fast with an internal error page") {
     REQUIRE(page.has_value());
     CHECK(page->doc.title == "Network Error");
 }
+
+// M13: address bar validates URL before navigating — mirrors what the
+// Ctrl-L handler does (Url::parse gate, then load_page).
+TEST_CASE("integration: address bar accepts valid URL and navigates") {
+    const ServerFixture server;
+    const std::string typed = server.base_url() + "/pages/typography.html";
+
+    // Simulate the dialog validation step.
+    REQUIRE(tvshow::util::Url::parse(typed).has_value());
+    CHECK_FALSE(tvshow::util::Url::parse("not-a-url").has_value());
+    CHECK_FALSE(tvshow::util::Url::parse("").has_value());
+
+    // Simulate navigation after validation.
+    const auto page = load_page(typed, Viewport{80, 24});
+    REQUIRE(page.has_value());
+    CHECK(page->doc.title == "Typography");
+}

@@ -94,6 +94,7 @@ add_executable(tvshow
     src/main.cpp
     src/app/application.cpp
     src/app/browser_view.cpp
+    src/app/browser_window.cpp
 )
 
 target_include_directories(tvshow

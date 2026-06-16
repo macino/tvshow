@@ -7,7 +7,9 @@
 
 #include <tvision/tv.h>
 
+#include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace tvshow::app {
@@ -24,6 +26,11 @@ public:
     void draw() override;
     void handleEvent(TEvent& event) override;
     void changeBounds(const TRect& bounds) override;
+
+    // Navigate to url, pushing onto history. No-op on load failure.
+    void navigate_to(std::string_view url);
+
+    [[nodiscard]] const Page& page() const { return page_; }
 
 private:
     Page page_;
