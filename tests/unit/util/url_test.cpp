@@ -5,6 +5,7 @@
 using tvshow::util::percent_decode;
 using tvshow::util::percent_encode;
 using tvshow::util::resolve_file_url;
+using tvshow::util::resolve_url;
 using tvshow::util::Url;
 
 TEST_CASE("Url::parse: basic HTTP URL") {
@@ -198,4 +199,16 @@ TEST_CASE("resolve_file_url: empty href returns the base unchanged") {
 
 TEST_CASE("resolve_file_url: relative href climbs into a sibling directory") {
     CHECK(resolve_file_url("file:///a/b/index.html", "../c/d.html") == "file:///a/c/d.html");
+}
+
+TEST_CASE("resolve_url: dispatches to resolve_file_url for file:// bases") {
+    CHECK(resolve_url("file:///a/b/index.html", "other.html") == "file:///a/b/other.html");
+}
+
+TEST_CASE("resolve_url: dispatches to Url::resolve for http:// bases") {
+    CHECK(resolve_url("http://example.com/a/b", "c") == "http://example.com/a/c");
+}
+
+TEST_CASE("resolve_url: dispatches to Url::resolve for https:// bases") {
+    CHECK(resolve_url("https://example.com/a/b", "/c") == "https://example.com/c");
 }

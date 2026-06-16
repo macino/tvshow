@@ -107,7 +107,7 @@ void BrowserView::handleEvent(TEvent& event) {
         break;
     case kbEnter:
         if (focused_ >= 0 && focused_ < static_cast<int>(links_.size())) {
-            navigate(util::resolve_file_url(page_.url, links_[focused_].href), true);
+            navigate(util::resolve_url(page_.url, links_[focused_].href), true);
         }
         clearEvent(event);
         break;

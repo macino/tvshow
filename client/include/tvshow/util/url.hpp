@@ -59,4 +59,9 @@ private:
 // transport is local files (HTTP lands in M12).
 [[nodiscard]] std::string resolve_file_url(std::string_view base, std::string_view href);
 
+// Resolves a possibly-relative href against `base`, dispatching on base's
+// scheme: "file://" uses resolve_file_url, "http(s)://" uses Url::resolve.
+// Returns `base` unchanged if base's scheme is unrecognized.
+[[nodiscard]] std::string resolve_url(std::string_view base, std::string_view href);
+
 }  // namespace tvshow::util

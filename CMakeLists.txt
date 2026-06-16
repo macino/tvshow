@@ -11,6 +11,9 @@ include(Tvision)
 include(Gumbo)
 include(Katana)
 include(Doctest)
+include(HttpLib)
+
+find_package(Threads REQUIRED)
 
 enable_testing()
 

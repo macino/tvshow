@@ -1,10 +1,105 @@
-// tvshow-srv — demo HTTP server (placeholder).
-// Real implementation lands in M12 (HTTP fetch + demo server). Until then this
-// binary exists only so the CMake target structure mirrors SPEC §4 from M0.
+// tvshow-srv — demo HTTP server (SPEC §16).
+// Serves the static sample pages under pages/ plus a couple of dynamic
+// routes (/echo, /pages/errors/404) used by integration tests.
+
+#include <httplib.h>
 
 #include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <ios>
+#include <sstream>
+#include <string>
+#include <string_view>
 
-auto main() -> int {
-    std::puts("tvshow-srv: not implemented yet (lands in M12)");
+namespace {
+
+std::string read_file(const std::string& path) {
+    const std::ifstream in(path, std::ios::binary);
+    std::ostringstream contents;
+    contents << in.rdbuf();
+    return contents.str();
+}
+
+void serve_page(httplib::Response& res, const std::string& path) {
+    const std::string body = read_file(path);
+    if (body.empty()) {
+        res.status = 404;
+        res.set_content("<!doctype html><html><body><h1>404 Not Found</h1></body></html>",
+                        "text/html");
+        return;
+    }
+    res.set_content(body, "text/html");
+}
+
+std::string html_escape(std::string_view s) {
+    std::string out;
+    out.reserve(s.size());
+    for (const char c : s) {
+        switch (c) {
+        case '&':
+            out += "&amp;";
+            break;
+        case '<':
+            out += "&lt;";
+            break;
+        case '>':
+            out += "&gt;";
+            break;
+        default:
+            out += c;
+        }
+    }
+    return out;
+}
+
+std::string render_echo(const httplib::Request& req) {
+    std::ostringstream html;
+    html << "<!doctype html><html><head><title>Echo</title></head><body>";
+    html << "<h1>Submitted form</h1><ul>";
+    for (const auto& [key, value] : req.params) {
+        html << "<li>" << html_escape(key) << " = " << html_escape(value) << "</li>";
+    }
+    html << "</ul></body></html>";
+    return html.str();
+}
+
+}  // namespace
+
+auto main(int argc, char** argv) -> int {
+    int port = 8080;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--port" && i + 1 < argc) {
+            port = std::atoi(argv[++i]);
+        }
+    }
+
+    const std::string pages_dir = TVSHOW_PAGES_DIR;
+    httplib::Server svr;
+
+    svr.Get("/", [pages_dir](const httplib::Request&, httplib::Response& res) {
+        serve_page(res, pages_dir + "/index.html");
+    });
+
+    svr.Get(R"(/pages/(\w+)\.html)",
+            [pages_dir](const httplib::Request& req, httplib::Response& res) {
+                serve_page(res, pages_dir + "/" + req.matches[1].str() + ".html");
+            });
+
+    svr.Get("/pages/errors/404", [](const httplib::Request&, httplib::Response& res) {
+        res.status = 404;
+        res.set_content("<!doctype html><html><body><h1>404 Not Found</h1>"
+                        "<p>This page intentionally does not exist.</p></body></html>",
+                        "text/html");
+    });
+
+    svr.Post("/echo", [](const httplib::Request& req, httplib::Response& res) {
+        res.set_content(render_echo(req), "text/html");
+    });
+
+    std::printf("tvshow-srv: listening on http://0.0.0.0:%d/ (pages: %s)\n", port,
+                pages_dir.c_str());
+    svr.listen("0.0.0.0", port);
     return 0;
 }

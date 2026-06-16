@@ -9,7 +9,14 @@ target_include_directories(tvshow-srv
 
 target_link_libraries(tvshow-srv
   PRIVATE
+    httplib::httplib
+    Threads::Threads
     tvshow_warnings
+)
+
+target_compile_definitions(tvshow-srv
+  PRIVATE
+    TVSHOW_PAGES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/pages"
 )
 
 set_target_properties(tvshow-srv PROPERTIES

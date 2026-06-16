@@ -67,6 +67,7 @@ add_executable(tvshow
     src/app/application.cpp
     src/app/browser_view.cpp
     src/app/page.cpp
+    src/net/cpp_http_client.cpp
 )
 
 target_include_directories(tvshow
@@ -79,6 +80,8 @@ target_link_libraries(tvshow
         tvshow_core
         tvshow_paint
         tvision
+        httplib::httplib
+        Threads::Threads
         tvshow_warnings
 )
 

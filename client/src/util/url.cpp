@@ -272,4 +272,16 @@ std::string resolve_file_url(std::string_view base, std::string_view href) {
     return std::string(k_prefix) + remove_dot_segments(std::string(dir) + std::string(href));
 }
 
+std::string resolve_url(std::string_view base, std::string_view href) {
+    if (base.starts_with("file://")) {
+        return resolve_file_url(base, href);
+    }
+    if (const auto base_url = Url::parse(base)) {
+        if (const auto resolved = base_url->resolve(href)) {
+            return resolved->to_string();
+        }
+    }
+    return std::string(base);
+}
+
 }  // namespace tvshow::util

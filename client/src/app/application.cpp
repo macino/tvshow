@@ -35,7 +35,7 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
                                *new TMenuItem("E~x~it", cmQuit, cmQuit, hcNoContext, "Alt-X"));
 }
 
-void Application::open_file_url(std::string_view url) {
+void Application::open_url(std::string_view url) {
     const layout::Viewport vp{std::max(1, deskTop->size.x), std::max(1, deskTop->size.y)};
     auto page = load_page(url, vp);
     if (!page) {

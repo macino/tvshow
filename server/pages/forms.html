@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<title>Forms</title>
+</head>
+<body>
+<h1>Forms</h1>
+<form action="/echo" method="post">
+<label>Name <input type="text" name="name" value=""></label>
+<label>Password <input type="password" name="password"></label>
+<label>Subscribe <input type="checkbox" name="subscribe" value="yes"></label>
+<label>Plan A <input type="radio" name="plan" value="a"></label>
+<label>Plan B <input type="radio" name="plan" value="b"></label>
+<label>Comments <textarea name="comments"></textarea></label>
+<label>Country
+<select name="country">
+<option value="cz">Czechia</option>
+<option value="sk">Slovakia</option>
+</select>
+</label>
+<input type="hidden" name="source" value="forms-demo">
+<button type="submit">Submit</button>
+<input type="submit" value="Also submit">
+</form>
+</body>
+</html>

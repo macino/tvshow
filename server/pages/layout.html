@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<title>Layout</title>
+<style>
+.box { border: 1px solid; padding: 1; margin: 1; }
+.row { display: flex; flex-direction: row; gap: 1; }
+.col { display: flex; flex-direction: column; gap: 1; }
+.grow { flex-grow: 1; }
+</style>
+</head>
+<body>
+<h1>Layout</h1>
+<div class="box">A block box with a border and padding.</div>
+<div class="row">
+<div class="box grow">Flex item one (grows)</div>
+<div class="box">Flex item two</div>
+</div>
+<div class="col">
+<div class="box">Stacked item A</div>
+<div class="box">Stacked item B</div>
+</div>
+<ul>
+<li>List item one</li>
+<li>List item two</li>
+<li>List item three</li>
+</ul>
+</body>
+</html>
