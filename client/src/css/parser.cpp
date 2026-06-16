@@ -40,9 +40,18 @@ double kval_double(const KatanaValue& v) noexcept {
                ? static_cast<double>(v.iValue)  // NOLINT(cppcoreguidelines-pro-type-union-access)
                : v.fValue;                      // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
+const KatanaValueFunction* kval_function(const KatanaValue& v) noexcept {
+    return v.function;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+}
+
+// Build a value string from a katana value array, tokens joined by sep.
+std::string serialize_values_joined(const KatanaArray* values, std::string_view sep);
 
 // Serialize one KatanaValue to a CSS value string.
 // Do NOT use KatanaValue::raw — it is uninitialized in this katana build.
+// Mutually recursive with serialize_values_joined to unwrap nested CSS
+// functions e.g. rgb(...); depth is bounded by CSS nesting in the input.
+// NOLINTNEXTLINE(misc-no-recursion)
 std::string serialize_value_single(const KatanaValue* val) {
     switch (val->unit) {
     case KATANA_VALUE_IDENT:
@@ -51,6 +60,16 @@ std::string serialize_value_single(const KatanaValue* val) {
     case KATANA_VALUE_PARSER_IDENTIFIER: {
         const char* s = kval_string(*val);
         return (s != nullptr) ? std::string(s) : std::string{};
+    }
+    case KATANA_VALUE_PARSER_HEXCOLOR: {
+        const char* s = kval_string(*val);
+        return "#" + ((s != nullptr) ? std::string(s) : std::string{});
+    }
+    case KATANA_VALUE_PARSER_FUNCTION: {
+        const KatanaValueFunction* fn = kval_function(*val);
+        if (fn == nullptr || fn->name == nullptr)
+            return {};
+        return std::string(fn->name) + "(" + serialize_values_joined(fn->args, ", ") + ")";
     }
     case KATANA_VALUE_NUMBER:
         return fmt_num(kval_double(*val));
@@ -69,8 +88,8 @@ std::string serialize_value_single(const KatanaValue* val) {
     }
 }
 
-// Build a value string from a katana value array.
-std::string serialize_values(const KatanaArray* values) {
+// NOLINTNEXTLINE(misc-no-recursion)
+std::string serialize_values_joined(const KatanaArray* values, std::string_view sep) {
     if (values == nullptr)
         return {};
     std::string result;
@@ -79,10 +98,15 @@ std::string serialize_values(const KatanaArray* values) {
         if (val == nullptr)
             continue;
         if (i > 0)
-            result += ' ';
+            result += sep;
         result += serialize_value_single(val);
     }
     return result;
+}
+
+// Build a value string from a katana value array (top-level declaration values).
+std::string serialize_values(const KatanaArray* values) {
+    return serialize_values_joined(values, " ");
 }
 
 Declaration convert_declaration(const KatanaDeclaration* kd) {

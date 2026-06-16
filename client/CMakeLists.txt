@@ -9,6 +9,7 @@ add_library(tvshow_core STATIC
     src/css/parser.cpp
     src/style/resolver.cpp
     src/layout/engine.cpp
+    src/render/render.cpp
 )
 
 target_include_directories(tvshow_core

@@ -141,8 +141,8 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     const int chrome_h = mar.left + brd.left + pad.left + pad.right + brd.right + mar.right;
 
     // Content width: auto = stretch to fill, explicit = use value.
-    const int content_w = st.width.is_auto ? std::max(0, avail_w - chrome_h)
-                                           : resolve_h(st.width, avail_w);
+    const int content_w =
+        st.width.is_auto ? std::max(0, avail_w - chrome_h) : resolve_h(st.width, avail_w);
 
     const CellPos border_origin{origin.col + mar.left, origin.row + mar.top};
     const CellPos content_origin{border_origin.col + brd.left + pad.left,
@@ -174,8 +174,8 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
         y += inline_rows(sn, content_w);
     }
 
-    const int content_h = st.height.is_auto ? std::max(0, y - content_origin.row)
-                                            : resolve_v(st.height, avail_h);
+    const int content_h =
+        st.height.is_auto ? std::max(0, y - content_origin.row) : resolve_v(st.height, avail_h);
 
     Box box;
     box.node = &sn;
@@ -190,7 +190,13 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
 }  // namespace
 
 Box layout(const style::StyledNode& root, Viewport vp) {
-    return layout_block(root, {0, 0}, vp.cols, vp.rows);
+    Box root_box = layout_block(root, {0, 0}, vp.cols, vp.rows);
+    // Width auto already stretches to the viewport (see layout_block); height
+    // auto shrink-wraps to content, which would leave the rest of a short
+    // page unpainted. Stretch the root box to the full viewport so render
+    // has a background to paint over.
+    root_box.border_box.size.rows = std::max(root_box.border_box.size.rows, vp.rows);
+    return root_box;
 }
 
 }  // namespace tvshow::layout
