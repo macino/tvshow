@@ -4,6 +4,7 @@
 
 using tvshow::util::percent_decode;
 using tvshow::util::percent_encode;
+using tvshow::util::resolve_file_url;
 using tvshow::util::Url;
 
 TEST_CASE("Url::parse: basic HTTP URL") {
@@ -177,4 +178,24 @@ TEST_CASE("percent_encode: special chars encoded") {
 TEST_CASE("percent_encode / percent_decode: round-trip") {
     const std::string orig = "Hello World! /path?query=value&key=other";
     CHECK(percent_decode(percent_encode(orig)) == orig);
+}
+
+TEST_CASE("resolve_file_url: relative href resolves against the base's directory") {
+    CHECK(resolve_file_url("file:///a/b/index.html", "other.html") == "file:///a/b/other.html");
+}
+
+TEST_CASE("resolve_file_url: absolute path href replaces the whole path") {
+    CHECK(resolve_file_url("file:///a/b/index.html", "/c/d.html") == "file:///c/d.html");
+}
+
+TEST_CASE("resolve_file_url: href already carrying a file:// scheme passes through") {
+    CHECK(resolve_file_url("file:///a/b/index.html", "file:///z.html") == "file:///z.html");
+}
+
+TEST_CASE("resolve_file_url: empty href returns the base unchanged") {
+    CHECK(resolve_file_url("file:///a/b/index.html", "") == "file:///a/b/index.html");
+}
+
+TEST_CASE("resolve_file_url: relative href climbs into a sibling directory") {
+    CHECK(resolve_file_url("file:///a/b/index.html", "../c/d.html") == "file:///a/c/d.html");
 }

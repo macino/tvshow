@@ -253,4 +253,23 @@ std::string percent_encode(std::string_view s) {
     return result;
 }
 
+std::string resolve_file_url(std::string_view base, std::string_view href) {
+    constexpr std::string_view k_prefix = "file://";
+    if (href.empty()) {
+        return std::string(base);
+    }
+    if (href.starts_with(k_prefix)) {
+        return std::string(href);
+    }
+    const std::string_view base_path =
+        base.starts_with(k_prefix) ? base.substr(k_prefix.size()) : base;
+    if (href.starts_with('/')) {
+        return std::string(k_prefix) + remove_dot_segments(std::string(href));
+    }
+    const auto slash = base_path.rfind('/');
+    const std::string_view dir =
+        slash == std::string_view::npos ? std::string_view{} : base_path.substr(0, slash + 1);
+    return std::string(k_prefix) + remove_dot_segments(std::string(dir) + std::string(href));
+}
+
 }  // namespace tvshow::util

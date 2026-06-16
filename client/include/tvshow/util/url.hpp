@@ -51,4 +51,12 @@ private:
 // Percent-encode a string; unreserved chars (RFC 3986 §2.3) pass through.
 [[nodiscard]] std::string percent_encode(std::string_view s);
 
+// Resolves a possibly-relative href against a base "file://" URL by simple
+// path-joining (no ".." normalization — the filesystem handles that when
+// the path is opened). `href` already carrying its own scheme, or starting
+// with '/', is returned unchanged (modulo the file:// prefix); an empty
+// href returns `base`. Used for M11 link navigation, where the only
+// transport is local files (HTTP lands in M12).
+[[nodiscard]] std::string resolve_file_url(std::string_view base, std::string_view href);
+
 }  // namespace tvshow::util
