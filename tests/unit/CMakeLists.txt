@@ -7,6 +7,7 @@ add_executable(tvshow-tests
     dom/parser_test.cpp
     css/parser_test.cpp
     style/resolver_test.cpp
+    layout/engine_test.cpp
 )
 
 target_link_libraries(tvshow-tests

@@ -36,7 +36,9 @@ const char* kval_string(const KatanaValue& v) noexcept {
     return v.string;  // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
 double kval_double(const KatanaValue& v) noexcept {
-    return v.fValue;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+    return v.isInt
+               ? static_cast<double>(v.iValue)  // NOLINT(cppcoreguidelines-pro-type-union-access)
+               : v.fValue;                      // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
 
 // Serialize one KatanaValue to a CSS value string.

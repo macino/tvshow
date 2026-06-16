@@ -173,6 +173,7 @@ Length parse_length(std::string_view s) noexcept {
 namespace {
 
 constexpr std::string_view k_ua_css = R"css(
+head { display: none; }
 body { display: block; }
 div { display: block; }
 p { display: block; }

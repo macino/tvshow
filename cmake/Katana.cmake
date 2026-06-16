@@ -6,12 +6,16 @@ include(FetchContent)
 set(TVSHOW_KATANA_TAG "499118d32c387a893fdc9dda2cb95eee524bdb9b"
     CACHE STRING "katana-parser commit to pin")
 
+# Upstream bug: tokenizer.c never parses the numeric value of `ch`-unit
+# lengths (missing switch case) — see cmake/patches/katana-fix-chs-unit.cmake.
 FetchContent_Declare(
     katana_parser
     GIT_REPOSITORY https://github.com/hackers-painters/katana-parser.git
     GIT_TAG        ${TVSHOW_KATANA_TAG}
     GIT_SHALLOW    FALSE
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    PATCH_COMMAND  ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-fix-chs-unit.cmake
 )
 
 FetchContent_GetProperties(katana_parser)
