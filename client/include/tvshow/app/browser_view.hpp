@@ -51,6 +51,7 @@ private:
     void navigate(const std::string& url, bool push_history);
     void focus_next(int direction);
     void handle_form_input(unsigned keyCode);
+    void submit_form();
 };
 
 }  // namespace tvshow::app

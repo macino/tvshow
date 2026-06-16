@@ -94,6 +94,10 @@ auto main(int argc, char** argv) -> int {
                         "text/html");
     });
 
+    svr.Get("/echo", [](const httplib::Request& req, httplib::Response& res) {
+        res.set_content(render_echo(req), "text/html");
+    });
+
     svr.Post("/echo", [](const httplib::Request& req, httplib::Response& res) {
         res.set_content(render_echo(req), "text/html");
     });

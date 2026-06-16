@@ -101,6 +101,56 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
 
 }  // namespace
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::optional<Page> post_page(std::string_view action_url, std::string_view body,
+                              layout::Viewport vp) {
+    const auto parsed = util::Url::parse(action_url);
+    if (!parsed) {
+        std::cerr << "tvshow: invalid action URL: " << action_url << '\n';
+        return std::nullopt;
+    }
+    net::CppHttpClient client;
+    const net::Result result = client.post(*parsed, body);
+    Fetched fetched;
+    if (const auto* err = std::get_if<net::NetworkError>(&result)) {
+        fetched = {error_page_html("Network Error", err->message), true};
+    } else {
+        const auto& resp = std::get<net::Response>(result);
+        if (resp.status >= 400) {
+            fetched = {
+                error_page_html("HTTP " + std::to_string(resp.status),
+                                "The server returned an error for " + std::string(action_url)),
+                true};
+        } else {
+            fetched = {resp.body, false};
+        }
+    }
+
+    auto doc = dom::parse(fetched.html);
+    if (!doc) {
+        std::cerr << "tvshow: failed to parse HTML from POST response\n";
+        return std::nullopt;
+    }
+    std::vector<css::Stylesheet> sheets;
+    if (!fetched.is_error) {
+        sheets = fetch_external_sheets(action_url, *doc);
+    }
+    for (const auto& css_text : doc->inline_styles) {
+        if (auto sheet = css::parse(css_text)) {
+            sheets.push_back(std::move(*sheet));
+        }
+    }
+    auto tree = style::resolve(*doc, sheets);
+    if (!tree) {
+        std::cerr << "tvshow: failed to resolve styles from POST response\n";
+        return std::nullopt;
+    }
+    auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
+    Page page{std::string(action_url), std::move(*doc), std::move(styled_tree), {}};
+    page.box = layout::layout(*page.tree, vp);
+    return page;
+}
+
 std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
     constexpr std::string_view k_file_prefix = "file://";
 

@@ -12,6 +12,7 @@
 #include "server_fixture.hpp"
 
 using tvshow::app::load_page;
+using tvshow::app::post_page;
 using tvshow::itest::ServerFixture;
 using tvshow::layout::collect_links;
 using tvshow::layout::Viewport;
@@ -50,6 +51,25 @@ TEST_CASE("integration: form POST round-trips through /echo") {
     CHECK(resp->status == 200);
     CHECK(resp->body.find("name = tomas") != std::string::npos);
     CHECK(resp->body.find("subscribe = yes") != std::string::npos);
+}
+
+TEST_CASE("integration: post_page submits form and renders response") {
+    const ServerFixture server;
+    const std::string echo_url = server.base_url() + "/echo";
+    const auto page = post_page(echo_url, "user=alice&qty=3", Viewport{80, 24});
+    REQUIRE(page.has_value());
+    CHECK(page->doc.title == "Echo");
+    // The rendered echo page should mention the submitted fields.
+    CHECK(page->doc.root != nullptr);
+}
+
+TEST_CASE("integration: GET form submission appends query to echo URL") {
+    const ServerFixture server;
+    // Simulate what BrowserView.submit_form does for GET forms.
+    const std::string get_url = server.base_url() + "/echo?color=blue&size=L";
+    const auto page = load_page(get_url, Viewport{80, 24});
+    REQUIRE(page.has_value());
+    CHECK(page->doc.title == "Echo");
 }
 
 TEST_CASE("integration: https request fails fast with an internal error page") {

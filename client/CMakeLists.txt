@@ -10,6 +10,7 @@ add_library(tvshow_core STATIC
     src/style/resolver.cpp
     src/layout/engine.cpp
     src/layout/form.cpp
+    src/layout/form_data.cpp
     src/layout/form_focus.cpp
     src/layout/inline_text.cpp
     src/layout/links.cpp

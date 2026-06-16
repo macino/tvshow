@@ -6,6 +6,7 @@
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/form.hpp"
+#include "tvshow/layout/form_data.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
 #include "tvshow/paint/paint.hpp"
@@ -153,6 +154,43 @@ void BrowserView::handle_form_input(unsigned keyCode) {
     }
 }
 
+void BrowserView::submit_form() {
+    const layout::FormFocus* fc = focused_fc();
+    if (fc == nullptr || fc->form == nullptr) {
+        return;
+    }
+    const auto fields =
+        layout::collect_form_fields(*fc->form, form_values_.text, form_values_.checked);
+    const std::string encoded = layout::encode_fields(fields);
+
+    const std::string_view action_attr = fc->form->attr("action");
+    const std::string action_url = util::resolve_url(
+        page_.url, action_attr.empty() ? std::string_view(page_.url) : action_attr);
+
+    const std::string_view method_attr = fc->form->attr("method");
+    const bool is_post = (method_attr == "post" || method_attr == "POST");
+
+    if (is_post) {
+        auto page = post_page(action_url, encoded, {size.x, size.y});
+        if (!page) {
+            return;
+        }
+        page_ = std::move(*page);
+        links_ = layout::collect_links(page_.box);
+        form_controls_ = layout::collect_form_controls(page_.box);
+        form_values_ = {};
+        focused_ = -1;
+        history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_pos_) + 1,
+                       history_.end());
+        history_.push_back(action_url);
+        history_pos_ = history_.size() - 1;
+        drawView();
+    } else {
+        const std::string get_url = encoded.empty() ? action_url : (action_url + "?" + encoded);
+        navigate(get_url, true);
+    }
+}
+
 void BrowserView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
     if (event.what != evKeyDown) {
@@ -173,6 +211,8 @@ void BrowserView::handleEvent(TEvent& event) {
         if (is_link_focused()) {
             navigate(util::resolve_url(page_.url, links_[static_cast<size_t>(focused_)].href),
                      true);
+        } else if (focused_fc() != nullptr) {
+            submit_form();
         }
         clearEvent(event);
         break;

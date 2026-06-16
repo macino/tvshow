@@ -9,10 +9,12 @@
 
 namespace tvshow::layout {
 
-// One focusable form control (SPEC §13.2): its DOM node, kind, and bounding
-// rect for focus-highlight via render::apply_focus.
+// One focusable form control (SPEC §13.2): its DOM node, the enclosing
+// <form> element (nullptr if the control is outside any form), its kind,
+// and the bounding rect for focus-highlight via render::apply_focus.
 struct FormFocus {
     const dom::Node* node = nullptr;
+    const dom::Node* form = nullptr;
     FormControlKind kind = FormControlKind::None;
     CellRect span = {};
 };

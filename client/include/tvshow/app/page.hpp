@@ -28,8 +28,13 @@ struct Page {
     layout::Box box;
 };
 
-// Reads, parses, resolves, and lays out `url` (a "file://" URL) at `vp`.
+// Reads, parses, resolves, and lays out `url` at `vp`.
 // Returns nullopt on read/parse/resolve failure; logs the reason to stderr.
 [[nodiscard]] std::optional<Page> load_page(std::string_view url, layout::Viewport vp);
+
+// Issues a POST to action_url with application/x-www-form-urlencoded body,
+// then parses and lays out the response document.
+[[nodiscard]] std::optional<Page> post_page(std::string_view action_url, std::string_view body,
+                                            layout::Viewport vp);
 
 }  // namespace tvshow::app
