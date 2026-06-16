@@ -2,6 +2,7 @@
 
 #include "tvshow/dom/node.hpp"
 #include "tvshow/layout/box.hpp"
+#include "tvshow/layout/inline_text.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/style/tree.hpp"
 #include "tvshow/style/types.hpp"
@@ -86,33 +87,8 @@ EdgePx compute_margin(const style::Edges& mar, int avail_w, int avail_h) noexcep
 
 // ── Inline content measurement ────────────────────────────────────────────────
 
-// NOLINTNEXTLINE(misc-no-recursion)
-int count_inline_chars(const style::StyledNode& sn) noexcept {
-    int total = 0;
-    for (const auto& child : sn.children) {
-        if (child.node == nullptr) {
-            continue;
-        }
-        if (child.node->kind == dom::NodeKind::Text) {
-            total += static_cast<int>(child.node->text.size());
-        } else if (child.style.display != style::Display::None &&
-                   child.style.display != style::Display::Block &&
-                   child.style.display != style::Display::Flex) {
-            total += count_inline_chars(child);
-        }
-    }
-    return total;
-}
-
-int inline_rows(const style::StyledNode& sn, int content_w) noexcept {
-    if (content_w <= 0) {
-        return 0;
-    }
-    const int chars = count_inline_chars(sn);
-    if (chars == 0) {
-        return 0;
-    }
-    return (chars + content_w - 1) / content_w;
+int inline_rows(const style::StyledNode& sn, int content_w) {
+    return static_cast<int>(break_inline(sn, content_w).size());
 }
 
 bool has_inline_content(const style::StyledNode& sn) noexcept {

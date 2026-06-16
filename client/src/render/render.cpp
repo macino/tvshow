@@ -1,7 +1,7 @@
 #include "tvshow/render/render.hpp"
 
-#include "tvshow/dom/node.hpp"
 #include "tvshow/layout/box.hpp"
+#include "tvshow/layout/inline_text.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/style/tree.hpp"
@@ -9,9 +9,8 @@
 #include "tvshow/types.hpp"
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
-#include <string_view>
+#include <vector>
 
 namespace tvshow::render {
 
@@ -33,37 +32,6 @@ ColorAttr text_attr(const style::ComputedStyle& st, uint32_t bg) noexcept {
     attr.underline = st.text_decoration == style::TextDecoration::Underline;
     attr.strike = st.text_decoration == style::TextDecoration::LineThrough;
     return attr;
-}
-
-// Decode one UTF-8 code point starting at s[i]; advance i past the bytes consumed.
-char32_t utf8_decode_at(std::string_view s, size_t& i) noexcept {
-    const auto lead = static_cast<uint8_t>(s[i]);
-    if (lead < 0x80U) {
-        ++i;
-        return static_cast<char32_t>(lead);
-    }
-    auto cont = [&](size_t pos) -> uint8_t {
-        return pos < s.size() ? static_cast<uint8_t>(s[pos]) : 0x80U;
-    };
-    if ((lead & 0xE0U) == 0xC0U && i + 1 < s.size()) {
-        const char32_t cp = ((lead & 0x1FU) << 6U) | (cont(i + 1) & 0x3FU);
-        i += 2;
-        return cp;
-    }
-    if ((lead & 0xF0U) == 0xE0U && i + 2 < s.size()) {
-        const char32_t cp =
-            ((lead & 0x0FU) << 12U) | ((cont(i + 1) & 0x3FU) << 6U) | (cont(i + 2) & 0x3FU);
-        i += 3;
-        return cp;
-    }
-    if ((lead & 0xF8U) == 0xF0U && i + 3 < s.size()) {
-        const char32_t cp = ((lead & 0x07U) << 18U) | ((cont(i + 1) & 0x3FU) << 12U) |
-                            ((cont(i + 2) & 0x3FU) << 6U) | (cont(i + 3) & 0x3FU);
-        i += 4;
-        return cp;
-    }
-    ++i;
-    return U'?';
 }
 
 // ── background ───────────────────────────────────────────────────────────────
@@ -163,55 +131,30 @@ void paint_border(CharGrid& grid, const layout::CellRect& rect, const style::Bor
 
 // ── inline text ──────────────────────────────────────────────────────────────
 
-struct TextCursor {
-    layout::CellRect content_box;
-    int col = 0;
-    int row = 0;
-};
-
-void paint_codepoint(CharGrid& grid, TextCursor& cur, char32_t cp, const style::ComputedStyle& st) {
-    const int max_col = cur.content_box.origin.col + cur.content_box.size.cols;
-    const int max_row = cur.content_box.origin.row + cur.content_box.size.rows;
-    if (cur.row >= max_row) {
-        return;  // clipped — content overflows its box
-    }
-    if (cp == U'\n') {
-        ++cur.row;
-        cur.col = cur.content_box.origin.col;
-        return;
-    }
-    if (cur.col >= max_col) {
-        ++cur.row;
-        cur.col = cur.content_box.origin.col;
-        if (cur.row >= max_row) {
-            return;
+// SPEC §10.2: line boxes are built (and wrapped) by layout::break_inline, so
+// layout's row count and render's character placement agree by construction.
+void paint_text(CharGrid& grid, const layout::CellRect& content_box, const style::StyledNode& sn) {
+    const auto lines = layout::break_inline(sn, content_box.size.cols);
+    const int max_row = content_box.size.rows;
+    const style::TextAlign align = sn.style.text_align;
+    for (int row = 0; row < static_cast<int>(lines.size()) && row < max_row; ++row) {
+        const auto& line = lines[row];
+        int col = content_box.origin.col;
+        const int slack = content_box.size.cols - static_cast<int>(line.size());
+        if (align == style::TextAlign::Center) {
+            col += std::max(0, slack / 2);
+        } else if (align == style::TextAlign::Right) {
+            col += std::max(0, slack);
         }
-    }
-    const Point pos{cur.col, cur.row};
-    const uint32_t bg = grid.at(pos).attr.bg;
-    grid.put(pos, cp, text_attr(st, bg));
-    ++cur.col;
-}
-
-// Mirrors layout::count_inline_chars's recursion condition (Text nodes, plus
-// any non-block/flex/none descendant) so wrapped row counts stay consistent
-// between the layout and render stages.
-// NOLINTNEXTLINE(misc-no-recursion)
-void paint_inline(CharGrid& grid, TextCursor& cur, const style::StyledNode& sn) {
-    for (const auto& child : sn.children) {
-        if (child.node == nullptr) {
-            continue;
-        }
-        if (child.node->kind == dom::NodeKind::Text) {
-            size_t i = 0;
-            const std::string_view text = child.node->text;
-            while (i < text.size()) {
-                paint_codepoint(grid, cur, utf8_decode_at(text, i), child.style);
+        const int max_col = content_box.origin.col + content_box.size.cols;
+        for (const auto& tok : line) {
+            if (col >= max_col) {
+                break;  // clipped — content overflows its box
             }
-        } else if (child.style.display != style::Display::None &&
-                   child.style.display != style::Display::Block &&
-                   child.style.display != style::Display::Flex) {
-            paint_inline(grid, cur, child);
+            const Point pos{col, content_box.origin.row + row};
+            const uint32_t bg = grid.at(pos).attr.bg;
+            grid.put(pos, tok.cp, text_attr(*tok.style, bg));
+            ++col;
         }
     }
 }
@@ -227,8 +170,7 @@ void paint_box(CharGrid& grid, const layout::Box& box) {
     if (st.visibility != style::Visibility::Hidden) {
         paint_background(grid, box.border_box, st.background);
         paint_border(grid, box.border_box, st.border);
-        TextCursor cur{box.content_box, box.content_box.origin.col, box.content_box.origin.row};
-        paint_inline(grid, cur, *box.node);
+        paint_text(grid, box.content_box, *box.node);
     }
     for (const auto& child : box.children) {
         paint_box(grid, child);

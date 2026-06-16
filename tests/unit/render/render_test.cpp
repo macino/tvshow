@@ -184,6 +184,51 @@ TEST_CASE("render: font-weight:bold sets bold attribute") {
     CHECK(grid.at({0, 0}).attr.bold);
 }
 
+TEST_CASE("render: text wraps at word boundaries, not mid-word") {
+    auto [doc, tree] = make_tree("<body><p>ab cd ef</p></body>");
+    const Box box = layout(tree, {5, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'a');
+    CHECK(grid.at({4, 0}).cp == U'd');
+    CHECK(grid.at({0, 1}).cp == U'e');
+    CHECK(grid.at({1, 1}).cp == U'f');
+}
+
+TEST_CASE("render: text-align:center centers each line in the content box") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>", "p { text-align: center; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({4, 0}).cp == U'h');
+    CHECK(grid.at({5, 0}).cp == U'i');
+}
+
+TEST_CASE("render: text-align:right right-aligns each line in the content box") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>", "p { text-align: right; }");
+    const Box box = layout(tree, {10, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({8, 0}).cp == U'h');
+    CHECK(grid.at({9, 0}).cp == U'i');
+}
+
+TEST_CASE("render: white-space:pre preserves runs of spaces verbatim") {
+    auto [doc, tree] = make_tree("<body><p>a    b</p></body>", "p { white-space: pre; }");
+    const Box box = layout(tree, {20, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'a');
+    CHECK(grid.at({1, 0}).cp == U' ');
+    CHECK(grid.at({4, 0}).cp == U' ');
+    CHECK(grid.at({5, 0}).cp == U'b');
+}
+
+TEST_CASE("render: white-space:nowrap keeps text on one line, clipped by the content box") {
+    auto [doc, tree] = make_tree("<body><p>ab cd ef</p></body>", "p { white-space: nowrap; }");
+    const Box box = layout(tree, {5, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'a');
+    CHECK(grid.at({4, 0}).cp == U'd');
+    CHECK(grid.at({0, 1}).cp == U' ');  // nothing wrapped onto row 1
+}
+
 TEST_CASE("render: visibility:hidden suppresses painting") {
     auto [doc, tree] = make_tree("<body><div></div></body>",
                                  "div { background-color: #ff0000; visibility: hidden; }");
