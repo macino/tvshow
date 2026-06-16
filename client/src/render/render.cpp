@@ -166,4 +166,20 @@ CharGrid render(const layout::Box& root) {
     return grid;
 }
 
+void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans) {
+    for (const auto& span : spans) {
+        const int row_end = std::min(span.origin.row + span.size.rows, grid.rows());
+        const int col_end = std::min(span.origin.col + span.size.cols, grid.cols());
+        for (int r = std::max(span.origin.row, 0); r < row_end; ++r) {
+            for (int c = std::max(span.origin.col, 0); c < col_end; ++c) {
+                const Point pos{c, r};
+                const Cell cell = grid.at(pos);
+                ColorAttr attr = cell.attr;
+                std::swap(attr.fg, attr.bg);
+                grid.put(pos, cell.cp, attr);
+            }
+        }
+    }
+}
+
 }  // namespace tvshow::render

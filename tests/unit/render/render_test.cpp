@@ -236,3 +236,35 @@ TEST_CASE("render: visibility:hidden suppresses painting") {
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).attr.bg != 0xFF0000U);
 }
+
+// ── focus highlight ──────────────────────────────────────────────────────────
+
+TEST_CASE("apply_focus: inverts fg/bg of cells within the given spans") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>");
+    const Box box = layout(tree, {10, 5});
+    CharGrid grid = tvshow::render::render(box);
+    const auto before = grid.at({0, 0}).attr;
+    tvshow::render::apply_focus(grid, {{{0, 0}, {2, 1}}});
+    const auto after = grid.at({0, 0}).attr;
+    CHECK(after.fg == before.bg);
+    CHECK(after.bg == before.fg);
+}
+
+TEST_CASE("apply_focus: leaves cells outside the spans untouched") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>");
+    const Box box = layout(tree, {10, 5});
+    CharGrid grid = tvshow::render::render(box);
+    const auto before = grid.at({5, 0}).attr;
+    tvshow::render::apply_focus(grid, {{{0, 0}, {2, 1}}});
+    CHECK(grid.at({5, 0}).attr == before);
+}
+
+TEST_CASE("apply_focus: clips spans that extend past the grid bounds") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>");
+    const Box box = layout(tree, {10, 5});
+    CharGrid grid = tvshow::render::render(box);
+    // Span extends well past the 10x5 grid; should not throw and should
+    // still flip the in-bounds portion.
+    tvshow::render::apply_focus(grid, {{{8, 4}, {20, 20}}});
+    CHECK(grid.at({9, 4}).attr.fg != 0xFFFFFFU);
+}
