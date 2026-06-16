@@ -98,8 +98,24 @@ auto main(int argc, char** argv) -> int {
         res.set_content(render_echo(req), "text/html");
     });
 
+    // port 0 asks the OS for a free port (used by integration tests, which
+    // spawn this binary and parse the bound port back out of stdout).
+    if (port == 0) {
+        const int bound = svr.bind_to_any_port("127.0.0.1");
+        if (bound <= 0) {
+            std::fprintf(stderr, "tvshow-srv: failed to bind an ephemeral port\n");
+            return 1;
+        }
+        std::printf("tvshow-srv: listening on http://127.0.0.1:%d/ (pages: %s)\n", bound,
+                    pages_dir.c_str());
+        std::fflush(stdout);
+        svr.listen_after_bind();
+        return 0;
+    }
+
     std::printf("tvshow-srv: listening on http://0.0.0.0:%d/ (pages: %s)\n", port,
                 pages_dir.c_str());
+    std::fflush(stdout);
     svr.listen("0.0.0.0", port);
     return 0;
 }

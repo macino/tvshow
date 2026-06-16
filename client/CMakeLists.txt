@@ -61,13 +61,39 @@ set_target_properties(tvshow_paint PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
+# tvshow_io: page loading (file I/O, HTTP fetch). No tvision dependency,
+# so it's also linked directly by tests/integration without dragging in
+# the TUI. Kept out of tvshow_core because it does real I/O.
+add_library(tvshow_io STATIC
+    src/app/page.cpp
+    src/net/cpp_http_client.cpp
+)
+
+target_include_directories(tvshow_io
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(tvshow_io
+    PUBLIC
+        tvshow_core
+    PRIVATE
+        httplib::httplib
+        Threads::Threads
+        tvshow_warnings
+)
+
+set_target_properties(tvshow_io PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
 # Browser client — links tvision for TUI.
 add_executable(tvshow
     src/main.cpp
     src/app/application.cpp
     src/app/browser_view.cpp
-    src/app/page.cpp
-    src/net/cpp_http_client.cpp
 )
 
 target_include_directories(tvshow
@@ -79,9 +105,8 @@ target_link_libraries(tvshow
     PRIVATE
         tvshow_core
         tvshow_paint
+        tvshow_io
         tvision
-        httplib::httplib
-        Threads::Threads
         tvshow_warnings
 )
 

@@ -9,11 +9,13 @@
 #include "tvshow/net/cpp_http_client.hpp"
 #include "tvshow/net/http_client.hpp"
 #include "tvshow/style/resolver.hpp"
+#include "tvshow/style/tree.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <fstream>
 #include <ios>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -140,8 +142,9 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
         return std::nullopt;
     }
 
-    Page page{std::string(url), std::move(*doc), std::move(*tree), {}};
-    page.box = layout::layout(page.tree, vp);
+    auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
+    Page page{std::string(url), std::move(*doc), std::move(styled_tree), {}};
+    page.box = layout::layout(*page.tree, vp);
     return page;
 }
 

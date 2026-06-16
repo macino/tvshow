@@ -53,7 +53,7 @@ void BrowserView::changeBounds(const TRect& bounds) {
 }
 
 void BrowserView::relayout() {
-    page_.box = layout::layout(page_.tree, {size.x, size.y});
+    page_.box = layout::layout(*page_.tree, {size.x, size.y});
     links_ = layout::collect_links(page_.box);
     if (focused_ >= static_cast<int>(links_.size())) {
         focused_ = -1;
