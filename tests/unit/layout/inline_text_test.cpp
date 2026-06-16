@@ -129,6 +129,21 @@ TEST_CASE("break_inline: zero content width yields no lines") {
     CHECK(break_inline(*p, 0).empty());
 }
 
+TEST_CASE("break_inline: tokens inside <a href> carry the link target") {
+    auto [doc, tree] = make_tree("<body><p>see <a href=\"/x\">this</a> page</p></body>");
+    const auto* p = find_tag(tree, "p");
+    REQUIRE(p != nullptr);
+    const auto lines = break_inline(*p, 20);
+    REQUIRE(lines.size() == 1);
+    // "see this page" — only the 4 chars of "this" carry the href.
+    const auto& line = lines[0];
+    REQUIRE(line.size() == std::string_view("see this page").size());
+    for (size_t i = 0; i < line.size(); ++i) {
+        const bool in_link = i >= 4 && i < 8;  // "this" spans [4, 8)
+        CHECK(line[i].href.empty() != in_link);
+    }
+}
+
 TEST_CASE("break_inline: no inline content yields no lines") {
     auto [doc, tree] = make_tree("<body><p></p></body>");
     const auto* p = find_tag(tree, "p");

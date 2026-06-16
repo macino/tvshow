@@ -1,17 +1,23 @@
 #pragma once
 
+#include "tvshow/layout/types.hpp"
 #include "tvshow/style/tree.hpp"
 #include "tvshow/style/types.hpp"
+#include "tvshow/types.hpp"
 
+#include <string_view>
 #include <vector>
 
 namespace tvshow::layout {
 
 // One painted character of inline content, with the style of the element it
-// came from (text color/weight/etc. can differ per inline span).
+// came from (text color/weight/etc. can differ per inline span). `href` is
+// the target of the nearest enclosing `<a href>`, or empty if the character
+// isn't part of a link (SPEC §12.1 focusable elements).
 struct InlineToken {
     char32_t cp = 0;
     const style::ComputedStyle* style = nullptr;
+    std::string_view href;
 };
 
 using InlineLine = std::vector<InlineToken>;
@@ -28,5 +34,18 @@ using InlineLine = std::vector<InlineToken>;
 // characters) call this, so wrapping decisions are identical by
 // construction.
 std::vector<InlineLine> break_inline(const style::StyledNode& sn, int content_w);
+
+// One token positioned at an absolute grid cell, honoring `sn.style.text_align`.
+struct PlacedToken {
+    Point pos;
+    InlineToken token;
+};
+
+// Runs break_inline(sn, content_box.size.cols) and assigns each surviving
+// token its absolute cell position, applying text-align and clipping to
+// content_box. Render (to paint characters) and layout::collect_links (to
+// find focusable link rects) both call this, so token positions agree by
+// construction.
+std::vector<PlacedToken> place_inline(const style::StyledNode& sn, CellRect content_box);
 
 }  // namespace tvshow::layout

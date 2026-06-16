@@ -1,9 +1,11 @@
 #include "tvshow/layout/inline_text.hpp"
 
 #include "tvshow/dom/node.hpp"
+#include "tvshow/layout/types.hpp"
 #include "tvshow/style/tree.hpp"
 #include "tvshow/style/types.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -50,41 +52,62 @@ bool is_inline_descendant(const style::StyledNode& sn) noexcept {
            sn.style.display != style::Display::Flex;
 }
 
+// A run of collapsed whitespace not yet emitted, carrying the href of the
+// node where the run started (so a space at a link's boundary keeps the
+// href of the text it followed, not whatever text happens to follow it).
+struct PendingSpace {
+    bool active = false;
+    std::string_view href;
+};
+
 void collect_text_node(std::string_view text, const style::ComputedStyle& st, style::WhiteSpace ws,
-                       std::vector<InlineToken>& out, bool& pending_space) {
+                       std::string_view href, std::vector<InlineToken>& out,
+                       PendingSpace& pending) {
     size_t i = 0;
     while (i < text.size()) {
         const char32_t cp = utf8_decode_at(text, i);
         if (ws == style::WhiteSpace::Pre) {
-            out.push_back({cp, &st});
+            out.push_back({cp, &st, href});
             continue;
         }
         const bool is_ws = cp == U' ' || cp == U'\t' || cp == U'\n' || cp == U'\r';
         if (is_ws) {
-            pending_space = pending_space || !out.empty();
+            if (!pending.active && !out.empty()) {
+                pending.active = true;
+                pending.href = href;
+            }
             continue;
         }
-        if (pending_space) {
-            out.push_back({U' ', &st});
-            pending_space = false;
+        if (pending.active) {
+            out.push_back({U' ', &st, pending.href});
+            pending.active = false;
         }
-        out.push_back({cp, &st});
+        out.push_back({cp, &st, href});
     }
 }
 
+// SPEC §12.1: focusable links are `<a href>` elements. `href` is the target
+// inherited from the nearest enclosing `<a href>`, or empty outside one.
 // Mirrors render::paint_text / layout::has_inline_content's recursion
 // condition (Text nodes, plus any non-block/flex/none descendant).
 // NOLINTNEXTLINE(misc-no-recursion)
-void collect_tokens(const style::StyledNode& sn, style::WhiteSpace ws,
-                    std::vector<InlineToken>& out, bool& pending_space) {
+void collect_tokens(const style::StyledNode& sn, style::WhiteSpace ws, std::string_view href,
+                    std::vector<InlineToken>& out, PendingSpace& pending) {
     for (const auto& child : sn.children) {
         if (child.node == nullptr) {
             continue;
         }
         if (child.node->kind == dom::NodeKind::Text) {
-            collect_text_node(child.node->text, child.style, ws, out, pending_space);
+            collect_text_node(child.node->text, child.style, ws, href, out, pending);
         } else if (is_inline_descendant(child)) {
-            collect_tokens(child, ws, out, pending_space);
+            std::string_view child_href = href;
+            if (child.node->tag == "a") {
+                const std::string_view a_href = child.node->attr("href");
+                if (!a_href.empty()) {
+                    child_href = a_href;
+                }
+            }
+            collect_tokens(child, ws, child_href, out, pending);
         }
     }
 }
@@ -129,8 +152,8 @@ void append_oversized_word(const std::vector<InlineToken>& tokens, WordSpan word
 
 // Appends a word that fits within a line on its own, wrapping to a new line
 // first if it doesn't fit after the current one.
-void append_word(const std::vector<InlineToken>& tokens, WordSpan word, int content_w,
-                 std::vector<InlineLine>& lines, InlineLine& cur) {
+void append_word(const std::vector<InlineToken>& tokens, WordSpan word, std::string_view sep_href,
+                 int content_w, std::vector<InlineLine>& lines, InlineLine& cur) {
     const size_t word_len = word.end - word.begin;
     const size_t needed = word_len + (cur.empty() ? 0 : 1);
     if (!cur.empty() && static_cast<int>(cur.size() + needed) > content_w) {
@@ -138,7 +161,7 @@ void append_word(const std::vector<InlineToken>& tokens, WordSpan word, int cont
         cur.clear();
     }
     if (!cur.empty()) {
-        cur.push_back({U' ', tokens[word.begin].style});
+        cur.push_back({U' ', tokens[word.begin].style, sep_href});
     }
     for (size_t k = word.begin; k < word.end; ++k) {
         cur.push_back(tokens[k]);
@@ -149,8 +172,10 @@ std::vector<InlineLine> break_normal(const std::vector<InlineToken>& tokens, int
     std::vector<InlineLine> lines;
     InlineLine cur;
     size_t i = 0;
+    std::string_view sep_href;
     while (i < tokens.size()) {
         if (tokens[i].cp == U' ') {
+            sep_href = tokens[i].href;
             ++i;
             continue;
         }
@@ -162,7 +187,7 @@ std::vector<InlineLine> break_normal(const std::vector<InlineToken>& tokens, int
         if (static_cast<int>(j - i) > content_w) {
             append_oversized_word(tokens, word, content_w, lines, cur);
         } else {
-            append_word(tokens, word, content_w, lines, cur);
+            append_word(tokens, word, sep_href, content_w, lines, cur);
         }
         i = j;
     }
@@ -180,8 +205,8 @@ std::vector<InlineLine> break_inline(const style::StyledNode& sn, int content_w)
     }
     const style::WhiteSpace ws = sn.style.white_space;
     std::vector<InlineToken> tokens;
-    bool pending_space = false;
-    collect_tokens(sn, ws, tokens, pending_space);
+    PendingSpace pending;
+    collect_tokens(sn, ws, {}, tokens, pending);
     if (tokens.empty()) {
         return {};
     }
@@ -192,6 +217,32 @@ std::vector<InlineLine> break_inline(const style::StyledNode& sn, int content_w)
         return {std::move(tokens)};
     }
     return break_normal(tokens, content_w);
+}
+
+std::vector<PlacedToken> place_inline(const style::StyledNode& sn, CellRect content_box) {
+    std::vector<PlacedToken> placed;
+    const auto lines = break_inline(sn, content_box.size.cols);
+    const int max_row = content_box.size.rows;
+    const int max_col = content_box.origin.col + content_box.size.cols;
+    const style::TextAlign align = sn.style.text_align;
+    for (int row = 0; row < static_cast<int>(lines.size()) && row < max_row; ++row) {
+        const auto& line = lines[row];
+        int col = content_box.origin.col;
+        const int slack = content_box.size.cols - static_cast<int>(line.size());
+        if (align == style::TextAlign::Center) {
+            col += std::max(0, slack / 2);
+        } else if (align == style::TextAlign::Right) {
+            col += std::max(0, slack);
+        }
+        for (const auto& tok : line) {
+            if (col >= max_col) {
+                break;  // clipped — content overflows its box
+            }
+            placed.push_back({{col, content_box.origin.row + row}, tok});
+            ++col;
+        }
+    }
+    return placed;
 }
 
 }  // namespace tvshow::layout

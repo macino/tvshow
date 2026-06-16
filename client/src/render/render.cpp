@@ -131,31 +131,12 @@ void paint_border(CharGrid& grid, const layout::CellRect& rect, const style::Bor
 
 // ── inline text ──────────────────────────────────────────────────────────────
 
-// SPEC §10.2: line boxes are built (and wrapped) by layout::break_inline, so
+// SPEC §10.2: line boxes are built (and placed) by layout::place_inline, so
 // layout's row count and render's character placement agree by construction.
 void paint_text(CharGrid& grid, const layout::CellRect& content_box, const style::StyledNode& sn) {
-    const auto lines = layout::break_inline(sn, content_box.size.cols);
-    const int max_row = content_box.size.rows;
-    const style::TextAlign align = sn.style.text_align;
-    for (int row = 0; row < static_cast<int>(lines.size()) && row < max_row; ++row) {
-        const auto& line = lines[row];
-        int col = content_box.origin.col;
-        const int slack = content_box.size.cols - static_cast<int>(line.size());
-        if (align == style::TextAlign::Center) {
-            col += std::max(0, slack / 2);
-        } else if (align == style::TextAlign::Right) {
-            col += std::max(0, slack);
-        }
-        const int max_col = content_box.origin.col + content_box.size.cols;
-        for (const auto& tok : line) {
-            if (col >= max_col) {
-                break;  // clipped — content overflows its box
-            }
-            const Point pos{col, content_box.origin.row + row};
-            const uint32_t bg = grid.at(pos).attr.bg;
-            grid.put(pos, tok.cp, text_attr(*tok.style, bg));
-            ++col;
-        }
+    for (const auto& placed : layout::place_inline(sn, content_box)) {
+        const uint32_t bg = grid.at(placed.pos).attr.bg;
+        grid.put(placed.pos, placed.token.cp, text_attr(*placed.token.style, bg));
     }
 }
 
