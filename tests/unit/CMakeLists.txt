@@ -15,7 +15,12 @@ add_executable(tvshow-tests
     layout/flex_test.cpp
     layout/image_test.cpp
     render/render_test.cpp
+    render/golden_test.cpp
     paint/paint_test.cpp
+)
+
+target_compile_definitions(tvshow-tests PRIVATE
+    TVSHOW_GOLDEN_DIR="${CMAKE_SOURCE_DIR}/tests/golden"
 )
 
 target_link_libraries(tvshow-tests

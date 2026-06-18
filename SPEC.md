@@ -410,7 +410,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 | Q-8 | Charset support beyond UTF-8 | Need `iconv` dep? |
 | Q-9 | Cookies / sessions | v1 / later |
 | Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
-| Q-11 | Anchor navigation animation policy | Instant vs smooth |
+| Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
 | Q-12 | Debug overlay (Ctrl-D) detail | Box outlines, focus order, box dims, all? |
 | Q-13 | `<table>` support | v1.1 priority? Subset (no colspan)? |
 | Q-14 | Error page styling | UA-themed or plain |
