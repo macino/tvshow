@@ -98,4 +98,14 @@ void BrowserWindow::handleEvent(TEvent& event) {
     TWindow::handleEvent(event);
 }
 
+void BrowserWindow::navigate_back() {
+    view_->navigate_back();
+}
+void BrowserWindow::navigate_forward() {
+    view_->navigate_forward();
+}
+void BrowserWindow::reload() {
+    view_->reload();
+}
+
 }  // namespace tvshow::app

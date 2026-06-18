@@ -217,17 +217,11 @@ void BrowserView::handleEvent(TEvent& event) {
         clearEvent(event);
         break;
     case kbAltLeft:
-        if (history_pos_ > 0) {
-            --history_pos_;
-            navigate(history_[history_pos_], false);
-        }
+        navigate_back();
         clearEvent(event);
         break;
     case kbAltRight:
-        if (history_pos_ + 1 < history_.size()) {
-            ++history_pos_;
-            navigate(history_[history_pos_], false);
-        }
+        navigate_forward();
         clearEvent(event);
         break;
     default: {
@@ -241,6 +235,24 @@ void BrowserView::handleEvent(TEvent& event) {
         break;
     }
     }
+}
+
+void BrowserView::navigate_back() {
+    if (history_pos_ > 0) {
+        --history_pos_;
+        navigate(history_[history_pos_], false);
+    }
+}
+
+void BrowserView::navigate_forward() {
+    if (history_pos_ + 1 < history_.size()) {
+        ++history_pos_;
+        navigate(history_[history_pos_], false);
+    }
+}
+
+void BrowserView::reload() {
+    navigate(history_[history_pos_], false);
 }
 
 }  // namespace tvshow::app

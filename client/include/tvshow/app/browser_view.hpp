@@ -29,6 +29,9 @@ public:
 
     // Navigate to url, pushing onto history. No-op on load failure.
     void navigate_to(std::string_view url);
+    void navigate_back();
+    void navigate_forward();
+    void reload();
 
     [[nodiscard]] const Page& page() const { return page_; }
 

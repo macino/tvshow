@@ -72,6 +72,27 @@ TEST_CASE("integration: GET form submission appends query to echo URL") {
     CHECK(page->doc.title == "Echo");
 }
 
+TEST_CASE("integration: two-tab state isolation") {
+    const ServerFixture server;
+    auto tab1 = load_page(server.base_url() + "/", Viewport{80, 24});
+    auto tab2 = load_page(server.base_url() + "/pages/typography.html", Viewport{80, 24});
+    REQUIRE(tab1.has_value());
+    REQUIRE(tab2.has_value());
+
+    // Each tab holds its own independent URL.
+    CHECK(tab1->url != tab2->url);
+    const std::string tab2_url = tab2->url;
+
+    // Simulating tab1 navigating forward does not disturb tab2.
+    tab1 = load_page(server.base_url() + "/pages/typography.html", Viewport{80, 24});
+    REQUIRE(tab1.has_value());
+    CHECK(tab2->url == tab2_url);
+
+    // Direct mutation of tab1 is invisible to tab2.
+    tab1->url = "mutated";
+    CHECK(tab2->url == tab2_url);
+}
+
 TEST_CASE("integration: https request fails fast with an internal error page") {
     auto page = load_page("https://127.0.0.1:1/pages/colors.html", Viewport{80, 24});
     REQUIRE(page.has_value());

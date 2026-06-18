@@ -34,6 +34,9 @@ public:
 
     // Navigate the inner BrowserView to url (validates first; no-op on bad URL).
     void navigate(std::string_view url);
+    void navigate_back();
+    void navigate_forward();
+    void reload();
 
     // Returns the URL of the currently displayed page.
     [[nodiscard]] std::string_view current_url() const { return view_->page().url; }

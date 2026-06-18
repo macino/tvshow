@@ -31,6 +31,7 @@ private:
 
     // Returns the focused BrowserWindow in the desktop, or nullptr.
     static BrowserWindow* active_browser_window();
+    static void show_window_list();
 };
 
 }  // namespace tvshow::app
