@@ -40,6 +40,22 @@ cmake --build --preset debug --target tvshow-srv
 
 The application opens a TurboVision desktop with a menu bar and status line. Each browser tab is an MDI child window.
 
+```
+ ≡ tvshow  File  Navigate  View  Window
+┌─ http://localhost:8080/ ──────────────────────────────────────┐
+│  Welcome to tvshow                                           ▲│
+│                                                              ░│
+│  A terminal web browser.                                     ░│
+│  Ctrl-L to enter a URL · Tab / Enter to follow links         █│
+│                                                              ░│
+│  ┌─ Sample Pages ──────────────────────────────────────────┐ ░│
+│  │  Typography  Layout & Flex  Forms  Colors  Borders      │ ░│
+│  └─────────────────────────────────────────────────────────┘ ░│
+│                                                              ▼│
+└───────────────────────────────────────────────────────────────┘
+ http://localhost:8080/   F5 Reload  Alt-← Back  Ctrl-L URL
+```
+
 ---
 
 ## Navigation
@@ -49,6 +65,21 @@ The application opens a TurboVision desktop with a menu bar and status line. Eac
 Press **Ctrl-L** to open the address bar. Type a URL and press Enter to navigate. Press Esc to cancel.
 
 Accepted URL schemes: `http://` (HTTPS not yet supported in v1).
+
+```
+ ≡ tvshow  File  Navigate  View  Window
+┌─ http://localhost:8080/pages/ ────────────────────────────────┐
+│                                                              ░│
+│          ┌─ Open URL ──────────────────────────────┐        ░│
+│          │                                         │        █│
+│          │  URL: [ http://localhost:8080/pages/_ ] │        ░│
+│          │                                         │        ░│
+│          │           [ Open ]    [ Cancel ]        │        ░│
+│          │                                         │        ░│
+│          └─────────────────────────────────────────┘        ▼│
+└───────────────────────────────────────────────────────────────┘
+ Enter URL and press Enter                        Esc · Cancel
+```
 
 ### Links
 
@@ -81,6 +112,23 @@ Press **F5** to reload the current page.
 
 Each tab is an independent MDI window with its own history stack. Use the **Window** menu to switch between open tabs, or use standard TurboVision window controls (Alt-F5 to zoom, Alt-F7 to move, Alt-F8 to resize).
 
+```
+ ≡ tvshow  File  Navigate  View  Window
+ ┌─ http://localhost:8080/pages/typography.html ─────────────┐
+ │  Typography                                               ▲│
+ │                                                           ░│
+ │  Heading 1                                                █│
+ │  Heading 2                                                ░│
+ │    ┌─ http://localhost:8080/pages/layout.html ─────────┐  ░│
+ │    │  Layout & Flex                                    ▲│  ░│
+ │    │                                                   ░│  ░│
+ │    │  ┌──────────┐ ┌──────────┐ ┌──────────┐          █│  ░│
+ │    │  │  Item 1  │ │  Item 2  │ │  Item 3  │          ░│  ░│
+ │    │  └──────────┘ └──────────┘ └──────────┘          ▼│  ▼│
+ └────└───────────────────────────────────────────────────┘───┘
+ layout.html — 3 tabs open   F5 Reload  Alt-← Back  Ctrl-L URL
+```
+
 ---
 
 ## Scrolling
@@ -97,6 +145,22 @@ Each tab is an independent MDI window with its own history stack. Use the **Wind
 The vertical scrollbar on the right edge of each tab reflects the current scroll position.
 
 Fragment links (`#section-id`) scroll directly to the target anchor.
+
+```
+┌─ http://localhost:8080/pages/long.html ───────────────────────┐
+│  Section 3: Advanced Topics                                  ▲│
+│                                                              ░│
+│  Lorem ipsum dolor sit amet, consectetur adipiscing elit.   ░│
+│  Sed do eiusmod tempor incididunt ut labore et dolore.       ░│
+│  Ut enim ad minim veniam, quis nostrud exercitation.         ░│
+│                                                              ░│
+│  Sub-section 3.1                                             ░│
+│                                                              █│  ← current position
+│  Aliquip ex ea commodo consequat. Duis aute irure dolor      ░│
+│  in reprehenderit in voluptate velit esse cillum dolore.     ░│
+│                                                              ▼│
+└───────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -115,6 +179,24 @@ Tab/Shift-Tab moves focus between form fields. Supported controls:
 | Button / Submit | `[ Label ]` | Enter to activate |
 
 Press **Enter** on a submit button (or an `input type="submit"`) to submit the form. GET forms append a query string to the action URL; POST forms send `application/x-www-form-urlencoded`.
+
+```
+┌─ http://localhost:8080/pages/forms.html ──────────────────────┐
+│  Contact Form                                                ▲│
+│                                                              ░│
+│  Name:    [ John Smith__________________ ]                   ░│
+│  Email:   [ john@example.com____________ ]                   █│
+│  Message: ┌───────────────────────────────────────┐         ░│
+│           │ Hello! I wanted to ask about...       │         ░│
+│           │                                       │         ░│
+│           └───────────────────────────────────────┘         ░│
+│  Options: [x] Newsletter  [ ] Notifications                  ░│
+│  Role:    (•) User  ( ) Admin  ( ) Guest                     ░│
+│  Theme:   [ Dark ▾ ]                                         ░│
+│                                                              ░│
+│           [ Submit ]    [ Reset ]                            ▼│
+└───────────────────────────────────────────────────────────────┘
+```
 
 ---
 

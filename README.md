@@ -3,19 +3,23 @@
 A terminal "web browser" built with TurboVision. An HTTP server returns HTML+CSS; the client parses, lays out into character cells, and renders with box-drawing glyphs and truecolor attributes.
 
 ```
-┌──────────────────────────────────────────┐
-│ ≡ tvshow  File  Navigate  View  Window   │
-├──────────────────────────────────────────┤
-│ ┌── http://localhost:8080/ ────────────┐ │
-│ │                                      │ │
-│ │  Welcome to tvshow                   │ │
-│ │                                      │ │
-│ │  ┌──────────┐  ┌──────────────────┐  │ │
-│ │  │ Typography│  │ Layout & Flex    │  │ │
-│ │  └──────────┘  └──────────────────┘  │ │
-│ └──────────────────────────────────────┘ │
-│ F5 Reload  Alt-← Back  Ctrl-L URL        │
-└──────────────────────────────────────────┘
+ ≡ tvshow  File  Navigate  View  Window
+┌─ http://localhost:8080/ ──────────────────────────────────────┐
+│  Welcome to tvshow                                           ▲│
+│                                                              ░│
+│  A terminal web browser built with TurboVision.              ░│
+│  Ctrl-L · URL   Tab/Enter · links   Ctrl-T · new tab         █│
+│                                                              ░│
+│  ┌─ Sample Pages ──────────────────────────────────────────┐ ░│
+│  │  Typography  Layout & Flex  Forms  Colors  Borders      │ ░│
+│  └─────────────────────────────────────────────────────────┘ ░│
+│                                                              ░│
+│  ╔═ Features ══════════════════════════════════════════════╗ ░│
+│  ║  HTML5 block · inline · flex layout                     ║ ░│
+│  ║  CSS cascade · truecolor · box-drawing borders          ║ ░│
+│  ║  Forms GET/POST · MDI tabs · back/forward history       ║ ▼│
+└───────────────────────────────────────────────────────────────┘
+ http://localhost:8080/   F5 Reload  Alt-← Back  Ctrl-L URL
 ```
 
 ## Documentation

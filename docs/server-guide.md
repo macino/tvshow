@@ -198,9 +198,76 @@ tvshow draws CSS borders using Unicode box-drawing characters:
 
 Border width is always 1 cell regardless of the `px` value. Setting `border-width: 0` collapses to `none`.
 
+**Rendered example:**
+
+```html
+<div style="border: solid; padding: 1ch;">Solid border</div>
+<div style="border: double; padding: 1ch;">Double border</div>
+<div style="border: dashed; padding: 1ch;">Dashed border</div>
+```
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Solid border                                            │
+└─────────────────────────────────────────────────────────┘
+
+╔═════════════════════════════════════════════════════════╗
+║ Double border                                           ║
+╚═════════════════════════════════════════════════════════╝
+
+┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
+╎ Dashed border                                           ╎
+└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘
+```
+
 ---
 
 ## Tips for targeting tvshow
+
+**Rendered examples**
+
+Typography — `h1`–`h3` with inline emphasis:
+
+```html
+<h1>Page Title</h1>
+<h2>Section Heading</h2>
+<p>Normal text with <strong>bold</strong> and <em>italic</em> spans.
+A <a href="/next">link</a> renders highlighted when focused.</p>
+<pre>  preformatted
+  text block</pre>
+```
+
+```
+Page Title
+══════════════════════════════════════════════════════════════
+
+Section Heading
+──────────────────────────────────────────────────────────────
+
+Normal text with bold and italic spans. A link renders
+highlighted when focused.
+
+  preformatted
+  text block
+```
+
+Flex row layout:
+
+```html
+<div style="display:flex; justify-content:space-between; gap:2ch;">
+  <div style="border:solid; padding:1ch; flex-grow:1;">Alpha</div>
+  <div style="border:solid; padding:1ch; flex-grow:1;">Beta</div>
+  <div style="border:solid; padding:1ch; flex-grow:1;">Gamma</div>
+</div>
+```
+
+```
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│ Alpha            │ │ Beta             │ │ Gamma            │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+```
+
+---
 
 **Use explicit widths in cells, not pixels.** `width: 40ch` is exactly 40 columns. `width: 320px` is 40 columns (320 ÷ 8). Both are fine; `ch` is clearer.
 
