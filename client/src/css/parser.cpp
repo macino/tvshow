@@ -35,10 +35,10 @@ std::string fmt_num(double v) {
 const char* kval_string(const KatanaValue& v) noexcept {
     return v.string;  // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
+// Katana always stores numeric values in fValue (including integers).
+// iValue is only populated for KATANA_VALUE_PARSER_OPERATOR tokens.
 double kval_double(const KatanaValue& v) noexcept {
-    return v.isInt
-               ? static_cast<double>(v.iValue)  // NOLINT(cppcoreguidelines-pro-type-union-access)
-               : v.fValue;                      // NOLINT(cppcoreguidelines-pro-type-union-access)
+    return v.fValue;  // NOLINT(cppcoreguidelines-pro-type-union-access)
 }
 const KatanaValueFunction* kval_function(const KatanaValue& v) noexcept {
     return v.function;  // NOLINT(cppcoreguidelines-pro-type-union-access)

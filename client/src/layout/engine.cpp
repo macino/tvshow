@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <numeric>
 #include <utility>
 #include <vector>
 
@@ -105,6 +107,21 @@ bool has_inline_content(const style::StyledNode& sn) noexcept {
     });
 }
 
+// ── Forward declarations (mutual recursion) ───────────────────────────────────
+
+// NOLINTNEXTLINE(misc-no-recursion)
+Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int avail_h);
+// NOLINTNEXTLINE(misc-no-recursion)
+Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int avail_h);
+
+// NOLINTNEXTLINE(misc-no-recursion)
+Box layout_node(const style::StyledNode& sn, CellPos origin, int avail_w, int avail_h) {
+    if (sn.style.display == style::Display::Flex) {
+        return layout_flex(sn, origin, avail_w, avail_h);
+    }
+    return layout_block(sn, origin, avail_w, avail_h);
+}
+
 // ── Block layout ──────────────────────────────────────────────────────────────
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -158,7 +175,7 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
             disp == style::Display::InlineBlock) {
             const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
             y += cmar.top;
-            Box child_box = layout_block(child, {content_origin.col, y}, content_w, avail_h);
+            Box child_box = layout_node(child, {content_origin.col, y}, content_w, avail_h);
             y += child_box.border_box.size.rows + cmar.bottom;
             children.push_back(std::move(child_box));
         }
@@ -170,6 +187,261 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
 
     const int content_h =
         st.height.is_auto ? std::max(0, y - content_origin.row) : resolve_v(st.height, avail_h);
+
+    Box box;
+    box.node = &sn;
+    box.border_box = {border_origin,
+                      {brd.left + pad.left + content_w + pad.right + brd.right,
+                       brd.top + pad.top + content_h + pad.bottom + brd.bottom}};
+    box.content_box = {content_origin, {content_w, content_h}};
+    box.children = std::move(children);
+    return box;
+}
+
+// ── Flex layout ───────────────────────────────────────────────────────────────
+
+struct FlexItem {
+    const style::StyledNode* sn;
+    int main_base;  // hypothetical main-axis size in cells
+    float grow;
+    float shrink;
+};
+
+// Collect flex items from a container's children, skipping display:none and
+// hidden form controls. Returns items in source order.
+std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_row, int content_main,
+                                         int avail_cross) {
+    std::vector<FlexItem> items;
+    for (const auto& child : sn.children) {
+        if (child.node == nullptr || child.node->kind != dom::NodeKind::Element) {
+            continue;
+        }
+        if (child.style.display == style::Display::None) {
+            continue;
+        }
+        const FormControlKind fck = form_control_kind(*child.node);
+        if (fck == FormControlKind::Hidden) {
+            continue;
+        }
+
+        int base = 0;
+        const auto& fb = child.style.flex_basis;
+        if (!fb.is_auto) {
+            base = is_row ? resolve_h(fb, content_main) : resolve_v(fb, avail_cross);
+        } else if (is_row && !child.style.width.is_auto) {
+            base = resolve_h(child.style.width, content_main);
+        } else if (!is_row && !child.style.height.is_auto) {
+            base = resolve_v(child.style.height, avail_cross);
+        }
+        items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink});
+    }
+    return items;
+}
+
+// Distribute main-axis free space among items via flex-grow / flex-shrink.
+void distribute_flex_space(std::vector<int>& main_sizes, const std::vector<FlexItem>& items,
+                           int free_space) {
+    const int n = static_cast<int>(main_sizes.size());
+    if (free_space > 0) {
+        const float total_grow =
+            std::accumulate(items.begin(), items.end(), 0.0F,
+                            [](float s, const FlexItem& it) { return s + it.grow; });
+        if (total_grow > 0) {
+            for (int i = 0; i < n; ++i) {
+                main_sizes[static_cast<size_t>(i)] +=
+                    static_cast<int>(items[static_cast<size_t>(i)].grow / total_grow *
+                                     static_cast<float>(free_space));
+            }
+        }
+    } else if (free_space < 0) {
+        const float total_ws =
+            std::accumulate(items.begin(), items.end(), 0.0F, [](float s, const FlexItem& it) {
+                return s + it.shrink * static_cast<float>(it.main_base);
+            });
+        if (total_ws > 0) {
+            for (int i = 0; i < n; ++i) {
+                const auto& it = items[static_cast<size_t>(i)];
+                main_sizes[static_cast<size_t>(i)] +=
+                    static_cast<int>(it.shrink * static_cast<float>(it.main_base) / total_ws *
+                                     static_cast<float>(free_space));
+                main_sizes[static_cast<size_t>(i)] =
+                    std::max(0, main_sizes[static_cast<size_t>(i)]);
+            }
+        }
+    }
+}
+
+// Compute per-item main-axis offsets from content origin based on justify-content.
+// Returns {start_offset, gap_between_items} (gap_between adds to the fixed gap).
+struct JustifyResult {
+    int start = 0;
+    int between = 0;
+};
+JustifyResult apply_justify(style::JustifyContent jc, int free_space, int n) {
+    switch (jc) {
+    case style::JustifyContent::FlexStart:
+        return {0, 0};
+    case style::JustifyContent::FlexEnd:
+        return {free_space, 0};
+    case style::JustifyContent::Center:
+        return {free_space / 2, 0};
+    case style::JustifyContent::SpaceBetween:
+        return {0, (n > 1) ? free_space / (n - 1) : 0};
+    case style::JustifyContent::SpaceAround:
+        return {(n > 0) ? free_space / n / 2 : 0, (n > 0) ? free_space / n : 0};
+    }
+    return {0, 0};
+}
+
+// Apply cross-axis alignment (align-items) to already-laid-out flex items.
+// content_cross: resolved container cross size.
+// is_row: true for row direction, false for column direction.
+void apply_cross_align(std::vector<Box>& children, style::AlignItems align, bool is_row,
+                       int content_cross) {
+    for (auto& cb : children) {
+        const int item_cross = is_row ? cb.border_box.size.rows : cb.border_box.size.cols;
+        const int free_cross = content_cross - item_cross;
+
+        int cross_offset = 0;
+        switch (align) {
+        case style::AlignItems::Stretch:
+            if (is_row && content_cross > item_cross) {
+                cb.border_box.size.rows = content_cross;
+                cb.content_box.size.rows = content_cross;
+            }
+            break;
+        case style::AlignItems::FlexStart:
+            break;
+        case style::AlignItems::FlexEnd:
+            cross_offset = free_cross;
+            break;
+        case style::AlignItems::Center:
+            cross_offset = free_cross / 2;
+            break;
+        case style::AlignItems::Baseline:
+            break;
+        }
+
+        if (cross_offset > 0) {
+            if (is_row) {
+                cb.border_box.origin.row += cross_offset;
+                cb.content_box.origin.row += cross_offset;
+            } else {
+                cb.border_box.origin.col += cross_offset;
+                cb.content_box.origin.col += cross_offset;
+            }
+        }
+    }
+}
+
+// NOLINTNEXTLINE(misc-no-recursion,readability-function-cognitive-complexity)
+Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int avail_h) {
+    const auto& st = sn.style;
+    const EdgePx brd = compute_border(st.border);
+    const EdgePx pad = compute_padding(st.padding, avail_w, avail_h);
+    const EdgePx mar = compute_margin(st.margin, avail_w, avail_h);
+
+    const int chrome_h = mar.left + brd.left + pad.left + pad.right + brd.right + mar.right;
+    const int content_w =
+        st.width.is_auto ? std::max(0, avail_w - chrome_h) : resolve_h(st.width, avail_w);
+
+    const CellPos border_origin{origin.col + mar.left, origin.row + mar.top};
+    const CellPos content_origin{border_origin.col + brd.left + pad.left,
+                                 border_origin.row + brd.top + pad.top};
+
+    const bool is_row = (st.flex_direction != style::FlexDirection::Column &&
+                         st.flex_direction != style::FlexDirection::ColumnReverse);
+    const int content_main = is_row ? content_w : avail_h;
+
+    int content_cross_explicit = content_w;  // column direction: cross is content_w
+    if (is_row) {
+        content_cross_explicit = st.height.is_auto ? -1 : resolve_v(st.height, avail_h);
+    }
+
+    const int gap_main = is_row ? resolve_h(st.gap, content_main) : resolve_v(st.gap, avail_h);
+
+    const std::vector<FlexItem> items =
+        collect_flex_items(sn, is_row, content_main, is_row ? avail_h : content_w);
+    const int n = static_cast<int>(items.size());
+
+    // ── Main-axis sizing ──────────────────────────────────────────────────────
+
+    std::vector<int> main_sizes(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        main_sizes[static_cast<size_t>(i)] = items[static_cast<size_t>(i)].main_base;
+    }
+
+    const int total_base = std::accumulate(main_sizes.begin(), main_sizes.end(), 0);
+    const int total_gaps = (n > 1) ? gap_main * (n - 1) : 0;
+    const int main_available =
+        (content_cross_explicit >= 0 && !is_row) ? content_cross_explicit : content_main;
+    distribute_flex_space(main_sizes, items, main_available - total_base - total_gaps);
+
+    const int used_main = std::accumulate(main_sizes.begin(), main_sizes.end(), 0) + total_gaps;
+    const int free_main = main_available - used_main;
+
+    const auto [jc_start, jc_between] = apply_justify(st.justify_content, free_main, n);
+
+    // ── Lay out each item ─────────────────────────────────────────────────────
+
+    const bool do_stretch = (st.align_items == style::AlignItems::Stretch);
+    const int cross_avail = is_row ? avail_h : content_w;
+
+    std::vector<Box> children;
+    children.reserve(static_cast<size_t>(n));
+
+    int main_cursor = (is_row ? content_origin.col : content_origin.row) + jc_start;
+
+    for (int i = 0; i < n; ++i) {
+        const auto& item = items[static_cast<size_t>(i)];
+        const int msz = main_sizes[static_cast<size_t>(i)];
+
+        int item_w = 0;
+        int item_h = 0;
+        if (is_row) {
+            item_w = msz;
+            item_h = (do_stretch && content_cross_explicit >= 0) ? content_cross_explicit : 0;
+        } else {
+            item_w = cross_avail;
+            item_h = msz;
+        }
+
+        const CellPos tmp_origin = is_row ? CellPos{main_cursor, content_origin.row}
+                                          : CellPos{content_origin.col, main_cursor};
+
+        Box child_box = layout_node(*item.sn, tmp_origin, item_w > 0 ? item_w : cross_avail,
+                                    item_h > 0 ? item_h : avail_h);
+
+        if (is_row && msz > 0) {
+            child_box.border_box.size.cols = msz;
+            child_box.content_box.size.cols = std::max(
+                0, msz - (child_box.border_box.size.cols - child_box.content_box.size.cols));
+        }
+        if (!is_row && msz > 0) {
+            child_box.border_box.size.rows = msz;
+        }
+
+        children.push_back(std::move(child_box));
+        main_cursor += msz + gap_main + jc_between;
+    }
+
+    // ── Cross-axis sizing and positioning (align-items) ───────────────────────
+
+    int max_cross = 0;
+    for (const auto& cb : children) {
+        max_cross = std::max(max_cross, is_row ? cb.border_box.size.rows : cb.border_box.size.cols);
+    }
+    const int content_cross = (content_cross_explicit >= 0) ? content_cross_explicit : max_cross;
+
+    apply_cross_align(children, st.align_items, is_row, content_cross);
+
+    // ── Build container box ───────────────────────────────────────────────────
+
+    int content_h =
+        st.height.is_auto ? used_main : resolve_v(st.height, avail_h);  // column default
+    if (is_row) {
+        content_h = st.height.is_auto ? content_cross : resolve_v(st.height, avail_h);
+    }
 
     Box box;
     box.node = &sn;

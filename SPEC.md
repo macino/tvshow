@@ -261,7 +261,7 @@ Standard CSS block flow. Block boxes stack vertically; inline boxes flow horizon
 Line boxes built greedily. `white-space: pre` preserves newlines and runs of spaces. `white-space: nowrap` disables wrapping — overflow handled per `overflow` property.
 
 ### 10.3 Flex
-v1 supports `flex-direction: row | column`, `justify-content: flex-start | flex-end | center | space-between | space-around`, `align-items: flex-start | flex-end | center | stretch`, `gap`, `flex-grow`, `flex-shrink`, `flex-basis`. No wrapping (`flex-wrap: nowrap` only).
+v1 supports `flex-direction: row | column`, `justify-content: flex-start | flex-end | center | space-between | space-around`, `align-items: flex-start | flex-end | center | stretch`, `gap`, `flex-grow`, `flex-shrink`, `flex-basis`. No wrapping (`flex-wrap: nowrap` only). Overflow truncates at the viewport edge (Q-3 resolved).
 
 ### 10.4 Viewport and Resize
 Viewport = inner content area of the active `TBrowserWindow` (after subtracting frame, scrollbars, address line). On terminal resize, the active document is re-laid-out from the cached Styled DOM (no re-fetch).
@@ -402,7 +402,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 |---|-------|------|
 | Q-1 | Address bar UX | **Resolved**: modal default; `--address-bar=persistent` opt-in for permanent top bar. |
 | Q-2 | Bookmarks / homepage / start page | Format (file? config? UI menu) |
-| Q-3 | Resize behavior for flex layouts when viewport too narrow | Truncate vs horizontal scrollbar vs reflow |
+| Q-3 | Resize behavior for flex layouts when viewport too narrow | **Resolved**: truncate — overflow clips at viewport edge; no per-container horizontal scrollbar in v1. |
 | Q-4 | UA default stylesheet — how opinionated | Mimic browser defaults vs minimal |
 | Q-5 | Selection / clipboard support | v1 yes/no |
 | Q-6 | Mouse support level | Click only, or wheel + drag-to-resize windows |
