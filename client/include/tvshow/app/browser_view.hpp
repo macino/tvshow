@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 struct TScrollBar;
@@ -36,6 +37,7 @@ public:
     void reload();
 
     [[nodiscard]] const Page& page() const { return page_; }
+    [[nodiscard]] const std::vector<std::string>& history() const { return history_; }
 
     // Wire a vertical scrollbar managed by BrowserWindow. May be null.
     void set_vscroll(TScrollBar* sb) { vscroll_ = sb; }
@@ -57,6 +59,7 @@ private:
     TScrollBar* vscroll_{nullptr};  // non-owning; managed by BrowserWindow
 
     std::vector<std::string> history_;
+    std::unordered_set<std::string> visited_;
     size_t history_pos_ = 0;
 
     [[nodiscard]] int total_focusables() const;
@@ -67,6 +70,9 @@ private:
     void sync_vscroll();
     [[nodiscard]] render::CharGrid render_grid() const;
     void navigate(const std::string& url, bool push_history);
+    // Hit-test pt (content coords) against links/form controls, handle and clear
+    // event on hit. Returns true if the event was consumed.
+    bool handle_mouse_hit(Point pt, TEvent& event);
     void focus_next(int direction);
     void handle_form_input(unsigned keyCode);
     void submit_form();

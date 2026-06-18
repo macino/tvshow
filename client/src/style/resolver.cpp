@@ -198,7 +198,7 @@ hr { display: block; margin-top: 8px; margin-bottom: 8px; }
 span { display: inline; }
 small { display: inline; }
 u { display: inline; text-decoration: underline; }
-a { display: inline; text-decoration: underline; }
+a { display: inline; color: #5555ff; text-decoration: underline; }
 b { display: inline; font-weight: bold; }
 strong { display: inline; font-weight: bold; }
 i { display: inline; font-style: italic; }

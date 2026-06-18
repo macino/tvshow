@@ -10,6 +10,7 @@
 #include "tvshow/style/tree.hpp"
 #include "tvshow/style/types.hpp"
 #include "tvshow/types.hpp"
+#include "tvshow/util/url.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -142,16 +143,26 @@ void paint_border(CharGrid& grid, const layout::CellRect& rect, const style::Bor
 
 // ── inline text ──────────────────────────────────────────────────────────────
 
+constexpr uint32_t k_visited_fg = 0xCC55CCU;  // purple for visited links
+
 // SPEC §10.2: line boxes are built (and placed) by layout::place_inline, so
 // layout's row count and render's character placement agree by construction.
-void paint_text(CharGrid& grid, const layout::CellRect& content_box, const style::StyledNode& sn) {
+void paint_text(CharGrid& grid, const layout::CellRect& content_box, const style::StyledNode& sn,
+                const RenderOpts& opts) {
     for (const auto& placed : layout::place_inline(sn, content_box)) {
         if (placed.pos.col < 0 || placed.pos.col >= grid.cols() || placed.pos.row < 0 ||
             placed.pos.row >= grid.rows()) {
             continue;
         }
         const uint32_t bg = grid.at(placed.pos).attr.bg;
-        grid.put(placed.pos, placed.token.cp, text_attr(*placed.token.style, bg));
+        ColorAttr attr = text_attr(*placed.token.style, bg);
+        if (opts.visited_urls != nullptr && !placed.token.href.empty()) {
+            const std::string resolved = util::resolve_url(opts.base_url, placed.token.href);
+            if (opts.visited_urls->count(resolved) > 0) {
+                attr.fg = k_visited_fg;
+            }
+        }
+        grid.put(placed.pos, placed.token.cp, attr);
     }
 }
 
@@ -231,7 +242,7 @@ void paint_submit(const GridPen& pen, int w, const dom::Node& node) {
     pen.put({w - 1, 0}, U']');
 }
 
-void paint_textarea(const GridPen& pen, int w, int h) {
+void paint_textarea(const GridPen& pen, int w, int h, const dom::Node& node, const FormValues& fv) {
     if (w < 2 || h < 2) {
         return;
     }
@@ -252,6 +263,20 @@ void paint_textarea(const GridPen& pen, int w, int h) {
         pen.put({c, h - 1}, U'─');
     }
     pen.put({w - 1, h - 1}, U'┘');
+    // Render text content in the interior (rows 1..h-2, cols 1..w-2).
+    const std::string_view val = resolve_text_value(node, fv);
+    int text_row = 1;
+    size_t pos = 0;
+    while (text_row < h - 1 && pos <= val.size()) {
+        const size_t eol = val.find('\n', pos);
+        const size_t line_end = (eol == std::string_view::npos) ? val.size() : eol;
+        int col = 1;
+        for (size_t i = pos; i < line_end && col < w - 1; ++i, ++col) {
+            pen.put({col, text_row}, static_cast<char32_t>(static_cast<unsigned char>(val[i])));
+        }
+        pos = (eol == std::string_view::npos) ? val.size() + 1 : eol + 1;
+        ++text_row;
+    }
 }
 
 void paint_select(const GridPen& pen, int w) {
@@ -292,7 +317,7 @@ void paint_form_control(CharGrid& grid, const layout::Box& box, const dom::Node&
         paint_submit(pen, w, node);
         break;
     case layout::FormControlKind::Textarea:
-        paint_textarea(pen, w, h);
+        paint_textarea(pen, w, h, node, fv);
         break;
     case layout::FormControlKind::Select:
         paint_select(pen, w);
@@ -333,7 +358,7 @@ void paint_img(CharGrid& grid, const layout::Box& box, const dom::Node& node,
 
 // NOLINTNEXTLINE(misc-no-recursion)
 void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
-               const images::ImageRenderer& img_renderer) {
+               const images::ImageRenderer& img_renderer, const RenderOpts& opts) {
     if (box.node == nullptr) {
         return;
     }
@@ -352,19 +377,19 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
             }
         }
         paint_border(grid, box.border_box, st.border);
-        paint_text(grid, box.content_box, *box.node);
+        paint_text(grid, box.content_box, *box.node, opts);
     }
     for (const auto& child : box.children) {
-        paint_box(grid, child, fv, img_renderer);
+        paint_box(grid, child, fv, img_renderer, opts);
     }
 }
 
 }  // namespace
 
-CharGrid render(const layout::Box& root, const FormValues& fv) {
+CharGrid render(const layout::Box& root, const FormValues& fv, const RenderOpts& opts) {
     CharGrid grid(std::max(root.border_box.size.cols, 1), std::max(root.border_box.size.rows, 1));
     const images::AltTextRenderer img_renderer;
-    paint_box(grid, root, fv, img_renderer);
+    paint_box(grid, root, fv, img_renderer, opts);
     return grid;
 }
 

@@ -11,9 +11,13 @@
 #include <tvision/tv.h>
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <ranges>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace tvshow::app {
@@ -87,6 +91,45 @@ void BrowserWindow::navigate(std::string_view url) {
     }
 }
 
+void BrowserWindow::handle_url_completion(bool reverse) {
+    std::array<char, kUrlMaxLen + 1> buf{};
+    bar_->getData(buf.data());
+    const std::string cur(buf.data());
+
+    // Check whether we can continue the current session or must start a new one.
+    const bool same_session = completion_valid_ && cur == completion_current_;
+    if (!same_session) {
+        completion_prefix_ = cur;
+        completion_candidates_.clear();
+        completion_idx_ = 0;
+        completion_valid_ = true;
+        // Collect unique history entries that extend the current prefix (most recent first).
+        std::unordered_set<std::string> seen;
+        for (const auto& url : view_->history() | std::views::reverse) {
+            if (url.size() > cur.size() && url.starts_with(cur) && seen.insert(url).second) {
+                completion_candidates_.push_back(url);
+            }
+        }
+    } else {
+        // Advance (or reverse) through existing candidates.
+        if (!completion_candidates_.empty()) {
+            const std::size_t n = completion_candidates_.size();
+            completion_idx_ = reverse ? (completion_idx_ + n - 1) % n : (completion_idx_ + 1) % n;
+        }
+    }
+
+    if (completion_candidates_.empty()) {
+        return;
+    }
+    const std::string& suggestion = completion_candidates_[completion_idx_];
+    completion_current_ = suggestion;
+    std::array<char, kUrlMaxLen + 1> sbuf{};
+    std::strncpy(sbuf.data(), suggestion.c_str(), kUrlMaxLen);
+    bar_->setData(sbuf.data());
+    bar_->selectAll(true);
+    bar_->drawView();
+}
+
 void BrowserWindow::handleEvent(TEvent& event) {
     // Scrollbar changed: update view scroll position.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
@@ -97,18 +140,34 @@ void BrowserWindow::handleEvent(TEvent& event) {
         clearEvent(event);
         return;
     }
-    // Persistent bar: Enter while bar_ is focused → validate and navigate.
+    // Persistent bar key handling (Tab completion + Enter navigation).
     if (mode_ == AddressBarMode::Persistent && bar_ != nullptr && event.what == evKeyDown &&
+        current == bar_) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
-        event.keyDown.keyCode == kbEnter && current == bar_) {
-        std::array<char, kUrlMaxLen + 1> buf{};
-        bar_->getData(buf.data());
-        const std::string url(buf.data());
-        clearEvent(event);
-        if (is_navigable(url)) {
-            view_->navigate_to(url);
+        const uint16_t key = event.keyDown.keyCode;
+        if (key == kbTab) {
+            handle_url_completion(false);
+            clearEvent(event);
+            return;
         }
-        return;
+        if (key == kbShiftTab) {
+            handle_url_completion(true);
+            clearEvent(event);
+            return;
+        }
+        if (key == kbEnter) {
+            std::array<char, kUrlMaxLen + 1> buf{};
+            bar_->getData(buf.data());
+            const std::string url(buf.data());
+            completion_valid_ = false;
+            clearEvent(event);
+            if (is_navigable(url)) {
+                view_->navigate_to(url);
+            }
+            return;
+        }
+        // Any other key resets the completion session.
+        completion_valid_ = false;
     }
     TWindow::handleEvent(event);
 }

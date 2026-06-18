@@ -8,8 +8,11 @@
 #define Uses_TWindow
 #include <tvision/tv.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace tvshow::app {
 
@@ -49,6 +52,15 @@ private:
     TScrollBar* vscroll_{nullptr};  // non-owning; null until constructed
 
     void reposition(const TRect& inner);
+
+    // URL-bar Tab-completion state.
+    std::string completion_prefix_;
+    std::string completion_current_;
+    std::vector<std::string> completion_candidates_;
+    std::size_t completion_idx_ = 0;
+    bool completion_valid_ = false;
+
+    void handle_url_completion(bool reverse);
 };
 
 }  // namespace tvshow::app

@@ -4,24 +4,36 @@
 <title>Forms</title>
 <style>
 .field { display: block; margin-bottom: 16px; }
+.label { display: block; }
 .actions { display: block; margin-top: 16px; }
 </style>
 </head>
 <body>
 <h1>Forms</h1>
 <form action="/echo" method="post">
-  <div class="field"><label>Name: </label><input type="text" name="name" value=""></div>
-  <div class="field"><label>Password: </label><input type="password" name="password"></div>
-  <div class="field"><label><input type="checkbox" name="subscribe" value="yes"> Subscribe to newsletter</label></div>
   <div class="field">
-    Plan:
-    <label><input type="radio" name="plan" value="a"> Plan A</label>
-    <label><input type="radio" name="plan" value="b"> Plan B</label>
-    <label><input type="radio" name="plan" value="c"> Plan C</label>
+    <div class="label">Name:</div>
+    <input type="text" name="name" value="">
   </div>
-  <div class="field"><label>Comments: </label><textarea name="comments" rows="3"></textarea></div>
   <div class="field">
-    <label>Country: </label>
+    <div class="label">Password:</div>
+    <input type="password" name="password">
+  </div>
+  <div class="field">
+    <div><input type="checkbox" name="subscribe" value="yes"> Subscribe to newsletter</div>
+  </div>
+  <div class="field">
+    <div class="label">Plan:</div>
+    <div><input type="radio" name="plan" value="a"> Plan A</div>
+    <div><input type="radio" name="plan" value="b"> Plan B</div>
+    <div><input type="radio" name="plan" value="c"> Plan C</div>
+  </div>
+  <div class="field">
+    <div class="label">Comments:</div>
+    <textarea name="comments" rows="3"></textarea>
+  </div>
+  <div class="field">
+    <div class="label">Country:</div>
     <select name="country">
       <option value="cz">Czechia</option>
       <option value="sk">Slovakia</option>

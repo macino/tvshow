@@ -13,6 +13,7 @@
 #include "tvshow/paint/paint.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
+#include "tvshow/types.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <tvision/tv.h>
@@ -52,7 +53,8 @@ const layout::FormFocus* BrowserView::focused_fc() const {
 }
 
 render::CharGrid BrowserView::render_grid() const {
-    render::CharGrid grid = render::render(page_.box, form_values_);
+    const render::RenderOpts opts{page_.url, &visited_};
+    render::CharGrid grid = render::render(page_.box, form_values_, opts);
     if (is_link_focused()) {
         render::apply_focus(grid, links_[static_cast<size_t>(focused_)].spans);
     } else if (const layout::FormFocus* fc = focused_fc()) {
@@ -124,6 +126,7 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
         return;
     }
     page_ = std::move(*page);
+    visited_.insert(page_.url);
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
     form_values_ = {};
@@ -165,12 +168,15 @@ void BrowserView::handle_form_input(unsigned keyCode) {
     }
     const unsigned char_code = keyCode & 0xFFU;
     if (fc->kind == layout::FormControlKind::Text ||
-        fc->kind == layout::FormControlKind::Password) {
+        fc->kind == layout::FormControlKind::Password ||
+        fc->kind == layout::FormControlKind::Textarea) {
         auto& val = form_values_.text[fc->node];
         if (char_code == 0x08U) {
             if (!val.empty()) {
                 val.pop_back();
             }
+        } else if (fc->kind == layout::FormControlKind::Textarea && char_code == 0x0DU) {
+            val += '\n';
         } else {
             val += static_cast<char>(char_code);
         }
@@ -228,29 +234,35 @@ void BrowserView::submit_form() {
     }
 }
 
+bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
+    for (const auto& link : links_) {
+        for (const auto& span : link.spans) {
+            if (span.contains(pt)) {
+                navigate(util::resolve_url(page_.url, link.href), true);
+                clearEvent(event);
+                return true;
+            }
+        }
+    }
+    for (size_t i = 0; i < form_controls_.size(); ++i) {
+        if (form_controls_[i].span.contains(pt)) {
+            focused_ = static_cast<int>(links_.size() + i);
+            drawView();
+            clearEvent(event);
+            return true;
+        }
+    }
+    return false;
+}
+
 void BrowserView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
 
     if (event.what == evMouseDown) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
         const TPoint local = makeLocal(event.mouse.where);
-        const tvshow::Point pt{local.x, local.y + scroll_row_};
-        for (size_t i = 0; i < links_.size(); ++i) {
-            for (const auto& span : links_[i].spans) {
-                if (span.contains(pt)) {
-                    navigate(util::resolve_url(page_.url, links_[i].href), true);
-                    clearEvent(event);
-                    return;
-                }
-            }
-        }
-        for (size_t i = 0; i < form_controls_.size(); ++i) {
-            if (form_controls_[i].span.contains(pt)) {
-                focused_ = static_cast<int>(links_.size() + i);
-                drawView();
-                clearEvent(event);
-                return;
-            }
+        if (handle_mouse_hit({local.x, local.y + scroll_row_}, event)) {
+            return;
         }
         return;
     }
@@ -297,8 +309,12 @@ void BrowserView::handleEvent(TEvent& event) {
         if (is_link_focused()) {
             navigate(util::resolve_url(page_.url, links_[static_cast<size_t>(focused_)].href),
                      true);
-        } else if (focused_fc() != nullptr) {
-            submit_form();
+        } else if (const layout::FormFocus* fc = focused_fc(); fc != nullptr) {
+            if (fc->kind == layout::FormControlKind::Textarea) {
+                handle_form_input(kbEnter);
+            } else {
+                submit_form();
+            }
         }
         clearEvent(event);
         break;
