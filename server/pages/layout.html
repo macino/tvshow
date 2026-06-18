@@ -3,27 +3,32 @@
 <head>
 <title>Layout</title>
 <style>
-.box { border: 1px solid; padding: 1; margin: 1; }
-.row { display: flex; flex-direction: row; gap: 1; }
-.col { display: flex; flex-direction: column; gap: 1; }
+.box  { border: solid; padding: 8px; margin-bottom: 16px; }
+.row  { display: flex; flex-direction: row; gap: 8px; margin-bottom: 16px; }
+.col  { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
 .grow { flex-grow: 1; }
 </style>
 </head>
 <body>
 <h1>Layout</h1>
+<h2>Block box</h2>
 <div class="box">A block box with a border and padding.</div>
+<h2>Flex row</h2>
 <div class="row">
-<div class="box grow">Flex item one (grows)</div>
-<div class="box">Flex item two</div>
+  <div class="box grow">Flex item one (grows)</div>
+  <div class="box" style="width: 16ch">Flex item two</div>
+  <div class="box" style="width: 18ch">Flex item three</div>
 </div>
+<h2>Flex column</h2>
 <div class="col">
-<div class="box">Stacked item A</div>
-<div class="box">Stacked item B</div>
+  <div class="box">Stacked item A</div>
+  <div class="box">Stacked item B</div>
 </div>
+<h2>List</h2>
 <ul>
-<li>List item one</li>
-<li>List item two</li>
-<li>List item three</li>
+  <li>List item one</li>
+  <li>List item two</li>
+  <li>List item three</li>
 </ul>
 </body>
 </html>

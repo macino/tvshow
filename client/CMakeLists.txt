@@ -93,6 +93,23 @@ set_target_properties(tvshow_io PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
+# Headless renderer — captures page render output as plain text. No tvision.
+add_executable(tvshow-capture
+    src/capture_main.cpp
+)
+
+target_link_libraries(tvshow-capture
+    PRIVATE
+        tvshow_io
+        tvshow_warnings
+)
+
+set_target_properties(tvshow-capture PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
 # Browser client — links tvision for TUI.
 add_executable(tvshow
     src/main.cpp

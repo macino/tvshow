@@ -47,8 +47,10 @@ void paint_background(CharGrid& grid, const layout::CellRect& rect, const style:
         return;
     }
     const uint32_t bg_u32 = to_rgb_u32(bg);
-    for (int r = rect.origin.row; r < rect.origin.row + rect.size.rows; ++r) {
-        for (int c = rect.origin.col; c < rect.origin.col + rect.size.cols; ++c) {
+    const int r_end = std::min(rect.origin.row + rect.size.rows, grid.rows());
+    const int c_end = std::min(rect.origin.col + rect.size.cols, grid.cols());
+    for (int r = std::max(rect.origin.row, 0); r < r_end; ++r) {
+        for (int c = std::max(rect.origin.col, 0); c < c_end; ++c) {
             const Point pos{c, r};
             ColorAttr attr = grid.at(pos).attr;
             attr.bg = bg_u32;
@@ -92,6 +94,9 @@ void paint_border(CharGrid& grid, const layout::CellRect& rect, const style::Bor
     const int y1 = rect.origin.row + rect.size.rows - 1;
 
     auto put_glyph = [&](Point pos, char32_t cp, const style::Color& color) {
+        if (pos.col < 0 || pos.col >= grid.cols() || pos.row < 0 || pos.row >= grid.rows()) {
+            return;
+        }
         ColorAttr attr = grid.at(pos).attr;
         attr.fg = color.none ? k_default_fg : to_rgb_u32(color);
         grid.put(pos, cp, attr);
@@ -141,6 +146,10 @@ void paint_border(CharGrid& grid, const layout::CellRect& rect, const style::Bor
 // layout's row count and render's character placement agree by construction.
 void paint_text(CharGrid& grid, const layout::CellRect& content_box, const style::StyledNode& sn) {
     for (const auto& placed : layout::place_inline(sn, content_box)) {
+        if (placed.pos.col < 0 || placed.pos.col >= grid.cols() || placed.pos.row < 0 ||
+            placed.pos.row >= grid.rows()) {
+            continue;
+        }
         const uint32_t bg = grid.at(placed.pos).attr.bg;
         grid.put(placed.pos, placed.token.cp, text_attr(*placed.token.style, bg));
     }

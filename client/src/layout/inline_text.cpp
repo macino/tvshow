@@ -99,6 +99,9 @@ void collect_tokens(const style::StyledNode& sn, style::WhiteSpace ws, std::stri
         }
         if (child.node->kind == dom::NodeKind::Text) {
             collect_text_node(child.node->text, child.style, ws, href, out, pending);
+        } else if (child.node->tag == "br") {
+            pending.active = false;
+            out.push_back({U'\n', &child.style, href});
         } else if (is_inline_descendant(child)) {
             std::string_view child_href = href;
             if (child.node->tag == "a") {
@@ -174,13 +177,20 @@ std::vector<InlineLine> break_normal(const std::vector<InlineToken>& tokens, int
     size_t i = 0;
     std::string_view sep_href;
     while (i < tokens.size()) {
+        if (tokens[i].cp == U'\n') {
+            lines.push_back(std::move(cur));
+            cur.clear();
+            sep_href = {};
+            ++i;
+            continue;
+        }
         if (tokens[i].cp == U' ') {
             sep_href = tokens[i].href;
             ++i;
             continue;
         }
         size_t j = i;
-        while (j < tokens.size() && tokens[j].cp != U' ') {
+        while (j < tokens.size() && tokens[j].cp != U' ' && tokens[j].cp != U'\n') {
             ++j;
         }
         const WordSpan word{i, j};

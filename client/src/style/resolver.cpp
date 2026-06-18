@@ -176,7 +176,7 @@ constexpr std::string_view k_ua_css = R"css(
 head { display: none; }
 body { display: block; }
 div { display: block; }
-p { display: block; }
+p { display: block; margin-top: 0; margin-bottom: 16px; }
 section { display: block; }
 article { display: block; }
 header { display: block; }
@@ -184,23 +184,28 @@ footer { display: block; }
 nav { display: block; }
 main { display: block; }
 aside { display: block; }
-h1 { display: block; font-weight: bold; }
-h2 { display: block; font-weight: bold; }
-h3 { display: block; font-weight: bold; }
-h4 { display: block; font-weight: bold; }
-h5 { display: block; font-weight: bold; }
-h6 { display: block; font-weight: bold; }
-ul { display: block; }
-ol { display: block; }
+h1 { display: block; font-weight: bold; margin-top: 16px; margin-bottom: 8px; }
+h2 { display: block; font-weight: bold; margin-top: 16px; margin-bottom: 8px; }
+h3 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
+h4 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
+h5 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
+h6 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
+ul { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 16px; }
+ol { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 16px; }
 li { display: block; }
+blockquote { display: block; margin-top: 16px; margin-bottom: 16px; margin-left: 16px; }
+hr { display: block; margin-top: 8px; margin-bottom: 8px; }
 span { display: inline; }
+small { display: inline; }
+u { display: inline; text-decoration: underline; }
 a { display: inline; text-decoration: underline; }
 b { display: inline; font-weight: bold; }
 strong { display: inline; font-weight: bold; }
 i { display: inline; font-style: italic; }
 em { display: inline; font-style: italic; }
-pre { display: block; white-space: pre; }
+pre { display: block; white-space: pre; margin-top: 0; margin-bottom: 16px; }
 code { display: inline; white-space: pre; }
+label { display: inline; }
 form { display: block; }
 input { display: inline-block; }
 button { display: inline-block; }
@@ -467,6 +472,75 @@ AlignItems parse_align_items_val(std::string_view val) noexcept {
     return AlignItems::Stretch;
 }
 
+// Parse the border shorthand: [<width>] [<style>] [<color>]
+// Tokens are space-separated; order doesn't matter.
+void apply_border_shorthand(ComputedStyle& style, std::string_view val) {
+    size_t i = 0;
+    while (i < val.size()) {
+        while (i < val.size() && val[i] == ' ') {
+            ++i;
+        }
+        const size_t j = val.find(' ', i);
+        const std::string_view tok =
+            (j == std::string_view::npos) ? val.substr(i) : val.substr(i, j - i);
+        if (tok.empty()) {
+            break;
+        }
+        const BorderStyle bs = parse_border_style_val(tok);
+        if (bs != BorderStyle::None || tok == "none") {
+            for (auto& side : style.border) {
+                side.style = bs;
+            }
+        } else {
+            const Length w = parse_length(tok);
+            if (!w.is_auto) {
+                for (auto& side : style.border) {
+                    side.width = w;
+                }
+            } else {
+                const Color c = parse_color(tok);
+                if (!c.none) {
+                    for (auto& side : style.border) {
+                        side.color = c;
+                    }
+                }
+            }
+        }
+        i = (j == std::string_view::npos) ? val.size() : j + 1;
+    }
+}
+
+// Apply one side of the border shorthand (border-top, border-right, etc.).
+void apply_border_side(BorderSide& side, std::string_view val) {
+    size_t i = 0;
+    while (i < val.size()) {
+        while (i < val.size() && val[i] == ' ') {
+            ++i;
+        }
+        const size_t j = val.find(' ', i);
+        const std::string_view tok =
+            (j == std::string_view::npos) ? val.substr(i) : val.substr(i, j - i);
+        if (tok.empty()) {
+            break;
+        }
+        const BorderStyle bs = parse_border_style_val(tok);
+        if (bs != BorderStyle::None || tok == "none") {
+            side.style = bs;
+        } else {
+            const Length w = parse_length(tok);
+            if (!w.is_auto) {
+                side.width = w;
+            } else {
+                const Color c = parse_color(tok);
+                if (!c.none) {
+                    side.color = c;
+                }
+            }
+        }
+        i = (j == std::string_view::npos) ? val.size() : j + 1;
+    }
+}
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool apply_box_props(ComputedStyle& style, std::string_view prop, std::string_view val) {
     if (prop == "display") {
@@ -481,8 +555,34 @@ bool apply_box_props(ComputedStyle& style, std::string_view prop, std::string_vi
         style.max_width = parse_length(val);
     } else if (prop == "margin") {
         apply_edges(style.margin, val);
+    } else if (prop == "margin-top") {
+        style.margin.top = parse_length(val);
+    } else if (prop == "margin-right") {
+        style.margin.right = parse_length(val);
+    } else if (prop == "margin-bottom") {
+        style.margin.bottom = parse_length(val);
+    } else if (prop == "margin-left") {
+        style.margin.left = parse_length(val);
     } else if (prop == "padding") {
         apply_edges(style.padding, val);
+    } else if (prop == "padding-top") {
+        style.padding.top = parse_length(val);
+    } else if (prop == "padding-right") {
+        style.padding.right = parse_length(val);
+    } else if (prop == "padding-bottom") {
+        style.padding.bottom = parse_length(val);
+    } else if (prop == "padding-left") {
+        style.padding.left = parse_length(val);
+    } else if (prop == "border") {
+        apply_border_shorthand(style, val);
+    } else if (prop == "border-top") {
+        apply_border_side(style.border[0], val);
+    } else if (prop == "border-right") {
+        apply_border_side(style.border[1], val);
+    } else if (prop == "border-bottom") {
+        apply_border_side(style.border[2], val);
+    } else if (prop == "border-left") {
+        apply_border_side(style.border[3], val);
     } else if (prop == "border-style") {
         const BorderStyle bs = parse_border_style_val(val);
         for (auto& side : style.border) {

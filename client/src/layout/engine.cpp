@@ -13,9 +13,9 @@
 #include <charconv>
 #include <cmath>
 #include <cstddef>
-#include <system_error>
 #include <numeric>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -209,24 +209,22 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
         if (fck != FormControlKind::None) {
             const auto [cols, rows] = form_control_size(*child.node);
             const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
-            y += cmar.top;
             Box fc_box;
             fc_box.node = &child;
-            fc_box.border_box = {{content_origin.col, y}, {cols, rows}};
+            fc_box.border_box = {{content_origin.col, y + cmar.top}, {cols, rows}};
             fc_box.content_box = fc_box.border_box;
-            y += rows + cmar.bottom;
+            y += cmar.top + rows + cmar.bottom;
             children.push_back(std::move(fc_box));
             continue;
         }
         if (child.node->tag == "img") {
             const auto [cols, rows] = img_cell_size(*child.node);
             const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
-            y += cmar.top;
             Box img_box;
             img_box.node = &child;
-            img_box.border_box = {{content_origin.col, y}, {cols, rows}};
+            img_box.border_box = {{content_origin.col, y + cmar.top}, {cols, rows}};
             img_box.content_box = img_box.border_box;
-            y += rows + cmar.bottom;
+            y += cmar.top + rows + cmar.bottom;
             children.push_back(std::move(img_box));
             continue;
         }
@@ -237,9 +235,8 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
         if (disp == style::Display::Block || disp == style::Display::Flex ||
             disp == style::Display::InlineBlock) {
             const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
-            y += cmar.top;
             Box child_box = layout_node(child, {content_origin.col, y}, content_w, avail_h);
-            y += child_box.border_box.size.rows + cmar.bottom;
+            y += cmar.top + child_box.border_box.size.rows + cmar.bottom;
             children.push_back(std::move(child_box));
         }
     }
@@ -422,6 +419,8 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
                          st.flex_direction != style::FlexDirection::ColumnReverse);
     const int content_main = is_row ? content_w : avail_h;
 
+    // For row: cross is height (explicit or auto = -1).
+    // For column: cross is width (always known = content_w).
     int content_cross_explicit = content_w;  // column direction: cross is content_w
     if (is_row) {
         content_cross_explicit = st.height.is_auto ? -1 : resolve_v(st.height, avail_h);
@@ -442,8 +441,9 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
 
     const int total_base = std::accumulate(main_sizes.begin(), main_sizes.end(), 0);
     const int total_gaps = (n > 1) ? gap_main * (n - 1) : 0;
+    // Row: distribute horizontal space. Column: use avail_h (vertical space available).
     const int main_available =
-        (content_cross_explicit >= 0 && !is_row) ? content_cross_explicit : content_main;
+        is_row ? content_main : (st.height.is_auto ? avail_h : resolve_v(st.height, avail_h));
     distribute_flex_space(main_sizes, items, main_available - total_base - total_gaps);
 
     const int used_main = std::accumulate(main_sizes.begin(), main_sizes.end(), 0) + total_gaps;
@@ -490,8 +490,13 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
             child_box.border_box.size.rows = msz;
         }
 
+        // Use the actual laid-out size when msz=0 (intrinsic-sized items).
+        const int actual_main =
+            is_row ? child_box.border_box.size.cols : child_box.border_box.size.rows;
+        const int item_advance = (msz > 0) ? msz : actual_main;
+
         children.push_back(std::move(child_box));
-        main_cursor += msz + gap_main + jc_between;
+        main_cursor += item_advance + gap_main + jc_between;
     }
 
     // ── Cross-axis sizing and positioning (align-items) ───────────────────────
@@ -506,8 +511,16 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
 
     // ── Build container box ───────────────────────────────────────────────────
 
+    // For column, recompute used height from actual child sizes (items may have been intrinsic).
+    int actual_used_main = total_gaps;
+    if (!is_row) {
+        for (const auto& cb : children) {
+            actual_used_main += cb.border_box.size.rows;
+        }
+    }
+
     int content_h =
-        st.height.is_auto ? used_main : resolve_v(st.height, avail_h);  // column default
+        st.height.is_auto ? actual_used_main : resolve_v(st.height, avail_h);  // column default
     if (is_row) {
         content_h = st.height.is_auto ? content_cross : resolve_v(st.height, avail_h);
     }

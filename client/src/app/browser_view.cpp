@@ -28,8 +28,8 @@ namespace tvshow::app {
 
 BrowserView::BrowserView(const TRect& bounds, Page page) : TView(bounds), page_(std::move(page)) {
     growMode = gfGrowHiX | gfGrowHiY;
-    options |= ofSelectable;
-    eventMask |= evKeyDown;
+    options |= ofSelectable | ofFirstClick;
+    eventMask |= evKeyDown | evMouseDown;
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
     history_.push_back(page_.url);
@@ -230,6 +230,31 @@ void BrowserView::submit_form() {
 
 void BrowserView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
+
+    if (event.what == evMouseDown) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        const TPoint local = makeLocal(event.mouse.where);
+        const tvshow::Point pt{local.x, local.y + scroll_row_};
+        for (size_t i = 0; i < links_.size(); ++i) {
+            for (const auto& span : links_[i].spans) {
+                if (span.contains(pt)) {
+                    navigate(util::resolve_url(page_.url, links_[i].href), true);
+                    clearEvent(event);
+                    return;
+                }
+            }
+        }
+        for (size_t i = 0; i < form_controls_.size(); ++i) {
+            if (form_controls_[i].span.contains(pt)) {
+                focused_ = static_cast<int>(links_.size() + i);
+                drawView();
+                clearEvent(event);
+                return;
+            }
+        }
+        return;
+    }
+
     if (event.what != evKeyDown) {
         return;
     }
