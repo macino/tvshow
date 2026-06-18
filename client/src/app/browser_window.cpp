@@ -5,6 +5,7 @@
 
 #define Uses_TEvent
 #define Uses_TKeys
+#define Uses_TScrollBar
 #include "tvshow/util/url.hpp"
 
 #include <tvision/tv.h>
@@ -41,11 +42,14 @@ BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page
         insert(bar_);
     }
 
-    TRect view_rect = inner;
-    if (mode_ == AddressBarMode::Persistent) {
-        view_rect.a.y += kBarHeight;
-    }
+    const int view_top = inner.a.y + (mode_ == AddressBarMode::Persistent ? kBarHeight : 0);
+    const TRect sb_rect{inner.b.x - 1, view_top, inner.b.x, inner.b.y};
+    vscroll_ = new TScrollBar(sb_rect);
+    insert(vscroll_);
+
+    const TRect view_rect{inner.a.x, view_top, inner.b.x - 1, inner.b.y};
     view_ = new BrowserView(view_rect, std::move(page));
+    view_->set_vscroll(vscroll_);
     insert(view_);
 }
 
@@ -55,10 +59,12 @@ void BrowserWindow::reposition(const TRect& inner) {
         bar_rect.b.y = bar_rect.a.y + kBarHeight;
         bar_->changeBounds(bar_rect);
     }
-    TRect view_rect = inner;
-    if (mode_ == AddressBarMode::Persistent) {
-        view_rect.a.y += kBarHeight;
+    const int view_top = inner.a.y + (mode_ == AddressBarMode::Persistent ? kBarHeight : 0);
+    if (vscroll_ != nullptr) {
+        const TRect sb_rect{inner.b.x - 1, view_top, inner.b.x, inner.b.y};
+        vscroll_->changeBounds(sb_rect);
     }
+    const TRect view_rect{inner.a.x, view_top, inner.b.x - 1, inner.b.y};
     view_->changeBounds(view_rect);
 }
 
@@ -82,6 +88,15 @@ void BrowserWindow::navigate(std::string_view url) {
 }
 
 void BrowserWindow::handleEvent(TEvent& event) {
+    // Scrollbar changed: update view scroll position.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+    if (event.what == evBroadcast && event.message.command == cmScrollBarChanged &&
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        event.message.infoPtr == vscroll_ && vscroll_ != nullptr) {
+        view_->scroll_to(vscroll_->value);
+        clearEvent(event);
+        return;
+    }
     // Persistent bar: Enter while bar_ is focused → validate and navigate.
     if (mode_ == AddressBarMode::Persistent && bar_ != nullptr && event.what == evKeyDown &&
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)

@@ -3,6 +3,7 @@
 #define Uses_TDrawBuffer
 #define Uses_TEvent
 #define Uses_TKeys
+#define Uses_TScrollBar
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/form.hpp"
@@ -63,9 +64,10 @@ render::CharGrid BrowserView::render_grid() const {
 void BrowserView::draw() {
     TDrawBuffer buf;
     const render::CharGrid grid = render_grid();
-    const int rows = std::min(size.y, grid.rows());
+    const int available = grid.rows() - scroll_row_;
+    const int rows = std::min(size.y, available > 0 ? available : 0);
     for (int row = 0; row < rows; ++row) {
-        paint::draw_row(grid, row, buf);
+        paint::draw_row(grid, scroll_row_ + row, buf);
         writeLine(0, static_cast<short>(row), static_cast<short>(size.x), 1, buf);
     }
 }
@@ -76,10 +78,31 @@ void BrowserView::changeBounds(const TRect& bounds) {
     drawView();
 }
 
+int BrowserView::scroll_limit() const {
+    return std::max(0, page_.box.border_box.size.rows - size.y);
+}
+
+void BrowserView::sync_vscroll() {
+    if (vscroll_ == nullptr) {
+        return;
+    }
+    const int limit = scroll_limit();
+    const int pg = std::max(1, size.y - 1);
+    vscroll_->setParams(scroll_row_, 0, limit, pg, 1);
+}
+
+void BrowserView::scroll_to(int row) {
+    scroll_row_ = std::clamp(row, 0, scroll_limit());
+    sync_vscroll();
+    drawView();
+}
+
 void BrowserView::relayout() {
     page_.box = layout::layout(*page_.tree, {size.x, size.y});
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
+    scroll_row_ = std::clamp(scroll_row_, 0, scroll_limit());
+    sync_vscroll();
     if (focused_ >= total_focusables()) {
         focused_ = -1;
     }
@@ -90,7 +113,13 @@ void BrowserView::navigate_to(std::string_view url) {
 }
 
 void BrowserView::navigate(const std::string& url, bool push_history) {
-    auto page = load_page(url, {size.x, size.y});
+    // Strip fragment from URL before loading (fragments are client-side only).
+    const auto hash_pos = url.rfind('#');
+    const std::string base_url = (hash_pos != std::string::npos) ? url.substr(0, hash_pos) : url;
+    const std::string fragment =
+        (hash_pos != std::string::npos) ? url.substr(hash_pos + 1) : std::string{};
+
+    auto page = load_page(base_url.empty() ? url : base_url, {size.x, size.y});
     if (!page) {
         return;
     }
@@ -99,6 +128,14 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
     form_controls_ = layout::collect_form_controls(page_.box);
     form_values_ = {};
     focused_ = -1;
+    scroll_row_ = 0;
+    if (!fragment.empty()) {
+        const int anchor = layout::find_anchor_row(page_.box, fragment);
+        if (anchor >= 0) {
+            scroll_row_ = std::clamp(anchor, 0, scroll_limit());
+        }
+    }
+    sync_vscroll();
     if (push_history) {
         history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_pos_) + 1,
                        history_.end());
@@ -199,6 +236,30 @@ void BrowserView::handleEvent(TEvent& event) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access) — TEvent is a tvision union.
     const unsigned keyCode = event.keyDown.keyCode;
     switch (keyCode) {
+    case kbUp:
+        scroll_to(scroll_row_ - 1);
+        clearEvent(event);
+        break;
+    case kbDown:
+        scroll_to(scroll_row_ + 1);
+        clearEvent(event);
+        break;
+    case kbPgUp:
+        scroll_to(scroll_row_ - std::max(1, size.y - 1));
+        clearEvent(event);
+        break;
+    case kbPgDn:
+        scroll_to(scroll_row_ + std::max(1, size.y - 1));
+        clearEvent(event);
+        break;
+    case kbHome:
+        scroll_to(0);
+        clearEvent(event);
+        break;
+    case kbEnd:
+        scroll_to(scroll_limit());
+        clearEvent(event);
+        break;
     case kbTab:
         focus_next(1);
         clearEvent(event);

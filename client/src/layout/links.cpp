@@ -67,4 +67,19 @@ std::vector<Link> collect_links(const Box& root) {
     return links;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
+int find_anchor_row(const Box& root, std::string_view fragment) {
+    if (root.node != nullptr && root.node->node != nullptr &&
+        root.node->node->attr("id") == fragment) {
+        return root.border_box.origin.row;
+    }
+    for (const auto& child : root.children) {
+        const int r = find_anchor_row(child, fragment);
+        if (r >= 0) {
+            return r;
+        }
+    }
+    return -1;
+}
+
 }  // namespace tvshow::layout

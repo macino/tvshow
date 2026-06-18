@@ -14,6 +14,8 @@
 #include <string_view>
 #include <vector>
 
+struct TScrollBar;
+
 namespace tvshow::app {
 
 // Hosts one loaded Page: renders it, tracks the focused link or form control
@@ -35,12 +37,24 @@ public:
 
     [[nodiscard]] const Page& page() const { return page_; }
 
+    // Wire a vertical scrollbar managed by BrowserWindow. May be null.
+    void set_vscroll(TScrollBar* sb) { vscroll_ = sb; }
+
+    // Scroll to absolute row (clamped to [0, scroll_limit()]).
+    void scroll_to(int row);
+
+    // Maximum scroll offset in rows.
+    [[nodiscard]] int scroll_limit() const;
+
 private:
     Page page_;
     std::vector<layout::Link> links_;
     std::vector<layout::FormFocus> form_controls_;
     render::FormValues form_values_;
-    int focused_ = -1;  // index into links_ + form_controls_ (0..n-1), or -1
+    int focused_ = -1;    // index into links_ + form_controls_ (0..n-1), or -1
+    int scroll_row_ = 0;  // current vertical scroll offset in rows
+
+    TScrollBar* vscroll_{nullptr};  // non-owning; managed by BrowserWindow
 
     std::vector<std::string> history_;
     size_t history_pos_ = 0;
@@ -50,6 +64,7 @@ private:
     [[nodiscard]] const layout::FormFocus* focused_fc() const;
 
     void relayout();
+    void sync_vscroll();
     [[nodiscard]] render::CharGrid render_grid() const;
     void navigate(const std::string& url, bool push_history);
     void focus_next(int direction);

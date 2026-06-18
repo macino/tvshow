@@ -4,6 +4,7 @@
 #include "tvshow/app/page.hpp"
 
 #define Uses_TInputLine
+#define Uses_TScrollBar
 #define Uses_TWindow
 #include <tvision/tv.h>
 
@@ -43,8 +44,9 @@ public:
 
 private:
     AddressBarMode mode_;
-    BrowserView* view_;         // non-owning pointer into child list
-    TInputLine* bar_{nullptr};  // non-owning; null in Modal mode
+    BrowserView* view_;             // non-owning pointer into child list
+    TInputLine* bar_{nullptr};      // non-owning; null in Modal mode
+    TScrollBar* vscroll_{nullptr};  // non-owning; null until constructed
 
     void reposition(const TRect& inner);
 };

@@ -23,4 +23,8 @@ struct Link {
 // position agree by construction.
 std::vector<Link> collect_links(const Box& root);
 
+// Returns the border_box.origin.row of the first box whose DOM node has
+// id==fragment, or -1 if not found. Used for #fragment URL anchor scrolling.
+int find_anchor_row(const Box& root, std::string_view fragment);
+
 }  // namespace tvshow::layout

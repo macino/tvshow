@@ -17,6 +17,7 @@
 
 using tvshow::layout::Box;
 using tvshow::layout::collect_links;
+using tvshow::layout::find_anchor_row;
 using tvshow::layout::layout;
 using tvshow::layout::Viewport;
 using tvshow::style::StyledNode;
@@ -74,6 +75,28 @@ TEST_CASE("collect_links: two separate links yield two entries in reading order"
     REQUIRE(links.size() == 2);
     CHECK(links[0].href == "/a");
     CHECK(links[1].href == "/b");
+}
+
+// ── find_anchor_row ───────────────────────────────────────────────────────────
+
+TEST_CASE("find_anchor_row: returns -1 when no element has matching id") {
+    auto [doc, tree] = make_tree("<body><p>no anchors here</p></body>");
+    const Box box = layout(tree, {40, 10});
+    CHECK(find_anchor_row(box, "nowhere") == -1);
+}
+
+TEST_CASE("find_anchor_row: returns row of element with matching id") {
+    // First p is at row 0 (1 line), second p at row 1.
+    auto [doc, tree] = make_tree("<body><p>first</p><p id=\"target\">second</p></body>");
+    const Box box = layout(tree, {40, 10});
+    const int row = find_anchor_row(box, "target");
+    CHECK(row >= 1);  // second p comes after first p
+}
+
+TEST_CASE("find_anchor_row: element not found returns -1") {
+    auto [doc, tree] = make_tree("<body><div id=\"foo\">content</div></body>");
+    const Box box = layout(tree, {40, 10});
+    CHECK(find_anchor_row(box, "bar") == -1);
 }
 
 TEST_CASE("collect_links: a link wrapped across lines yields one entry with multiple spans") {
