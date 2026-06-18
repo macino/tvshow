@@ -10,9 +10,12 @@
 #include "tvshow/types.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
+#include <system_error>
 #include <numeric>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -107,6 +110,54 @@ bool has_inline_content(const style::StyledNode& sn) noexcept {
     });
 }
 
+// ── Image sizing ──────────────────────────────────────────────────────────────
+
+// Parse an HTML attribute value as a plain integer (bare number = pixels).
+// Returns -1 if not parseable.
+int parse_attr_int(std::string_view s) noexcept {
+    if (s.empty()) {
+        return -1;
+    }
+    int v = 0;
+    const auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{} || end != s.data() + s.size()) {
+        return -1;
+    }
+    return v;
+}
+
+// SPEC §6.5: width/height attrs are in px. Map via SPEC §7.3 ratios.
+// cols = round(px_w / 8), rows = round(px_h / 16).
+// If width attr absent: cols = len("[alt]") = alt.size() + 2, min 1.
+// If height attr absent: rows = 1.
+struct ImgSize {
+    int cols;
+    int rows;
+};
+
+ImgSize img_cell_size(const dom::Node& node) noexcept {
+    const std::string_view w_attr = node.attr("width");
+    const std::string_view h_attr = node.attr("height");
+    const std::string_view alt = node.attr("alt");
+
+    int cols = 0;
+    const int w_px = parse_attr_int(w_attr);
+    if (w_px > 0) {
+        cols = static_cast<int>(std::floor(static_cast<float>(w_px) / 8.0F + 0.5F));
+    } else {
+        cols = static_cast<int>(alt.size()) + 2;  // "[alt]"
+    }
+    cols = std::max(1, cols);
+
+    int rows = 1;
+    const int h_px = parse_attr_int(h_attr);
+    if (h_px > 0) {
+        rows = static_cast<int>(std::floor(static_cast<float>(h_px) / 16.0F + 0.5F));
+        rows = std::max(1, rows);
+    }
+    return {cols, rows};
+}
+
 // ── Forward declarations (mutual recursion) ───────────────────────────────────
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -167,6 +218,18 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
             children.push_back(std::move(fc_box));
             continue;
         }
+        if (child.node->tag == "img") {
+            const auto [cols, rows] = img_cell_size(*child.node);
+            const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
+            y += cmar.top;
+            Box img_box;
+            img_box.node = &child;
+            img_box.border_box = {{content_origin.col, y}, {cols, rows}};
+            img_box.content_box = img_box.border_box;
+            y += rows + cmar.bottom;
+            children.push_back(std::move(img_box));
+            continue;
+        }
         const auto disp = child.style.display;
         if (disp == style::Display::None) {
             continue;
@@ -221,6 +284,12 @@ std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_ro
         }
         const FormControlKind fck = form_control_kind(*child.node);
         if (fck == FormControlKind::Hidden) {
+            continue;
+        }
+        if (child.node->tag == "img") {
+            const auto [icols, irows] = img_cell_size(*child.node);
+            const int base = is_row ? icols : irows;
+            items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink});
             continue;
         }
 

@@ -15,6 +15,7 @@ add_library(tvshow_core STATIC
     src/layout/inline_text.cpp
     src/layout/links.cpp
     src/render/render.cpp
+    src/images/alt_text_renderer.cpp
 )
 
 target_include_directories(tvshow_core

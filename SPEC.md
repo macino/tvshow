@@ -417,7 +417,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 | Q-15 | CI host | GitHub Actions / GitLab / local only |
 | Q-16 | License | MIT / Apache-2 / proprietary |
 | Q-17 | tvision pin | Specific commit / release tag |
-| Q-18 | Image renderer plug interface | Function signature for the future ASCII-art renderer |
+| Q-18 | Image renderer plug interface | Resolved: `ImageRenderer::render(int cols, int rows, std::string_view alt, std::string_view src) → vector<string>`. v1 impl: `AltTextRenderer` (writes `[alt]` in row 0). |
 | Q-19 | Config file location and format | `~/.config/tvshow/config.toml`? CLI flags only? |
 | Q-20 | Form `enctype: multipart/form-data` | v1 / later (tied to file upload, which needs a file dialog) |
 

@@ -206,6 +206,7 @@ input { display: inline-block; }
 button { display: inline-block; }
 textarea { display: block; }
 select { display: inline-block; }
+img { display: inline-block; }
 )css";
 
 }  // namespace

@@ -1,6 +1,7 @@
 #include "tvshow/render/render.hpp"
 
 #include "tvshow/dom/node.hpp"
+#include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/form.hpp"
 #include "tvshow/layout/inline_text.hpp"
@@ -13,6 +14,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -292,10 +294,37 @@ void paint_form_control(CharGrid& grid, const layout::Box& box, const dom::Node&
     }
 }
 
+// ── image rendering ──────────────────────────────────────────────────────────
+
+void paint_img(CharGrid& grid, const layout::Box& box, const dom::Node& node,
+               const images::ImageRenderer& renderer) {
+    const int cols = box.border_box.size.cols;
+    const int rows = box.border_box.size.rows;
+    const std::string_view alt = node.attr("alt");
+    const std::string_view src = node.attr("src");
+    const std::vector<std::string> lines = renderer.render(cols, rows, alt, src);
+    const int x0 = box.border_box.origin.col;
+    const int y0 = box.border_box.origin.row;
+    for (int r = 0; r < static_cast<int>(lines.size()) && r < rows; ++r) {
+        const auto& line = lines[static_cast<std::size_t>(r)];
+        for (int c = 0; c < static_cast<int>(line.size()) && c < cols; ++c) {
+            const Point pos{x0 + c, y0 + r};
+            if (pos.col >= 0 && pos.col < grid.cols() && pos.row >= 0 && pos.row < grid.rows()) {
+                const ColorAttr attr = grid.at(pos).attr;
+                grid.put(pos,
+                         static_cast<char32_t>(
+                             static_cast<unsigned char>(line[static_cast<std::size_t>(c)])),
+                         attr);
+            }
+        }
+    }
+}
+
 // ── box tree walk ────────────────────────────────────────────────────────────
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv) {
+void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
+               const images::ImageRenderer& img_renderer) {
     if (box.node == nullptr) {
         return;
     }
@@ -306,7 +335,10 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv) {
             const layout::FormControlKind kind = layout::form_control_kind(*box.node->node);
             if (kind != layout::FormControlKind::None && kind != layout::FormControlKind::Hidden) {
                 paint_form_control(grid, box, *box.node->node, fv);
-                // Form controls are leaf boxes — no children or text to recurse.
+                return;
+            }
+            if (box.node->node->tag == "img") {
+                paint_img(grid, box, *box.node->node, img_renderer);
                 return;
             }
         }
@@ -314,7 +346,7 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv) {
         paint_text(grid, box.content_box, *box.node);
     }
     for (const auto& child : box.children) {
-        paint_box(grid, child, fv);
+        paint_box(grid, child, fv, img_renderer);
     }
 }
 
@@ -322,7 +354,8 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv) {
 
 CharGrid render(const layout::Box& root, const FormValues& fv) {
     CharGrid grid(std::max(root.border_box.size.cols, 1), std::max(root.border_box.size.rows, 1));
-    paint_box(grid, root, fv);
+    const images::AltTextRenderer img_renderer;
+    paint_box(grid, root, fv, img_renderer);
     return grid;
 }
 

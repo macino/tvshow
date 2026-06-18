@@ -13,6 +13,7 @@ add_executable(tvshow-tests
     layout/form_test.cpp
     layout/form_data_test.cpp
     layout/flex_test.cpp
+    layout/image_test.cpp
     render/render_test.cpp
     paint/paint_test.cpp
 )
