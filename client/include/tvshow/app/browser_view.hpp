@@ -93,6 +93,8 @@ private:
     bool handle_mouse_hit(Point pt, TEvent& event);
     void focus_next(int direction);
     void handle_form_input(unsigned keyCode);
+    // Move the focused <select>'s selected option by direction (+1 = down, -1 = up).
+    void cycle_select_option(int direction);
     void submit_form();
 };
 

@@ -279,13 +279,51 @@ void paint_textarea(const GridPen& pen, int w, int h, const dom::Node& node, con
     }
 }
 
-void paint_select(const GridPen& pen, int w) {
+// Returns the display label for the currently selected <option> within node.
+// Falls back to the first option, then empty if no options exist.
+std::string_view get_select_label(const dom::Node& node, const FormValues& fv) noexcept {
+    const std::string_view cur_val = resolve_text_value(node, fv);
+    const dom::Node* first_opt = nullptr;
+    const dom::Node* selected_opt = nullptr;
+    for (const auto& cp : node.children) {
+        if (cp->kind != dom::NodeKind::Element || cp->tag != "option") {
+            continue;
+        }
+        if (first_opt == nullptr) {
+            first_opt = cp.get();
+        }
+        if (!cur_val.empty()) {
+            if (cp->attr("value") == cur_val) {
+                selected_opt = cp.get();
+                break;
+            }
+        } else if (selected_opt == nullptr && has_bool_attr(*cp, "selected")) {
+            selected_opt = cp.get();
+        }
+    }
+    const dom::Node* opt = (selected_opt != nullptr) ? selected_opt : first_opt;
+    if (opt != nullptr) {
+        for (const auto& tc : opt->children) {
+            if (tc->kind == dom::NodeKind::Text) {
+                return std::string_view(tc->text);
+            }
+        }
+    }
+    return {};
+}
+
+void paint_select(const GridPen& pen, int w, const dom::Node& node, const FormValues& fv) {
     if (w < 3) {
         return;
     }
+    const std::string_view label = get_select_label(node, fv);
     pen.put({0, 0}, U'[');
-    for (int c = 1; c < w - 2; ++c) {
-        pen.put({c, 0}, U' ');
+    int col = 1;
+    for (size_t i = 0; i < label.size() && col < w - 2; ++col, ++i) {
+        pen.put({col, 0}, static_cast<char32_t>(static_cast<unsigned char>(label[i])));
+    }
+    for (; col < w - 2; ++col) {
+        pen.put({col, 0}, U' ');
     }
     pen.put({w - 2, 0}, U'▾');  // U+25BE BLACK DOWN-POINTING SMALL TRIANGLE ▾
     pen.put({w - 1, 0}, U']');
@@ -320,7 +358,7 @@ void paint_form_control(CharGrid& grid, const layout::Box& box, const dom::Node&
         paint_textarea(pen, w, h, node, fv);
         break;
     case layout::FormControlKind::Select:
-        paint_select(pen, w);
+        paint_select(pen, w, node, fv);
         break;
     case layout::FormControlKind::None:
     case layout::FormControlKind::Hidden:

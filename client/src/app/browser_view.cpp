@@ -208,6 +208,37 @@ void BrowserView::handle_form_input(unsigned keyCode) {
     }
 }
 
+void BrowserView::cycle_select_option(int direction) {
+    const layout::FormFocus* fc = focused_fc();
+    if (fc == nullptr || fc->kind != layout::FormControlKind::Select) {
+        return;
+    }
+    const dom::Node* node = fc->node;
+    // Build ordered list of option value strings.
+    std::vector<std::string_view> vals;
+    for (const auto& cp : node->children) {
+        if (cp->kind == dom::NodeKind::Element && cp->tag == "option") {
+            vals.push_back(cp->attr("value"));
+        }
+    }
+    if (vals.empty()) {
+        return;
+    }
+    const auto it = form_values_.text.find(node);
+    const std::string_view cur =
+        (it != form_values_.text.end()) ? std::string_view(it->second) : node->attr("value");
+    int idx = 0;
+    for (int i = 0; i < static_cast<int>(vals.size()); ++i) {
+        if (vals[static_cast<size_t>(i)] == cur) {
+            idx = i;
+            break;
+        }
+    }
+    const int n = static_cast<int>(vals.size());
+    form_values_.text[node] = std::string(vals[static_cast<size_t>((idx + direction + n) % n)]);
+    drawView();
+}
+
 void BrowserView::submit_form() {
     const layout::FormFocus* fc = focused_fc();
     if (fc == nullptr || fc->form == nullptr) {
@@ -285,11 +316,21 @@ void BrowserView::handleEvent(TEvent& event) {
     const unsigned keyCode = event.keyDown.keyCode;
     switch (keyCode) {
     case kbUp:
-        scroll_to(scroll_row_ - 1);
+        if (const layout::FormFocus* fc = focused_fc();
+            fc != nullptr && fc->kind == layout::FormControlKind::Select) {
+            cycle_select_option(-1);
+        } else {
+            scroll_to(scroll_row_ - 1);
+        }
         clearEvent(event);
         break;
     case kbDown:
-        scroll_to(scroll_row_ + 1);
+        if (const layout::FormFocus* fc = focused_fc();
+            fc != nullptr && fc->kind == layout::FormControlKind::Select) {
+            cycle_select_option(1);
+        } else {
+            scroll_to(scroll_row_ + 1);
+        }
         clearEvent(event);
         break;
     case kbPgUp:

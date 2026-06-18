@@ -19,7 +19,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -31,6 +34,49 @@ namespace {
 
 constexpr int kUrlMaxLen = 255;
 constexpr int kUrlBufSize = kUrlMaxLen + 1;
+constexpr size_t k_max_history = 500;
+
+std::string history_file_path() {
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
+    const char* home = std::getenv("HOME");
+    if (home == nullptr) {
+        return {};
+    }
+    return std::string(home) + "/.local/share/tvshow/history";
+}
+
+void load_history(SharedBrowsingState& state) {
+    const std::string path = history_file_path();
+    if (path.empty()) {
+        return;
+    }
+    std::ifstream file(path);
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty()) {
+            state.history.push_back(line);
+            state.visited.insert(line);
+        }
+    }
+}
+
+void save_history(const SharedBrowsingState& state) {
+    const std::string path = history_file_path();
+    if (path.empty()) {
+        return;
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+    if (ec) {
+        return;
+    }
+    std::ofstream file(path);
+    const auto& hist = state.history;
+    const size_t start = hist.size() > k_max_history ? hist.size() - k_max_history : 0;
+    for (size_t i = start; i < hist.size(); ++i) {
+        file << hist[i] << '\n';
+    }
+}
 
 bool is_navigable(const std::string& url) {
     return util::Url::parse(url).has_value() || url.starts_with("file://");
@@ -102,7 +148,14 @@ void collect_windows_cb(TView* v, void* arg) {
 
 Application::Application(AddressBarMode mode)
     : TProgInit(&Application::initStatusLine, &Application::initMenuBar, &Application::initDeskTop),
-      mode_(mode) {}
+      mode_(mode) {
+    load_history(shared_browsing_state_);
+}
+
+void Application::shutDown() {
+    save_history(shared_browsing_state_);
+    TApplication::shutDown();
+}
 
 auto Application::initStatusLine(TRect r) -> TStatusLine* {
     r.a.y = r.b.y - 1;
@@ -193,6 +246,13 @@ void Application::handleEvent(TEvent& event) {
     }
     case cmOpenUrl: {
         clearEvent(event);
+        if (mode_ == AddressBarMode::Persistent) {
+            // Delegate to the window's persistent bar (Tab-completion lives there).
+            if (BrowserWindow* win = active_browser_window()) {
+                win->focus_address_bar();
+            }
+            return;
+        }
         std::array<char, kUrlBufSize> buf{};
         if (const BrowserWindow* win = active_browser_window()) {
             std::strncpy(buf.data(), std::string(win->current_url()).c_str(), kUrlMaxLen);
