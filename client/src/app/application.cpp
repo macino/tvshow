@@ -252,7 +252,7 @@ void Application::open_url(std::string_view url) {
     }
 
     const TRect bounds = deskTop->getExtent();
-    auto* win = new BrowserWindow(bounds, mode_, std::move(*page));
+    auto* win = new BrowserWindow(bounds, mode_, std::move(*page), &shared_browsing_state_);
     deskTop->insert(win);
 }
 

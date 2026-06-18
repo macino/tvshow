@@ -27,13 +27,24 @@
 
 namespace tvshow::app {
 
-BrowserView::BrowserView(const TRect& bounds, Page page) : TView(bounds), page_(std::move(page)) {
+BrowserView::BrowserView(const TRect& bounds, Page page, SharedBrowsingState* shared)
+    : TView(bounds), page_(std::move(page)), shared_(shared) {
     growMode = gfGrowHiX | gfGrowHiY;
     options |= ofSelectable | ofFirstClick;
     eventMask |= evKeyDown | evMouseDown;
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
     history_.push_back(page_.url);
+    record_visit(page_.url);
+}
+
+void BrowserView::record_visit(const std::string& url) {
+    if (shared_ != nullptr) {
+        shared_->history.push_back(url);
+        shared_->visited.insert(url);
+    } else {
+        local_visited_.insert(url);
+    }
 }
 
 int BrowserView::total_focusables() const {
@@ -53,7 +64,7 @@ const layout::FormFocus* BrowserView::focused_fc() const {
 }
 
 render::CharGrid BrowserView::render_grid() const {
-    const render::RenderOpts opts{page_.url, &visited_};
+    const render::RenderOpts opts{page_.url, &visited_set()};
     render::CharGrid grid = render::render(page_.box, form_values_, opts);
     if (is_link_focused()) {
         render::apply_focus(grid, links_[static_cast<size_t>(focused_)].spans);
@@ -126,7 +137,7 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
         return;
     }
     page_ = std::move(*page);
-    visited_.insert(page_.url);
+    record_visit(page_.url);
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
     form_values_ = {};

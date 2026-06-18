@@ -19,12 +19,20 @@ struct TScrollBar;
 
 namespace tvshow::app {
 
+// History and visited-URL state shared across all browser tabs in one process.
+// Owned by Application, passed by pointer to each BrowserView.
+struct SharedBrowsingState {
+    std::vector<std::string> history;         // all visited URLs in order (for autocomplete)
+    std::unordered_set<std::string> visited;  // set form of history (for link coloring)
+};
+
 // Hosts one loaded Page: renders it, tracks the focused link or form control
 // (SPEC §12.1 / §13.2 Tab/Shift-Tab cycling), and resolves/navigates
 // Enter-on-link, maintaining a simple per-window history stack.
 class BrowserView : public TView {
 public:
-    BrowserView(const TRect& bounds, Page page);
+    // shared may be null (e.g., in standalone/test contexts).
+    BrowserView(const TRect& bounds, Page page, SharedBrowsingState* shared = nullptr);
 
     void draw() override;
     void handleEvent(TEvent& event) override;
@@ -37,7 +45,10 @@ public:
     void reload();
 
     [[nodiscard]] const Page& page() const { return page_; }
-    [[nodiscard]] const std::vector<std::string>& history() const { return history_; }
+    // History for URL-bar autocomplete: shared history when available, else per-window.
+    [[nodiscard]] const std::vector<std::string>& history() const {
+        return (shared_ != nullptr) ? shared_->history : history_;
+    }
 
     // Wire a vertical scrollbar managed by BrowserWindow. May be null.
     void set_vscroll(TScrollBar* sb) { vscroll_ = sb; }
@@ -58,9 +69,16 @@ private:
 
     TScrollBar* vscroll_{nullptr};  // non-owning; managed by BrowserWindow
 
-    std::vector<std::string> history_;
-    std::unordered_set<std::string> visited_;
+    std::vector<std::string> history_;               // per-window, for back/forward only
+    std::unordered_set<std::string> local_visited_;  // fallback when shared_ is null
     size_t history_pos_ = 0;
+
+    SharedBrowsingState* shared_{nullptr};  // non-owning; null in standalone mode
+
+    [[nodiscard]] const std::unordered_set<std::string>& visited_set() const noexcept {
+        return (shared_ != nullptr) ? shared_->visited : local_visited_;
+    }
+    void record_visit(const std::string& url);
 
     [[nodiscard]] int total_focusables() const;
     [[nodiscard]] bool is_link_focused() const;

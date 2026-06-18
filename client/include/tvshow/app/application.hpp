@@ -28,6 +28,7 @@ public:
 
 private:
     AddressBarMode mode_;
+    SharedBrowsingState shared_browsing_state_;  // shared across all tabs
 
     // Returns the focused BrowserWindow in the desktop, or nullptr.
     static BrowserWindow* active_browser_window();

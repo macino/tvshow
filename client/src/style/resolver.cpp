@@ -211,7 +211,11 @@ input { display: inline-block; }
 button { display: inline-block; }
 textarea { display: block; }
 select { display: inline-block; }
+option { display: none; }
+optgroup { display: none; }
 img { display: inline-block; }
+script { display: none; }
+noscript { display: none; }
 )css";
 
 }  // namespace

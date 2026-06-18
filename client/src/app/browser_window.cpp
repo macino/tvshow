@@ -31,7 +31,8 @@ bool is_navigable(const std::string& url) {
 }
 }  // namespace
 
-BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page)
+BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page,
+                             SharedBrowsingState* shared)
     : TWindowInit(&TWindow::initFrame), TWindow(bounds, page.url.c_str(), wnNoNumber), mode_(mode) {
     options |= ofTileable;
     const TRect inner = getExtent().grow(-1, -1);
@@ -52,7 +53,7 @@ BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page
     insert(vscroll_);
 
     const TRect view_rect{inner.a.x, view_top, inner.b.x - 1, inner.b.y};
-    view_ = new BrowserView(view_rect, std::move(page));
+    view_ = new BrowserView(view_rect, std::move(page), shared);
     view_->set_vscroll(vscroll_);
     insert(view_);
 }

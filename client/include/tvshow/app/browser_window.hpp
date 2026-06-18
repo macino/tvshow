@@ -28,7 +28,8 @@ enum class AddressBarMode : std::uint8_t { Modal, Persistent };
 //   Content viewport is one row shorter.
 class BrowserWindow : public TWindow {
 public:
-    BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page);
+    BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page,
+                  SharedBrowsingState* shared = nullptr);
 
     void handleEvent(TEvent& event) override;
     void changeBounds(const TRect& bounds) override;
