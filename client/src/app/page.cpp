@@ -1,6 +1,7 @@
 #include "tvshow/app/page.hpp"
 
 #include "tvshow/css/parser.hpp"
+#include "tvshow/render/render.hpp"
 #include "tvshow/css/types.hpp"
 #include "tvshow/dom/node.hpp"
 #include "tvshow/dom/parser.hpp"
@@ -192,6 +193,18 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
     Page page{std::string(url), std::move(*doc), std::move(styled_tree), {}};
     page.box = layout::layout(*page.tree, vp);
+
+    // Auto-simplify: when author CSS hides all content (e.g. JS-dependent
+    // pages that render blank), rebuild the style tree with UA stylesheet only.
+    if (!fetched.is_error && render::is_mostly_blank(render::render(page.box))) {
+        const std::vector<css::Stylesheet> no_author;
+        if (auto fallback_tree = style::resolve(page.doc, no_author)) {
+            page.tree = std::make_unique<style::StyledNode>(std::move(*fallback_tree));
+            page.box = layout::layout(*page.tree, vp);
+            page.fallback = true;
+        }
+    }
+
     return page;
 }
 

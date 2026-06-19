@@ -447,4 +447,19 @@ void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans) {
     }
 }
 
+bool is_mostly_blank(const CharGrid& grid) noexcept {
+    constexpr int k_visible_threshold = 20;
+    int visible = 0;
+    for (int row = 0; row < grid.rows(); ++row) {
+        for (int col = 0; col < grid.cols(); ++col) {
+            if (grid.at({col, row}).cp > U' ') {
+                if (++visible >= k_visible_threshold) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 }  // namespace tvshow::render

@@ -26,6 +26,8 @@ struct Page {
     dom::Document doc;
     std::unique_ptr<style::StyledNode> tree;
     layout::Box box;
+    // True when author CSS was skipped because the initial render was blank.
+    bool fallback = false;
 };
 
 // Reads, parses, resolves, and lays out `url` at `vp`.

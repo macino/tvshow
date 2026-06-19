@@ -40,4 +40,8 @@ struct RenderOpts {
 // callers don't need to pre-clip spans.
 void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans);
 
+// Returns true if grid has fewer than 20 visible (non-space) cells — used
+// to detect pages where author CSS hides all content (JS-dependent pages).
+[[nodiscard]] bool is_mostly_blank(const CharGrid& grid) noexcept;
+
 }  // namespace tvshow::render
