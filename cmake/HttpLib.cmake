@@ -16,9 +16,12 @@ if(NOT EXISTS "${_httplib_header}")
 endif()
 
 find_package(OpenSSL REQUIRED)
+find_package(ZLIB REQUIRED)
 
 add_library(httplib_iface INTERFACE)
 add_library(httplib::httplib ALIAS httplib_iface)
 target_include_directories(httplib_iface INTERFACE "${CMAKE_BINARY_DIR}/_httplib_include")
-target_compile_definitions(httplib_iface INTERFACE CPPHTTPLIB_OPENSSL_SUPPORT)
-target_link_libraries(httplib_iface INTERFACE OpenSSL::SSL OpenSSL::Crypto)
+target_compile_definitions(httplib_iface INTERFACE
+    CPPHTTPLIB_OPENSSL_SUPPORT
+    CPPHTTPLIB_ZLIB_SUPPORT)
+target_link_libraries(httplib_iface INTERFACE OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
