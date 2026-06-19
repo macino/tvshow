@@ -199,6 +199,39 @@ private:
     int bar_max_len_;
 };
 
+// TDialog subclass that handles keyboard inside the URL picker correctly:
+//   - Enter (from anywhere) → close cmOK without dispatching to TInputLine
+//     (TInputLine would consume kbEnter or insert a space; TDialog alone never
+//     closes because it broadcasts cmDefault with no button to handle it).
+//   - Down arrow while input is focused → shift focus to the history list.
+class UrlPickerDialog : public TDialog {
+public:
+    UrlPickerDialog(const TRect& r, const char* dlg_title)
+        : TWindowInit(&TWindow::initFrame), TDialog(r, dlg_title) {}
+
+    TInputLine* bar_{nullptr};
+    HistoryListViewer* lv_{nullptr};
+
+    void handleEvent(TEvent& event) override {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        if (event.what == evKeyDown) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+            const uint16_t kc = event.keyDown.keyCode;
+            if (kc == kbEnter) {
+                endModal(cmOK);
+                clearEvent(event);
+                return;
+            }
+            if (kc == kbDown && current == bar_ && lv_ != nullptr) {
+                lv_->select();
+                clearEvent(event);
+                return;
+            }
+        }
+        TDialog::handleEvent(event);
+    }
+};
+
 // Builds a deduplicated (most-recent-first) view of the history vector.
 std::vector<std::string> dedupe_history(const std::vector<std::string>& history) {
     std::vector<std::string> out;
@@ -228,7 +261,7 @@ std::string show_url_picker(TGroup* desktop, const char* title,
     const TRect desk = desktop->getBounds();
     const TRect dlg_r{(desk.b.x - kDlgW) / 2, (desk.b.y - dlg_h) / 2,
                       (desk.b.x + kDlgW) / 2, (desk.b.y + dlg_h) / 2};
-    auto* dlg = new TDialog(dlg_r, title);
+    auto* dlg = new UrlPickerDialog(dlg_r, title);
 
     const TRect bar_r{1, 1, kDlgW - 2, 2};
     auto* bar = new TInputLine(bar_r, kPickerUrlMax);
@@ -238,10 +271,13 @@ std::string show_url_picker(TGroup* desktop, const char* title,
         bar->setData(ibuf.data());
     }
     dlg->insert(bar);
+    dlg->bar_ = bar;
 
     if (list_h > 0) {
         const TRect list_r{1, 2, kDlgW - 2, 2 + list_h};
-        dlg->insert(new HistoryListViewer(list_r, &items, bar, kPickerUrlMax));
+        auto* lv = new HistoryListViewer(list_r, &items, bar, kPickerUrlMax);
+        dlg->insert(lv);
+        dlg->lv_ = lv;
     }
     bar->select();
 
