@@ -216,6 +216,8 @@ optgroup { display: none; }
 img { display: inline-block; }
 script { display: none; }
 noscript { display: none; }
+style { display: none; }
+template { display: none; }
 )css";
 
 }  // namespace
