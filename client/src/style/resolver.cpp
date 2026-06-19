@@ -219,6 +219,16 @@ script { display: none; }
 noscript { display: none; }
 style { display: none; }
 template { display: none; }
+table { display: block; }
+caption { display: block; }
+thead { display: block; }
+tbody { display: block; }
+tfoot { display: block; }
+tr { display: block; }
+td { display: inline; }
+th { display: inline; font-weight: bold; }
+colgroup { display: none; }
+col { display: none; }
 )css";
 
 }  // namespace
