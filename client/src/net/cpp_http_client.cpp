@@ -23,6 +23,12 @@ namespace {
     return target;
 }
 
+// Build the base URL string ("scheme://host:port") understood by the
+// httplib::Client universal constructor, which selects SSLClient for https.
+[[nodiscard]] std::string client_base(const util::Url& url) {
+    return url.scheme() + "://" + url.host() + ":" + std::to_string(url.effective_port());
+}
+
 [[nodiscard]] Result to_result(const httplib::Result& res) {
     if (!res) {
         return NetworkError{httplib::to_string(res.error())};
@@ -41,16 +47,12 @@ namespace {
 }
 
 // Follows redirects with a plain loop (rather than recursion) since a
-// redirect can change host, requiring a fresh httplib::Client per hop.
+// redirect can change host or scheme, requiring a fresh Client per hop.
 // GET-on-redirect is used throughout: correct for 303 by spec, and matches
 // how browsers treat 301/302/307/308 in practice after the initial GET.
 [[nodiscard]] Result get_following_redirects(util::Url url, int max_redirects) {
     for (int hop = 0;; ++hop) {
-        if (url.scheme() != "http") {
-            return NetworkError{"only http:// is supported (no TLS compiled in): " +
-                                url.to_string()};
-        }
-        httplib::Client cli(url.host(), url.effective_port());
+        httplib::Client cli(client_base(url));
         Result result = to_result(cli.Get(request_target(url)));
 
         const auto* resp = std::get_if<Response>(&result);
@@ -76,10 +78,7 @@ Result CppHttpClient::get(const util::Url& url, int max_redirects) {
 }
 
 Result CppHttpClient::post(const util::Url& url, std::string_view body, int max_redirects) {
-    if (url.scheme() != "http") {
-        return NetworkError{"only http:// is supported (no TLS compiled in): " + url.to_string()};
-    }
-    httplib::Client cli(url.host(), url.effective_port());
+    httplib::Client cli(client_base(url));
     Result result = to_result(
         cli.Post(request_target(url), std::string(body), "application/x-www-form-urlencoded"));
 
