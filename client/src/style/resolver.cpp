@@ -175,6 +175,7 @@ namespace {
 constexpr std::string_view k_ua_css = R"css(
 head { display: none; }
 body { display: block; }
+center { display: block; text-align: center; }
 div { display: block; }
 p { display: block; margin-top: 0; margin-bottom: 16px; }
 section { display: block; }

@@ -149,7 +149,7 @@ std::optional<Url> Url::resolve(std::string_view ref) const {
     if (auto abs = Url::parse(ref); abs.has_value())
         return abs;
     if (ref.starts_with("//"))
-        return std::nullopt;
+        return Url::parse(scheme_ + ":" + std::string(ref));
 
     Url result = *this;
     result.fragment_.clear();
