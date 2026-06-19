@@ -55,10 +55,7 @@ std::optional<std::string> read_file(std::string_view path) {
 
 Fetched fetch_http(const util::Url& url) {
     net::CppHttpClient client;
-    const net::Result result =
-        url.scheme() == "https"
-            ? net::Result{net::NetworkError{"https:// is not supported (no TLS compiled in)"}}
-            : client.get(url);
+    const net::Result result = client.get(url);
     if (const auto* err = std::get_if<net::NetworkError>(&result)) {
         return {error_page_html("Network Error", err->message), true};
     }
