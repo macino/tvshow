@@ -80,8 +80,13 @@ void BrowserWindow::changeBounds(const TRect& bounds) {
 
 void BrowserWindow::focus_address_bar() {
     if (mode_ == AddressBarMode::Persistent && bar_ != nullptr) {
+        // Clear bar so Tab immediately searches all history.
+        std::array<char, kUrlMaxLen + 1> buf{};
+        buf[0] = '\0';
+        bar_->setData(buf.data());
+        completion_valid_ = false;
         bar_->select();
-        bar_->selectAll(true);
+        bar_->drawView();
     }
 }
 
@@ -164,6 +169,11 @@ void BrowserWindow::handleEvent(TEvent& event) {
             clearEvent(event);
             if (is_navigable(url)) {
                 view_->navigate_to(url);
+                // Reflect the actual loaded URL back in the bar.
+                std::array<char, kUrlMaxLen + 1> nbuf{};
+                std::strncpy(nbuf.data(), view_->page().url.c_str(), kUrlMaxLen);
+                bar_->setData(nbuf.data());
+                bar_->drawView();
             }
             return;
         }

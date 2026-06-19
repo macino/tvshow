@@ -1,8 +1,10 @@
 #include "tvshow/app/browser_view.hpp"
 
+#define Uses_TDialog
 #define Uses_TDrawBuffer
 #define Uses_TEvent
 #define Uses_TKeys
+#define Uses_TListViewer
 #define Uses_TScrollBar
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/engine.hpp"
@@ -20,10 +22,61 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+namespace {
+
+// Modal list for <select> option picking.
+class OptionListViewer : public TListViewer {
+public:
+    OptionListViewer(const TRect& bounds, const std::vector<std::string>* labels)
+        : TListViewer(bounds, 1, nullptr, nullptr), labels_(labels) {
+        setRange(static_cast<short>(labels_->size()));
+    }
+
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    void getText(char* dest, short item, short maxLen) override {
+        const auto idx = static_cast<size_t>(item);
+        if (idx < labels_->size()) {
+            std::strncpy(dest, (*labels_)[idx].c_str(), static_cast<size_t>(maxLen));
+        }
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        dest[maxLen] = '\0';
+    }
+
+    void handleEvent(TEvent& event) override {
+        const bool is_key =
+            event.what == evKeyDown;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        const bool is_down =
+            event.what == evMouseDown;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        const bool dbl_click = is_down && ((event.mouse.eventFlags &  // NOLINT(cppcoreguidelines-pro-type-union-access)
+                                            meDoubleClick) != 0);
+        const bool enter_key =
+            is_key &&
+            (event.keyDown.keyCode == kbEnter);  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        const bool esc_key =
+            is_key &&
+            (event.keyDown.keyCode == kbEsc);  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        if (dbl_click || enter_key) {
+            endModal(cmOK);
+            clearEvent(event);
+        } else if (esc_key) {
+            endModal(cmCancel);
+            clearEvent(event);
+        } else {
+            TListViewer::handleEvent(event);
+        }
+    }
+
+private:
+    const std::vector<std::string>* labels_;
+};
+
+}  // namespace
 
 namespace tvshow::app {
 
@@ -239,6 +292,67 @@ void BrowserView::cycle_select_option(int direction) {
     drawView();
 }
 
+void BrowserView::show_select_popup(const layout::FormFocus& fc) {
+    if (fc.node == nullptr || owner == nullptr || owner->owner == nullptr) {
+        return;
+    }
+    // Build option label/value lists from the DOM.
+    std::vector<std::string> labels;
+    std::vector<std::string> values;
+    for (const auto& cp : fc.node->children) {
+        if (cp->kind != dom::NodeKind::Element || cp->tag != "option") {
+            continue;
+        }
+        values.emplace_back(cp->attr("value"));
+        std::string label;
+        for (const auto& tc : cp->children) {
+            if (tc->kind == dom::NodeKind::Text) {
+                label = tc->text;
+                break;
+            }
+        }
+        labels.push_back(std::move(label));
+    }
+    if (labels.empty()) {
+        return;
+    }
+
+    // Find current selection index.
+    const auto it = form_values_.text.find(fc.node);
+    const std::string_view cur_val =
+        (it != form_values_.text.end()) ? std::string_view(it->second) : fc.node->attr("value");
+    int sel_idx = 0;
+    for (size_t i = 0; i < values.size(); ++i) {
+        if (values[i] == cur_val) {
+            sel_idx = static_cast<int>(i);
+            break;
+        }
+    }
+
+    // Build and run the dialog on the desktop (owner->owner).
+    constexpr int kDlgW = 40;
+    const int n = static_cast<int>(labels.size());
+    const int h = std::min(n + 2, 14);
+    TGroup* const desk = owner->owner;
+    const TRect desk_r = desk->getBounds();
+    const TRect dlg_r{(desk_r.b.x - kDlgW) / 2, (desk_r.b.y - h) / 2,
+                      (desk_r.b.x + kDlgW) / 2, (desk_r.b.y + h) / 2};
+    auto* dlg = new TDialog(dlg_r, "Select");
+    const TRect list_r{1, 1, kDlgW - 2, h - 1};
+    auto* viewer = new OptionListViewer(list_r, &labels);
+    viewer->focusItem(static_cast<short>(sel_idx));
+    dlg->insert(viewer);
+
+    const unsigned short res = desk->execView(dlg);
+    const short sel = viewer->focused;
+    TObject::destroy(dlg);
+
+    if (res == cmOK && sel >= 0 && sel < n) {
+        form_values_.text[fc.node] = values[static_cast<size_t>(sel)];
+        drawView();
+    }
+}
+
 void BrowserView::submit_form() {
     const layout::FormFocus* fc = focused_fc();
     if (fc == nullptr || fc->form == nullptr) {
@@ -287,8 +401,37 @@ bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
         }
     }
     for (size_t i = 0; i < form_controls_.size(); ++i) {
-        if (form_controls_[i].span.contains(pt)) {
-            focused_ = static_cast<int>(links_.size() + i);
+        if (!form_controls_[i].span.contains(pt)) {
+            continue;
+        }
+        focused_ = static_cast<int>(links_.size() + i);
+        const layout::FormFocus& fc = form_controls_[i];
+        switch (fc.kind) {
+        case layout::FormControlKind::Submit:
+            clearEvent(event);
+            submit_form();
+            return true;
+        case layout::FormControlKind::Checkbox: {
+            const auto it = form_values_.checked.find(fc.node);
+            const bool was = (it != form_values_.checked.end())
+                                 ? it->second
+                                 : (fc.node->attr("checked").data() != nullptr);
+            form_values_.checked[fc.node] = !was;
+            drawView();
+            clearEvent(event);
+            return true;
+        }
+        case layout::FormControlKind::Radio:
+            form_values_.checked[fc.node] = true;
+            drawView();
+            clearEvent(event);
+            return true;
+        case layout::FormControlKind::Select:
+            drawView();
+            clearEvent(event);
+            show_select_popup(fc);
+            return true;
+        default:
             drawView();
             clearEvent(event);
             return true;
@@ -364,6 +507,8 @@ void BrowserView::handleEvent(TEvent& event) {
         } else if (const layout::FormFocus* fc = focused_fc(); fc != nullptr) {
             if (fc->kind == layout::FormControlKind::Textarea) {
                 handle_form_input(kbEnter);
+            } else if (fc->kind == layout::FormControlKind::Select) {
+                show_select_popup(*fc);
             } else {
                 submit_form();
             }

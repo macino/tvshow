@@ -95,6 +95,8 @@ private:
     void handle_form_input(unsigned keyCode);
     // Move the focused <select>'s selected option by direction (+1 = down, -1 = up).
     void cycle_select_option(int direction);
+    // Show a modal option-picker dialog for the given select control.
+    void show_select_popup(const layout::FormFocus& fc);
     void submit_form();
 };
 
