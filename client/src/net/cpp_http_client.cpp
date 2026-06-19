@@ -5,6 +5,7 @@
 
 #include <httplib.h>
 
+#include <cctype>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -36,7 +37,9 @@ namespace {
     Response out;
     out.status = res->status;
     for (const auto& [key, value] : res->headers) {
-        out.headers[key] = value;
+        std::string lower_key = key;
+        for (char& c : lower_key) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+        out.headers[std::move(lower_key)] = value;
     }
     out.body = res->body;
     return out;
