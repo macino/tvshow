@@ -92,8 +92,15 @@ void BrowserWindow::focus_address_bar() {
 
 void BrowserWindow::navigate(std::string_view url) {
     const std::string s(url);
-    if (is_navigable(s)) {
-        view_->navigate_to(s);
+    if (!is_navigable(s)) {
+        return;
+    }
+    view_->navigate_to(s);
+    if (mode_ == AddressBarMode::Persistent && bar_ != nullptr) {
+        std::array<char, kUrlMaxLen + 1> nbuf{};
+        std::strncpy(nbuf.data(), view_->page().url.c_str(), kUrlMaxLen);
+        bar_->setData(nbuf.data());
+        bar_->drawView();
     }
 }
 

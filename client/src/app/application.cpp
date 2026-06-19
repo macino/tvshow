@@ -1,6 +1,7 @@
 #include "tvshow/app/application.hpp"
 
 #define Uses_TDialog
+#define Uses_TInputLine
 #define Uses_TListViewer
 #define Uses_TEvent
 #define Uses_TKeys
@@ -25,6 +26,7 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -129,6 +131,132 @@ public:
 private:
     const std::vector<std::string>* items_;
 };
+
+// ── URL history picker ───────────────────────────────────────────────────────
+
+// TListViewer that fills a TInputLine whenever the focused item changes.
+// Enter or double-click closes the parent dialog with cmOK.
+class HistoryListViewer : public TListViewer {
+public:
+    HistoryListViewer(const TRect& bounds, const std::vector<std::string>* items,
+                      TInputLine* bar, int bar_max_len)
+        : TListViewer(bounds, 1, nullptr, nullptr),
+          items_(items),
+          bar_(bar),
+          bar_max_len_(bar_max_len) {
+        setRange(static_cast<short>(items_->size()));
+    }
+
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    void getText(char* dest, short item, short maxLen) override {
+        const auto idx = static_cast<size_t>(item);
+        if (idx < items_->size()) {
+            std::strncpy(dest, (*items_)[idx].c_str(), static_cast<size_t>(maxLen));
+        }
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        dest[maxLen] = '\0';
+    }
+
+    void focusItem(short item) override {
+        TListViewer::focusItem(item);
+        const auto idx = static_cast<size_t>(item);
+        if (bar_ == nullptr || idx >= items_->size()) {
+            return;
+        }
+        std::vector<char> buf(static_cast<size_t>(bar_max_len_) + 1, '\0');
+        std::strncpy(buf.data(), (*items_)[idx].c_str(), static_cast<size_t>(bar_max_len_));
+        bar_->setData(buf.data());
+        bar_->drawView();
+    }
+
+    void handleEvent(TEvent& event) override {
+        const bool is_key =
+            event.what == evKeyDown;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        const bool is_down =
+            event.what == evMouseDown;  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        const bool dbl_click = is_down && ((event.mouse.eventFlags &  // NOLINT(cppcoreguidelines-pro-type-union-access)
+                                            meDoubleClick) != 0);
+        const bool enter_key =
+            is_key &&
+            (event.keyDown.keyCode == kbEnter);  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        const bool esc_key =
+            is_key &&
+            (event.keyDown.keyCode == kbEsc);  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        if (dbl_click || enter_key) {
+            endModal(cmOK);
+            clearEvent(event);
+        } else if (esc_key) {
+            endModal(cmCancel);
+            clearEvent(event);
+        } else {
+            TListViewer::handleEvent(event);
+        }
+    }
+
+private:
+    const std::vector<std::string>* items_;
+    TInputLine* bar_{nullptr};
+    int bar_max_len_;
+};
+
+// Builds a deduplicated (most-recent-first) view of the history vector.
+std::vector<std::string> dedupe_history(const std::vector<std::string>& history) {
+    std::vector<std::string> out;
+    std::unordered_set<std::string> seen;
+    for (auto it = history.rbegin(); it != history.rend(); ++it) {
+        if (seen.insert(*it).second) {
+            out.push_back(*it);
+        }
+    }
+    return out;
+}
+
+// Shows a URL picker dialog: TInputLine at top (pre-filled with initial_url),
+// deduplicated history list below.  Returns the chosen URL or "" on cancel.
+std::string show_url_picker(TGroup* desktop, const char* title,
+                            std::string_view initial_url,
+                            const std::vector<std::string>& history) {
+    if (desktop == nullptr) {
+        return {};
+    }
+    constexpr int kPickerUrlMax = 511;
+    const std::vector<std::string> items = dedupe_history(history);
+    const int n = static_cast<int>(items.size());
+    const int list_h = std::min(n, 12);
+    const int dlg_h = 2 + 1 + (list_h > 0 ? list_h : 0);  // frame + input + list
+    constexpr int kDlgW = 62;
+    const TRect desk = desktop->getBounds();
+    const TRect dlg_r{(desk.b.x - kDlgW) / 2, (desk.b.y - dlg_h) / 2,
+                      (desk.b.x + kDlgW) / 2, (desk.b.y + dlg_h) / 2};
+    auto* dlg = new TDialog(dlg_r, title);
+
+    const TRect bar_r{1, 1, kDlgW - 2, 2};
+    auto* bar = new TInputLine(bar_r, kPickerUrlMax);
+    {
+        std::array<char, kPickerUrlMax + 1> ibuf{};
+        std::strncpy(ibuf.data(), std::string(initial_url).c_str(), kPickerUrlMax);
+        bar->setData(ibuf.data());
+    }
+    dlg->insert(bar);
+
+    if (list_h > 0) {
+        const TRect list_r{1, 2, kDlgW - 2, 2 + list_h};
+        dlg->insert(new HistoryListViewer(list_r, &items, bar, kPickerUrlMax));
+    }
+    bar->select();
+
+    const unsigned short res = desktop->execView(dlg);
+    std::array<char, kPickerUrlMax + 1> rbuf{};
+    bar->getData(rbuf.data());
+    TObject::destroy(dlg);
+
+    if (res != cmOK) {
+        return {};
+    }
+    return std::string(rbuf.data());
+}
+
+// ── window-list helpers ──────────────────────────────────────────────────────
 
 struct CollectWindowsCtx {
     std::vector<std::string>* titles;
@@ -235,11 +363,8 @@ void Application::handleEvent(TEvent& event) {
     switch (event.message.command) {
     case cmNewTab: {
         clearEvent(event);
-        std::array<char, kUrlBufSize> buf{};
-        if (inputBox("New Tab", "Enter URL:", buf.data(), kUrlMaxLen) != cmOK) {
-            return;
-        }
-        const std::string url(buf.data());
+        const std::string url =
+            show_url_picker(deskTop, "New Tab", "", shared_browsing_state_.history);
         if (is_navigable(url)) {
             open_url(url);
         }
@@ -247,21 +372,14 @@ void Application::handleEvent(TEvent& event) {
     }
     case cmOpenUrl: {
         clearEvent(event);
-        if (mode_ == AddressBarMode::Persistent) {
-            // Delegate to the window's persistent bar (Tab-completion lives there).
-            if (BrowserWindow* win = active_browser_window()) {
-                win->focus_address_bar();
-            }
-            return;
-        }
-        std::array<char, kUrlBufSize> buf{};
+        std::string_view prefill;
+        std::string prefill_buf;
         if (const BrowserWindow* win = active_browser_window()) {
-            std::strncpy(buf.data(), std::string(win->current_url()).c_str(), kUrlMaxLen);
+            prefill_buf = std::string(win->current_url());
+            prefill = prefill_buf;
         }
-        if (inputBox("Open URL", "Enter URL:", buf.data(), kUrlMaxLen) != cmOK) {
-            return;
-        }
-        const std::string url(buf.data());
+        const std::string url =
+            show_url_picker(deskTop, "Open URL", prefill, shared_browsing_state_.history);
         if (!is_navigable(url)) {
             return;
         }
