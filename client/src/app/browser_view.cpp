@@ -3,6 +3,7 @@
 #define Uses_TDialog
 #define Uses_TDrawBuffer
 #define Uses_TEvent
+#define Uses_TEventQueue
 #define Uses_TKeys
 #define Uses_TListViewer
 #define Uses_TScrollBar
@@ -21,10 +22,16 @@
 #include <tvision/tv.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -84,11 +91,18 @@ BrowserView::BrowserView(const TRect& bounds, Page page, SharedBrowsingState* sh
     : TView(bounds), page_(std::move(page)), shared_(shared) {
     growMode = gfGrowHiX | gfGrowHiY;
     options |= ofSelectable | ofFirstClick;
-    eventMask |= evKeyDown | evMouseDown;
+    eventMask |= evKeyDown | evMouseDown | evMouseWheel;
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
     history_.push_back(page_.url);
     record_visit(page_.url);
+}
+
+BrowserView::~BrowserView() {
+    load_cancelled_.store(true, std::memory_order_release);
+    if (loader_thread_.joinable()) {
+        loader_thread_.join();
+    }
 }
 
 void BrowserView::record_visit(const std::string& url) {
@@ -128,6 +142,30 @@ render::CharGrid BrowserView::render_grid() const {
 }
 
 void BrowserView::draw() {
+    if (loading_.load(std::memory_order_acquire)) {
+        static constexpr std::array<const char*, 8> k_frames = {
+            "\xE2\xA3\xBE", "\xE2\xA3\xBD", "\xE2\xA3\xBB", "\xE2\xA2\xBF",
+            "\xE2\xA1\xBF", "\xE2\xA3\x9F", "\xE2\xA3\xAF", "\xE2\xA3\xB7",
+        };
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - load_start_)
+                            .count();
+        const char* spin = k_frames[static_cast<size_t>((ms / 120) % 8)];
+        const std::string label = std::string(spin) + " Loading...";
+
+        TDrawBuffer buf;
+        buf.moveChar(0, ' ', TColorAttr(0x07), static_cast<short>(size.x));
+        buf.moveStr(0, label.c_str(), TColorAttr(0x07));
+        writeLine(0, 0, static_cast<short>(size.x), 1, buf);
+
+        TDrawBuffer blank;
+        blank.moveChar(0, ' ', TColorAttr(0x07), static_cast<short>(size.x));
+        for (short row = 1; row < size.y; ++row) {
+            writeLine(0, row, static_cast<short>(size.x), 1, blank);
+        }
+        return;
+    }
+
     TDrawBuffer buf;
     const render::CharGrid grid = render_grid();
     const int available = grid.rows() - scroll_row_;
@@ -179,37 +217,110 @@ void BrowserView::navigate_to(std::string_view url) {
 }
 
 void BrowserView::navigate(const std::string& url, bool push_history) {
-    // Strip fragment from URL before loading (fragments are client-side only).
+    // Cancel any in-flight load and wait for it to finish.
+    load_cancelled_.store(true, std::memory_order_release);
+    if (loader_thread_.joinable()) {
+        loader_thread_.join();
+    }
+
+    // Strip fragment (client-side only).
     const auto hash_pos = url.rfind('#');
     const std::string base_url = (hash_pos != std::string::npos) ? url.substr(0, hash_pos) : url;
     const std::string fragment =
         (hash_pos != std::string::npos) ? url.substr(hash_pos + 1) : std::string{};
 
-    auto page = load_page(base_url.empty() ? url : base_url, {size.x, size.y});
-    if (!page) {
+    {
+        std::lock_guard<std::mutex> lk(pending_mutex_);
+        pending_load_.reset();
+    }
+    page_ready_.store(false, std::memory_order_relaxed);
+    load_cancelled_.store(false, std::memory_order_release);
+    loading_.store(true, std::memory_order_release);
+    load_start_ = std::chrono::steady_clock::now();
+    drawView();
+
+    const std::string fetch_url = base_url.empty() ? url : base_url;
+    const Size vp{size.x, size.y};
+
+    loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp]() {
+        // Inner thread does the blocking HTTP fetch.
+        std::atomic<bool> inner_done{false};
+        std::optional<Page> loaded;
+        std::thread inner([&]() {
+            loaded = load_page(fetch_url, vp);
+            inner_done.store(true, std::memory_order_release);
+        });
+
+        // Outer loop wakes the event loop for animation while inner is running.
+        using namespace std::chrono_literals;
+        while (!inner_done.load(std::memory_order_acquire)) {
+            std::this_thread::sleep_for(120ms);
+            if (!load_cancelled_.load(std::memory_order_acquire)) {
+                TEventQueue::wakeUp();  // thread-safe; drives spinner via Application::idle()
+            }
+        }
+        inner.join();
+
+        {
+            std::lock_guard<std::mutex> lk(pending_mutex_);
+            pending_load_.emplace(PendingLoad{std::move(loaded), url, fragment, push_history});
+        }
+        page_ready_.store(true, std::memory_order_release);
+
+        if (!load_cancelled_.load(std::memory_order_acquire)) {
+            TEventQueue::wakeUp();  // wake once more to apply the loaded page in idle()
+        }
+    });
+}
+
+void BrowserView::apply_loaded_page() {
+    PendingLoad result;
+    {
+        std::lock_guard<std::mutex> lk(pending_mutex_);
+        if (!pending_load_) {
+            return;
+        }
+        result = std::move(*pending_load_);
+        pending_load_.reset();
+    }
+    page_ready_.store(false, std::memory_order_relaxed);
+    loading_.store(false, std::memory_order_release);
+
+    if (!result.page) {
+        drawView();
         return;
     }
-    page_ = std::move(*page);
+
+    page_ = std::move(*result.page);
     record_visit(page_.url);
-    links_ = layout::collect_links(page_.box);
-    form_controls_ = layout::collect_form_controls(page_.box);
     form_values_ = {};
     focused_ = -1;
     scroll_row_ = 0;
-    if (!fragment.empty()) {
-        const int anchor = layout::find_anchor_row(page_.box, fragment);
+    relayout();
+
+    if (!result.fragment.empty()) {
+        const int anchor = layout::find_anchor_row(page_.box, result.fragment);
         if (anchor >= 0) {
             scroll_row_ = std::clamp(anchor, 0, scroll_limit());
+            sync_vscroll();
         }
     }
-    sync_vscroll();
-    if (push_history) {
+
+    if (result.push_history) {
         history_.erase(history_.begin() + static_cast<std::ptrdiff_t>(history_pos_) + 1,
                        history_.end());
-        history_.push_back(url);
+        history_.push_back(result.url);
         history_pos_ = history_.size() - 1;
     }
     drawView();
+}
+
+void BrowserView::tick_if_loading() {
+    if (page_ready_.load(std::memory_order_acquire)) {
+        apply_loaded_page();
+    } else if (loading_.load(std::memory_order_acquire)) {
+        drawView();
+    }
 }
 
 void BrowserView::focus_next(int direction) {
@@ -442,6 +553,19 @@ bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
 
 void BrowserView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
+
+    // Mouse wheel scroll.
+    if (event.what == evMouseWheel) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        const auto wheel = event.mouse.wheel;
+        if ((wheel & mwDown) != 0) {
+            scroll_to(scroll_row_ + 3);
+        } else if ((wheel & mwUp) != 0) {
+            scroll_to(scroll_row_ - 3);
+        }
+        clearEvent(event);
+        return;
+    }
 
     if (event.what == evMouseDown) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)

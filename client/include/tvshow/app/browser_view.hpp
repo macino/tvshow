@@ -9,9 +9,14 @@
 
 #include <tvision/tv.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstddef>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -38,6 +43,8 @@ public:
     void handleEvent(TEvent& event) override;
     void changeBounds(const TRect& bounds) override;
 
+    ~BrowserView() override;
+
     // Navigate to url, pushing onto history. No-op on load failure.
     void navigate_to(std::string_view url);
     void navigate_back();
@@ -59,6 +66,10 @@ public:
     // Maximum scroll offset in rows.
     [[nodiscard]] int scroll_limit() const;
 
+    // Called from Application::idle() on the main thread to animate the spinner
+    // and apply a completed page load.
+    void tick_if_loading();
+
 private:
     Page page_;
     std::vector<layout::Link> links_;
@@ -75,10 +86,27 @@ private:
 
     SharedBrowsingState* shared_{nullptr};  // non-owning; null in standalone mode
 
+    // Async loading state.
+    struct PendingLoad {
+        std::optional<Page> page;
+        std::string url;
+        std::string fragment;
+        bool push_history{false};
+    };
+    std::atomic<bool> loading_{false};
+    std::atomic<bool> page_ready_{false};  // set by thread, cleared by apply_loaded_page
+    std::atomic<bool> load_cancelled_{false};
+    std::chrono::steady_clock::time_point load_start_;
+    std::thread loader_thread_;
+    std::mutex pending_mutex_;
+    std::optional<PendingLoad> pending_load_;
+
     [[nodiscard]] const std::unordered_set<std::string>& visited_set() const noexcept {
         return (shared_ != nullptr) ? shared_->visited : local_visited_;
     }
     void record_visit(const std::string& url);
+    // Apply the result from pending_load_ (main thread only).
+    void apply_loaded_page();
 
     [[nodiscard]] int total_focusables() const;
     [[nodiscard]] bool is_link_focused() const;

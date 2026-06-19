@@ -17,6 +17,7 @@ public:
     explicit Application(AddressBarMode mode = AddressBarMode::Modal);
 
     void handleEvent(TEvent& event) override;
+    void idle() override;
     void shutDown() override;
 
     static auto initStatusLine(TRect r) -> TStatusLine*;

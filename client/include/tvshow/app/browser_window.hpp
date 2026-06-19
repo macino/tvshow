@@ -43,6 +43,9 @@ public:
     void navigate_forward();
     void reload();
 
+    // Called from Application::idle() to animate spinner or apply a completed load.
+    void tick_if_loading();
+
     // Returns the URL of the currently displayed page.
     [[nodiscard]] std::string_view current_url() const { return view_->page().url; }
 

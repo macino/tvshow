@@ -200,4 +200,8 @@ void BrowserWindow::reload() {
     view_->reload();
 }
 
+void BrowserWindow::tick_if_loading() {
+    view_->tick_if_loading();
+}
+
 }  // namespace tvshow::app

@@ -292,6 +292,14 @@ std::string show_url_picker(TGroup* desktop, const char* title,
     return std::string(rbuf.data());
 }
 
+// ── idle helper ─────────────────────────────────────────────────────────────
+
+static void tick_loading_window(TView* v, void* /*arg*/) {
+    if (auto* bw = dynamic_cast<BrowserWindow*>(v)) {
+        bw->tick_if_loading();
+    }
+}
+
 // ── window-list helpers ──────────────────────────────────────────────────────
 
 struct CollectWindowsCtx {
@@ -387,6 +395,13 @@ void Application::show_window_list() {  // NOLINT(readability-convert-member-fun
 
     if (res == cmOK && sel >= 0 && sel < count) {
         windows[static_cast<size_t>(sel)]->select();
+    }
+}
+
+void Application::idle() {
+    TProgram::idle();
+    if (deskTop != nullptr) {
+        deskTop->forEach(tick_loading_window, nullptr);
     }
 }
 
