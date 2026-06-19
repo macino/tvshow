@@ -193,19 +193,38 @@ void collect_head_metadata(const GumboNode* gn, Document& doc) {
     }
 }
 
+// Collect <style> elements from the body subtree (pages commonly embed
+// <style> blocks outside <head>; they are valid CSS cascade participants).
+// NOLINTNEXTLINE(misc-no-recursion)
+void collect_body_styles(const GumboNode* gn, Document& doc) {
+    if (gn == nullptr || gn->type != GUMBO_NODE_ELEMENT)
+        return;
+    const GumboElement& elem = gumbo_elem(*gn);
+    if (elem.tag == GUMBO_TAG_STYLE) {
+        handle_style(elem, doc);
+        return;
+    }
+    for (unsigned i = 0; i < elem.children.length; ++i) {
+        collect_body_styles(static_cast<const GumboNode*>(elem.children.data[i]), doc);
+    }
+}
+
 void walk_head(const GumboNode* html_node, Document& doc) {
     if (html_node == nullptr || html_node->type != GUMBO_NODE_ELEMENT)
         return;
     const GumboElement& html_elem = gumbo_elem(*html_node);
     for (unsigned i = 0; i < html_elem.children.length; ++i) {
         const auto* child = static_cast<const GumboNode*>(html_elem.children.data[i]);
-        if (child != nullptr && child->type == GUMBO_NODE_ELEMENT &&
-            gumbo_elem(*child).tag == GUMBO_TAG_HEAD) {
+        if (child == nullptr || child->type != GUMBO_NODE_ELEMENT)
+            continue;
+        const GumboTag tag = gumbo_elem(*child).tag;
+        if (tag == GUMBO_TAG_HEAD) {
             const GumboElement& head = gumbo_elem(*child);
             for (unsigned j = 0; j < head.children.length; ++j) {
                 collect_head_metadata(static_cast<const GumboNode*>(head.children.data[j]), doc);
             }
-            return;
+        } else if (tag == GUMBO_TAG_BODY) {
+            collect_body_styles(child, doc);
         }
     }
 }
