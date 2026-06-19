@@ -161,6 +161,7 @@ auto Application::initStatusLine(TRect r) -> TStatusLine* {
     r.a.y = r.b.y - 1;
     return new TStatusLine(r, *new TStatusDef(0, 0xFFFF) +
                                   *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
+                                  *new TStatusItem("~Alt-\x11~ Back", kbAltLeft, cmBack) +
                                   *new TStatusItem("~Ctrl-L~ URL", kbCtrlL, cmOpenUrl) +
                                   *new TStatusItem(nullptr, kbF10, cmMenu));
 }
