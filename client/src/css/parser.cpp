@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstddef>
 #include <optional>
@@ -58,6 +59,101 @@ struct StdoutSilencer {
     StdoutSilencer(const StdoutSilencer&) = delete;
     StdoutSilencer& operator=(const StdoutSilencer&) = delete;
 };
+
+// Strip vendor-prefixed CSS declarations (-webkit-*, -moz-*, -ms-*, -o-*) before
+// passing CSS to Katana.  We never act on vendor-prefixed properties, and they
+// trigger a bug in Katana's error-recovery path that corrupts internal state and
+// produces a SIGSEGV during katana_destroy_output() or katanaerror().
+// The stripper is a simple state machine that understands enough CSS structure
+// (strings, braces, semicolons) to remove whole declarations without touching
+// selector text.
+std::string strip_vendor_declarations(std::string_view css) {
+    static constexpr std::array<std::string_view, 4> k_prefixes = {
+        std::string_view{"-webkit-"},
+        std::string_view{"-moz-"},
+        std::string_view{"-ms-"},
+        std::string_view{"-o-"},
+    };
+
+    std::string out;
+    out.reserve(css.size());
+
+    bool in_str = false;
+    char str_ch = 0;
+    bool at_decl_start = false;  // true after { or ;
+
+    for (std::size_t i = 0; i < css.size(); ++i) {
+        const char c = css[i];
+
+        if (in_str) {
+            out += c;
+            if (c == str_ch && (i == 0 || css[i - 1] != '\\')) {
+                in_str = false;
+            }
+            continue;
+        }
+
+        if (c == '"' || c == '\'') {
+            in_str = true;
+            str_ch = c;
+            out += c;
+            at_decl_start = false;
+            continue;
+        }
+
+        if (c == '{') {
+            out += c;
+            at_decl_start = true;
+            continue;
+        }
+
+        if (c == ';') {
+            out += c;
+            at_decl_start = true;
+            continue;
+        }
+
+        if (c == '}') {
+            out += c;
+            at_decl_start = true;
+            continue;
+        }
+
+        // Whitespace is transparent at declaration start.
+        if (at_decl_start && (c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+            out += c;
+            continue;
+        }
+
+        // At the start of a declaration, check for a vendor prefix.
+        if (at_decl_start && c == '-') {
+            bool is_vendor = false;
+            for (const auto& pfx : k_prefixes) {
+                if (css.substr(i).starts_with(pfx)) {
+                    is_vendor = true;
+                    break;
+                }
+            }
+            if (is_vendor) {
+                // Skip the entire declaration value up to (and including) the next ;
+                // but stop before } so the closing brace is preserved.
+                while (i < css.size() && css[i] != ';' && css[i] != '}') {
+                    ++i;
+                }
+                if (i < css.size() && css[i] == ';') {
+                    ++i;  // consume ;
+                }
+                --i;  // the outer for-loop will increment
+                at_decl_start = true;
+                continue;
+            }
+        }
+
+        out += c;
+        at_decl_start = false;
+    }
+    return out;
+}
 
 std::string to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
@@ -339,9 +435,10 @@ std::vector<Declaration> extract_declarations(const KatanaArray* decls) {
 }  // namespace
 
 std::optional<Stylesheet> parse(std::string_view css) {
+    const std::string filtered = strip_vendor_declarations(css);
     KatanaOutput* output = [&] {
         const StdoutSilencer silence;
-        return katana_parse(css.data(), css.size(), KatanaParserModeStylesheet);
+        return katana_parse(filtered.data(), filtered.size(), KatanaParserModeStylesheet);
     }();
     if (output == nullptr)
         return std::nullopt;
@@ -368,9 +465,10 @@ std::vector<Declaration> parse_inline(std::string_view style) {
     if (style.empty())
         return {};
 
+    const std::string filtered = strip_vendor_declarations(style);
     KatanaOutput* output = [&] {
         const StdoutSilencer silence;
-        return katana_parse(style.data(), style.size(), KatanaParserModeDeclarationList);
+        return katana_parse(filtered.data(), filtered.size(), KatanaParserModeDeclarationList);
     }();
     if (output == nullptr)
         return {};

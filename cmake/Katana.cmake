@@ -6,8 +6,22 @@ include(FetchContent)
 set(TVSHOW_KATANA_TAG "499118d32c387a893fdc9dda2cb95eee524bdb9b"
     CACHE STRING "katana-parser commit to pin")
 
-# Upstream bug: tokenizer.c never parses the numeric value of `ch`-unit
-# lengths (missing switch case) — see cmake/patches/katana-fix-chs-unit.cmake.
+# Five upstream bugs patched via cmake/patches/:
+#   katana-fix-chs-unit.cmake            — tokenizer.c never parses `ch`-unit values.
+#   katana-null-data-ptr.cmake           — destroy loop crashes on NULL array->data.
+#   katana-error-scan-text.cmake         — katanaerror() crashes on garbage scanner text.
+#   katana-array-destroy-null.cmake      — katana_array_destroy() leaves dangling data
+#                                          pointer after free; zeroing it here closes the
+#                                          use-after-free that caused SIGSEGV on real-world
+#                                          CSS with modern properties (user-select, etc.).
+#   katana-destroy-style-rule-guard.cmake — katana_destroy_style_rule() lacks guards for
+#                                           uninitialised/corrupted selectors+declarations
+#                                           arrays; triggers assert/double-free on
+#                                           error-recovery rules from modern CSS.
+#   katana-dedup-rules.cmake              — error-recovery adds the same KatanaRule* twice
+#                                           to rules arrays; dedup before destroy to prevent
+#                                           double-free in katana_destroy_stylesheet and
+#                                           katana_destroy_rule_list (@media child rules).
 FetchContent_Declare(
     katana_parser
     GIT_REPOSITORY https://github.com/hackers-painters/katana-parser.git
@@ -16,6 +30,16 @@ FetchContent_Declare(
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     PATCH_COMMAND  ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
                    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-fix-chs-unit.cmake
+        COMMAND    ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-null-data-ptr.cmake
+        COMMAND    ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-error-scan-text.cmake
+        COMMAND    ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-array-destroy-null.cmake
+        COMMAND    ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-destroy-style-rule-guard.cmake
+        COMMAND    ${CMAKE_COMMAND} -DKATANA_SRC=<SOURCE_DIR>
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/katana-dedup-rules.cmake
 )
 
 FetchContent_GetProperties(katana_parser)
