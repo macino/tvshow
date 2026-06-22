@@ -4,6 +4,9 @@
 
 #include <katana.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
@@ -16,6 +19,45 @@
 namespace tvshow::css {
 
 namespace {
+
+// Katana's internal katana_print() goes to printf/stdout, which corrupts the
+// tvision terminal display when an unknown CSS unit is encountered.  This RAII
+// guard silences stdout for the duration of katana_parse() by redirecting fd 1
+// to /dev/null, then restoring it.  The module is otherwise pure (no I/O of
+// its own); this is containment of external library noise.
+struct StdoutSilencer {
+    int saved_{-1};
+    int null_{-1};
+
+    StdoutSilencer() noexcept {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,android-cloexec-open)
+        null_ = ::open("/dev/null", O_WRONLY);
+        if (null_ >= 0) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+            saved_ = ::dup(STDOUT_FILENO);
+            if (saved_ >= 0) {
+                std::fflush(stdout);
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+                ::dup2(null_, STDOUT_FILENO);
+            }
+        }
+    }
+
+    ~StdoutSilencer() noexcept {
+        if (saved_ >= 0) {
+            std::fflush(stdout);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+            ::dup2(saved_, STDOUT_FILENO);
+            ::close(saved_);
+        }
+        if (null_ >= 0) {
+            ::close(null_);
+        }
+    }
+
+    StdoutSilencer(const StdoutSilencer&) = delete;
+    StdoutSilencer& operator=(const StdoutSilencer&) = delete;
+};
 
 std::string to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(),
@@ -297,7 +339,10 @@ std::vector<Declaration> extract_declarations(const KatanaArray* decls) {
 }  // namespace
 
 std::optional<Stylesheet> parse(std::string_view css) {
-    KatanaOutput* output = katana_parse(css.data(), css.size(), KatanaParserModeStylesheet);
+    KatanaOutput* output = [&] {
+        const StdoutSilencer silence;
+        return katana_parse(css.data(), css.size(), KatanaParserModeStylesheet);
+    }();
     if (output == nullptr)
         return std::nullopt;
 
@@ -323,8 +368,10 @@ std::vector<Declaration> parse_inline(std::string_view style) {
     if (style.empty())
         return {};
 
-    KatanaOutput* output =
-        katana_parse(style.data(), style.size(), KatanaParserModeDeclarationList);
+    KatanaOutput* output = [&] {
+        const StdoutSilencer silence;
+        return katana_parse(style.data(), style.size(), KatanaParserModeDeclarationList);
+    }();
     if (output == nullptr)
         return {};
 
