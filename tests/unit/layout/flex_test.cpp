@@ -177,14 +177,16 @@ TEST_CASE("flex row flex-basis: explicit base size") {
 
 // ── align-items ───────────────────────────────────────────────────────────────
 
-TEST_CASE("flex row align-items stretch: items stretch to container height") {
+TEST_CASE("flex row align-items stretch: items stretch to tallest sibling") {
+    // Two spans: one empty (0 rows natural), one with 5 rows of content.
+    // Default align-items:stretch means the empty span must stretch to match the tallest.
     auto [doc, tree] =
-        make_tree("<body><div><span></span></div></body>",
-                  "div { display:flex; width:20ch; height:5em; } span { width:5ch; }");
+        make_tree("<body><div><span></span><span>AAAAA BBBBB CCCCC DDDDD EEEEE</span></div></body>",
+                  "div { display:flex; width:20ch; } span { width:5ch; }");
     const Box root = layout(tree, {40, 20});
     const auto* cont = find_box(root, "div");
     REQUIRE(cont != nullptr);
-    REQUIRE(cont->children.size() == 1);
+    REQUIRE(cont->children.size() == 2);
     CHECK(cont->children[0].border_box.size.rows == 5);
 }
 
@@ -217,16 +219,19 @@ TEST_CASE("flex row align-items flex-end: items at bottom of container") {
 }
 
 TEST_CASE("flex row align-items center: items vertically centered") {
+    // span[0]: 2 rows of content. span[1]: 4 rows of content.
+    // Container cross = 4 (max child height).  span[0] centered: offset = (4-2)/2 = 1.
     auto [doc, tree] =
-        make_tree("<body><div><span></span></div></body>",
-                  "div { display:flex; align-items:center; width:20ch; height:6em; } "
-                  "span { width:5ch; height:2em; }");
+        make_tree("<body><div>"
+                  "<span>AAAAA BBBBB</span>"
+                  "<span>AAAAA BBBBB CCCCC DDDDD</span>"
+                  "</div></body>",
+                  "div { display:flex; align-items:center; width:20ch; } span { width:5ch; }");
     const Box root = layout(tree, {40, 20});
     const auto* cont = find_box(root, "div");
     REQUIRE(cont != nullptr);
-    REQUIRE(cont->children.size() == 1);
-    // free cross = 4 rows, item starts at content_row + 2
-    CHECK(cont->children[0].border_box.origin.row == cont->content_box.origin.row + 2);
+    REQUIRE(cont->children.size() == 2);
+    CHECK(cont->children[0].border_box.origin.row == cont->content_box.origin.row + 1);
 }
 
 // ── Column direction ──────────────────────────────────────────────────────────

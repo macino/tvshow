@@ -245,8 +245,9 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
         y += inline_rows(sn, content_w);
     }
 
-    const int content_h =
-        st.height.is_auto ? std::max(0, y - content_origin.row) : resolve_v(st.height, avail_h);
+    // Text browser: explicit height on block containers produces blank rows without
+    // adding visible content.  img and form controls are already sized above.
+    const int content_h = std::max(0, y - content_origin.row);
 
     Box box;
     box.node = &sn;
@@ -419,11 +420,12 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
                          st.flex_direction != style::FlexDirection::ColumnReverse);
     const int content_main = is_row ? content_w : avail_h;
 
-    // For row: cross is height (explicit or auto = -1).
+    // For row: cross is height.  Text browser ignores explicit height (would create
+    // blank rows); always -1 so content_cross = max child height.
     // For column: cross is width (always known = content_w).
     int content_cross_explicit = content_w;  // column direction: cross is content_w
     if (is_row) {
-        content_cross_explicit = st.height.is_auto ? -1 : resolve_v(st.height, avail_h);
+        content_cross_explicit = -1;  // always auto in text mode
     }
 
     const int gap_main = is_row ? resolve_h(st.gap, content_main) : resolve_v(st.gap, avail_h);
@@ -519,11 +521,8 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
         }
     }
 
-    int content_h =
-        st.height.is_auto ? actual_used_main : resolve_v(st.height, avail_h);  // column default
-    if (is_row) {
-        content_h = st.height.is_auto ? content_cross : resolve_v(st.height, avail_h);
-    }
+    // Text browser: always content-driven; explicit height ignored (see above).
+    const int content_h = is_row ? content_cross : actual_used_main;
 
     Box box;
     box.node = &sn;

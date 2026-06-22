@@ -72,11 +72,8 @@ TEST_CASE("render: default cells are blank space") {
 // ── background ───────────────────────────────────────────────────────────────
 
 TEST_CASE("render: background-color fills the border box") {
-    // The div has no content, so without an explicit height it would
-    // shrink-wrap to zero rows (correct CSS auto-height behavior) and there
-    // would be nothing to paint.
     auto [doc, tree] =
-        make_tree("<body><div></div></body>", "div { background-color: #ff0000; height: 3em; }");
+        make_tree("<body><div>x</div></body>", "div { background-color: #ff0000; }");
     const Box box = layout(tree, {10, 5});
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).attr.bg == 0xFF0000U);
@@ -86,8 +83,11 @@ TEST_CASE("render: background-color fills the border box") {
 // ── border ───────────────────────────────────────────────────────────────────
 
 TEST_CASE("render: border-style:solid draws box-drawing corners") {
+    // padding-top/bottom push the bottom border to row 4 of the 5-row viewport
+    // (1 brd + 1 pad + 1 content + 1 pad + 1 brd = 5 rows).
     auto [doc, tree] =
-        make_tree("<body><div></div></body>", "div { border-style: solid; height: 3em; }");
+        make_tree("<body><div>x</div></body>",
+                  "div { border-style: solid; padding-top: 1em; padding-bottom: 1em; }");
     const Box box = layout(tree, {10, 5});
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).cp == U'┌');
@@ -99,10 +99,9 @@ TEST_CASE("render: border-style:solid draws box-drawing corners") {
 }
 
 TEST_CASE("render: border-style:double draws double-line glyphs") {
-    // height:3em makes the border box (3 content rows + 2 border rows) span
-    // the full 5-row viewport, so the bottom border lands on row 4.
     auto [doc, tree] =
-        make_tree("<body><div></div></body>", "div { border-style: double; height: 3em; }");
+        make_tree("<body><div>x</div></body>",
+                  "div { border-style: double; padding-top: 1em; padding-bottom: 1em; }");
     const Box box = layout(tree, {10, 5});
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).cp == U'╔');
@@ -115,7 +114,7 @@ TEST_CASE("render: border-style:double draws double-line glyphs") {
 
 TEST_CASE("render: border-style:dashed draws solid corners with dashed edges") {
     auto [doc, tree] =
-        make_tree("<body><div></div></body>", "div { border-style: dashed; height: 3em; }");
+        make_tree("<body><div>x</div></body>", "div { border-style: dashed; }");
     const Box box = layout(tree, {10, 5});
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).cp == U'┌');

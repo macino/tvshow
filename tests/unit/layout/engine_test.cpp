@@ -136,12 +136,14 @@ TEST_CASE("layout: border-style:solid adds 1-cell border on each side") {
     CHECK(div->content_box.origin.row >= 1);  // 1 cell border on top
 }
 
-TEST_CASE("layout: explicit height sets box height") {
+TEST_CASE("layout: explicit height on block container is ignored (text browser)") {
+    // Text browsers drive block height from content, not CSS height — explicit height
+    // would create blank rows with no content.  img/form controls are the exception.
     auto [doc, tree] = make_tree("<body><div></div></body>", "div { height: 5em; }");
     const Box root = layout(tree, {80, 24});
     const auto* div = find_box(root, "div");
     REQUIRE(div != nullptr);
-    CHECK(div->content_box.size.rows == 5);
+    CHECK(div->content_box.size.rows == 0);
 }
 
 TEST_CASE("layout: text content generates positive height") {
