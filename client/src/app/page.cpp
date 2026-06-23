@@ -11,6 +11,7 @@
 #include "tvshow/net/http_client.hpp"
 #include "tvshow/style/resolver.hpp"
 #include "tvshow/style/tree.hpp"
+#include "tvshow/util/charset.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <fstream>
@@ -67,7 +68,14 @@ Fetched fetch_http(const util::Url& url) {
                                 "The server returned an error for " + url.to_string()),
                 true};
     }
-    return {resp.body, false};
+    // Charset: Content-Type header takes priority; <meta charset> is the fallback.
+    // resp.charset() returns "utf-8" when no explicit charset is declared.
+    const std::string ct_charset = resp.charset();
+    const std::string meta_charset = util::prescan_charset(resp.body);
+    const std::string effective = (ct_charset != "utf-8") ? ct_charset
+                                  : !meta_charset.empty() ? meta_charset
+                                                          : "utf-8";
+    return {util::transcode_to_utf8(resp.body, effective), false};
 }
 
 // Fetches the stylesheets named by doc.stylesheet_hrefs, resolved against

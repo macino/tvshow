@@ -425,7 +425,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 | Q-5 | Selection / clipboard support | v1 yes/no |
 | Q-6 | Mouse support level | Click only, or wheel + drag-to-resize windows |
 | Q-7 | HTTPS via cpp-httplib + OpenSSL | v1 / v1.1 / v2 |
-| Q-8 | Charset support beyond UTF-8 | Need `iconv` dep? |
+| Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |
 | Q-9 | Cookies / sessions | v1 / later |
 | Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |

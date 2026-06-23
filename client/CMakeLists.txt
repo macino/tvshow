@@ -2,6 +2,7 @@
 add_library(tvshow_core STATIC
     src/render/chargrid.cpp
     src/util/url.cpp
+    src/util/charset.cpp
     src/net/http_client.cpp
     src/net/fake_http_client.cpp
     src/dom/node.cpp
@@ -25,12 +26,15 @@ target_include_directories(tvshow_core
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+find_library(ICONV_LIB iconv)
+
 target_link_libraries(tvshow_core
     PUBLIC
         gumbo::gumbo
         katana::katana
     PRIVATE
         tvshow_warnings
+        $<$<BOOL:${ICONV_LIB}>:${ICONV_LIB}>
 )
 
 set_target_properties(tvshow_core PROPERTIES

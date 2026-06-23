@@ -3,6 +3,7 @@ add_executable(tvshow-tests
     render/chargrid_test.cpp
     layout/types_test.cpp
     util/url_test.cpp
+    util/charset_test.cpp
     net/http_client_test.cpp
     dom/parser_test.cpp
     css/parser_test.cpp
