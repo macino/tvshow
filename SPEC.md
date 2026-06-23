@@ -400,7 +400,9 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 
 ## 18. Logging and Diagnostics
 
-`util::log` writes to `~/.cache/tvshow/log` by default; `--log-level` flag controls verbosity. Optional debug overlay (Ctrl-D) draws box outlines on top of the rendered page (Open Q-12 — final debug overlay design).
+`util::log` writes to `~/.cache/tvshow/log` by default; `--log-level` flag controls verbosity (debug / info / warn / error). Log module lives in `tvshow_io` (impure). Path `"-"` forces stderr-only output.
+
+Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in magenta over the rendered CharGrid. Applies to every box in the layout tree. Focus order display and box-dimension labels are deferred to a later milestone.
 
 ---
 
@@ -429,7 +431,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 | Q-9 | Cookies / sessions | v1 / later |
 | Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
-| Q-12 | Debug overlay (Ctrl-D) detail | Box outlines, focus order, box dims, all? |
+| Q-12 | Debug overlay (Ctrl-D) detail | **Resolved**: box outlines in magenta (Ctrl-D toggle); focus-order labels and box-dim display deferred. |
 | Q-13 | `<table>` support | **Resolved**: flex-reuse layout in UA stylesheet (ADR 002); no colspan/rowspan. |
 | Q-14 | Error page styling | UA-themed or plain |
 | Q-15 | CI host | GitHub Actions / GitLab / local only |

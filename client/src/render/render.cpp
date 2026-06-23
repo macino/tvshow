@@ -483,4 +483,56 @@ bool is_mostly_blank(const CharGrid& grid) noexcept {
     return true;
 }
 
+namespace {
+
+void draw_box_outline(CharGrid& grid, const layout::Box& box) {
+    const Rect& r = box.border_box;
+    if (r.size.cols < 1 || r.size.rows < 1) { return; }
+
+    constexpr ColorAttr k_dbg{0xFF00FFU, 0x000000U};  // magenta fg
+
+    const int r0 = r.origin.row;
+    const int c0 = r.origin.col;
+    const int r1 = r.origin.row + r.size.rows - 1;
+    const int c1 = r.origin.col + r.size.cols - 1;
+
+    auto safe_put = [&](int col, int row, char32_t cp) {
+        if (col >= 0 && col < grid.cols() && row >= 0 && row < grid.rows()) {
+            const auto bg = grid.at({col, row}).attr.bg;
+            grid.put({col, row}, cp, {k_dbg.fg, bg});
+        }
+    };
+
+    if (r.size.rows == 1) {
+        safe_put(c0, r0, U'[');
+        safe_put(c1, r0, U']');
+        for (int c = c0 + 1; c < c1; ++c) { safe_put(c, r0, U'─'); }
+        return;
+    }
+
+    safe_put(c0, r0, U'┌');  // ┌
+    safe_put(c1, r0, U'┐');  // ┐
+    safe_put(c0, r1, U'└');  // └
+    safe_put(c1, r1, U'┘');  // ┘
+
+    for (int c = c0 + 1; c < c1; ++c) {
+        safe_put(c, r0, U'─');  // ─
+        safe_put(c, r1, U'─');
+    }
+    for (int row = r0 + 1; row < r1; ++row) {
+        safe_put(c0, row, U'│');  // │
+        safe_put(c1, row, U'│');
+    }
+
+    for (const auto& child : box.children) {
+        draw_box_outline(grid, child);
+    }
+}
+
+}  // namespace
+
+void apply_debug_overlay(CharGrid& grid, const layout::Box& root) {
+    draw_box_outline(grid, root);
+}
+
 }  // namespace tvshow::render

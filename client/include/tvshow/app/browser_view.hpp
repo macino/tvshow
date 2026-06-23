@@ -139,6 +139,8 @@ private:
 
     void find_matches_in_page(std::string_view term);
     void navigate_to_hit(int dir);  // +1 = next, -1 = prev
+
+    bool debug_overlay_ = false;  // Ctrl-D toggles box-outline overlay
 };
 
 }  // namespace tvshow::app

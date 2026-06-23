@@ -387,3 +387,43 @@ TEST_CASE("render: table cells rendered as equal-width flex columns") {
     CHECK(grid.at({31, 1}).cp == U'B');
     CHECK(grid.at({32, 1}).cp == U'B');
 }
+
+// ── apply_debug_overlay (SPEC §20 Q-12) ──────────────────────────────────────
+
+TEST_CASE("render: apply_debug_overlay draws corners on a multi-row box") {
+    // Build a synthetic box tree with one root box 10 wide × 3 tall.
+    CharGrid grid(10, 3);
+    const tvshow::render::ColorAttr plain{0xFFFFFFU, 0x000000U};
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 10; ++c) {
+            grid.put({c, r}, U' ', plain);
+        }
+    }
+
+    Box root;
+    root.border_box = {{0, 0}, {10, 3}};
+
+    tvshow::render::apply_debug_overlay(grid, root);
+
+    CHECK(grid.at({0, 0}).cp == U'┌');
+    CHECK(grid.at({9, 0}).cp == U'┐');
+    CHECK(grid.at({0, 2}).cp == U'└');
+    CHECK(grid.at({9, 2}).cp == U'┘');
+    CHECK(grid.at({1, 0}).cp == U'─');  // top edge
+    CHECK(grid.at({0, 1}).cp == U'│');  // left edge
+    CHECK(grid.at({0, 0}).attr.fg == 0xFF00FFU);  // magenta
+}
+
+TEST_CASE("render: apply_debug_overlay single-row box uses bracket markers") {
+    CharGrid grid(5, 1);
+    const tvshow::render::ColorAttr plain{0xFFFFFFU, 0x000000U};
+    for (int c = 0; c < 5; ++c) { grid.put({c, 0}, U' ', plain); }
+
+    Box root;
+    root.border_box = {{0, 0}, {5, 1}};
+
+    tvshow::render::apply_debug_overlay(grid, root);
+
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({4, 0}).cp == U']');
+}

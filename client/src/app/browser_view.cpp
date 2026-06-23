@@ -212,6 +212,9 @@ render::CharGrid BrowserView::render_grid() const {
             }
         }
     }
+    if (debug_overlay_) {
+        render::apply_debug_overlay(grid, page_.box);
+    }
     return grid;
 }
 
@@ -727,6 +730,11 @@ void BrowserView::handleEvent(TEvent& event) {
         break;
     case kbCtrlF:
         show_find_dialog();
+        clearEvent(event);
+        break;
+    case 0x0004:  // Ctrl-D
+        debug_overlay_ = !debug_overlay_;
+        drawView();
         clearEvent(event);
         break;
     case kbEsc:

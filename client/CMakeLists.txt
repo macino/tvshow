@@ -75,6 +75,7 @@ set_target_properties(tvshow_paint PROPERTIES
 add_library(tvshow_io STATIC
     src/app/page.cpp
     src/net/cpp_http_client.cpp
+    src/util/log.cpp
 )
 
 target_include_directories(tvshow_io

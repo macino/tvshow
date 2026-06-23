@@ -12,11 +12,11 @@
 #include "tvshow/style/resolver.hpp"
 #include "tvshow/style/tree.hpp"
 #include "tvshow/util/charset.hpp"
+#include "tvshow/util/log.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <fstream>
 #include <ios>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -137,7 +137,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
 
     auto doc = dom::parse(fetched.html);
     if (!doc) {
-        std::cerr << "tvshow: failed to parse HTML from POST response\n";
+        util::log::error("failed to parse HTML from POST response");
         return std::nullopt;
     }
     std::vector<css::Stylesheet> sheets;
@@ -151,7 +151,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
     }
     auto tree = style::resolve(*doc, sheets);
     if (!tree) {
-        std::cerr << "tvshow: failed to resolve styles from POST response\n";
+        util::log::error("failed to resolve styles from POST response");
         return std::nullopt;
     }
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
@@ -182,7 +182,7 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
 
     auto doc = dom::parse(fetched.html);
     if (!doc) {
-        std::cerr << "tvshow: failed to parse HTML: " << url << '\n';
+        util::log::error("failed to parse HTML: " + std::string(url));
         return std::nullopt;
     }
 
@@ -198,7 +198,7 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
 
     auto tree = style::resolve(*doc, sheets);
     if (!tree) {
-        std::cerr << "tvshow: failed to resolve styles: " << url << '\n';
+        util::log::error("failed to resolve styles: " + std::string(url));
         return std::nullopt;
     }
 

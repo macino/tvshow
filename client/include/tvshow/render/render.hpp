@@ -44,4 +44,8 @@ void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans);
 // to detect pages where author CSS hides all content (JS-dependent pages).
 [[nodiscard]] bool is_mostly_blank(const CharGrid& grid) noexcept;
 
+// Paints debug box outlines (magenta) over each box in the tree.
+// Corners: ┌┐└┘  edges: ─ │
+void apply_debug_overlay(CharGrid& grid, const layout::Box& root);
+
 }  // namespace tvshow::render

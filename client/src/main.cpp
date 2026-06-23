@@ -1,5 +1,6 @@
 #include "tvshow/app/application.hpp"
 #include "tvshow/app/browser_window.hpp"
+#include "tvshow/util/log.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -9,15 +10,20 @@
 auto main(int argc, char** argv) -> int {
     tvshow::app::AddressBarMode mode = tvshow::app::AddressBarMode::Modal;
     std::string_view initial_url;
+    tvshow::util::log::Level log_level = tvshow::util::log::Level::Warn;
 
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg(argv[i]);
         if (arg == "--address-bar=persistent") {
             mode = tvshow::app::AddressBarMode::Persistent;
+        } else if (arg.starts_with("--log-level=")) {
+            log_level = tvshow::util::log::parse_level(arg.substr(12));
         } else if (!arg.starts_with("--")) {
             initial_url = arg;
         }
     }
+
+    tvshow::util::log::init(log_level);
 
     tvshow::app::Application app(mode);
     try {
