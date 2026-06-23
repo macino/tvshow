@@ -394,7 +394,7 @@ Used by integration tests to verify end-to-end golden grids.
 The pipeline is deterministic given (input bytes, viewport size, color depth, terminal capabilities). All non-determinism (timing, network) is behind the `net` module. Color autodetection is stubbed in tests.
 
 ### 17.3 CI
-`ctest --output-on-failure` in CMake build. PR cannot merge with red tests. (Open Q-15 — choice of CI host.)
+`ctest --output-on-failure` in CMake build. PR cannot merge with red tests. CI runs on GitHub Actions (`.github/workflows/ci.yml`): Ubuntu latest, clang, Ninja, cmake configure → build → ctest.
 
 ---
 
@@ -426,7 +426,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-4 | UA default stylesheet — how opinionated | **Resolved**: browser-like. h1 underlined+bold, h2 bold with more top margin, h3-h6 proportionally smaller margins; hr rendered via border-top-style: solid; blockquote gets left border + padding; em/strong/a already present. |
 | Q-5 | Selection / clipboard support | **Resolved**: Ctrl-C copies focused link URL via OSC 52 to terminal clipboard. No text selection. |
 | Q-6 | Mouse support level | **Resolved**: click (link/form) + scroll wheel (3 rows/tick). No drag-to-resize. |
-| Q-7 | HTTPS via cpp-httplib + OpenSSL | v1 / v1.1 / v2 |
+| Q-7 | HTTPS via cpp-httplib + OpenSSL | **Resolved**: already implemented — CPPHTTPLIB_OPENSSL_SUPPORT enabled in cmake/HttpLib.cmake, OpenSSL linked; Url::parse accepts https:// and maps port to 443; httplib::Client auto-selects SSLClient. |
 | Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |
 | Q-9 | Cookies / sessions | **Resolved**: in-memory session CookieJar (RFC 6265 §5 simplified); no persistence, no Secure/SameSite enforcement; per-SharedBrowsingState (shared across tabs). |
 | Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
@@ -434,8 +434,8 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-12 | Debug overlay (Ctrl-D) detail | **Resolved**: box outlines in magenta (Ctrl-D toggle); focus-order labels and box-dim display deferred. |
 | Q-13 | `<table>` support | **Resolved**: flex-reuse layout in UA stylesheet (ADR 002); no colspan/rowspan. |
 | Q-14 | Error page styling | **Resolved**: UA-themed — body padding + p margin applied via inline style in error_page_html(). |
-| Q-15 | CI host | GitHub Actions / GitLab / local only |
-| Q-16 | License | MIT / Apache-2 / proprietary |
+| Q-15 | CI host | **Resolved**: GitHub Actions — `.github/workflows/ci.yml`, Ubuntu latest, clang/Ninja, cmake+ctest. |
+| Q-16 | License | **Resolved**: MIT — `LICENSE` file at repo root, copyright Tomas Macik 2026. |
 | Q-17 | tvision pin | Specific commit / release tag |
 | Q-18 | Image renderer plug interface | Resolved: `ImageRenderer::render(int cols, int rows, std::string_view alt, std::string_view src) → vector<string>`. v1 impl: `AltTextRenderer` (writes `[alt]` in row 0). |
 | Q-19 | Config file location and format | `~/.config/tvshow/config.toml`? CLI flags only? |

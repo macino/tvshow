@@ -33,10 +33,10 @@ against it.
 
 - One more network fetch during first configure (same cost already paid for
   `tvision`, `gumbo-parser`, `katana-parser`, and `doctest`).
-- `httplib.h` is large (single TU, but pulls in OpenSSL headers if
-  `CPPHTTPLIB_OPENSSL_SUPPORT` is defined); we don't define it — v1 is HTTP
-  only, no TLS, matching `util::Url` (which only parses `http://`/`https://`
-  but `CppHttpClient` will reject `https://` until TLS is in scope).
+- `httplib.h` is large (single TU); `CPPHTTPLIB_OPENSSL_SUPPORT` is defined
+  and OpenSSL is linked, so `https://` URLs work via `httplib::Client`'s
+  automatic `SSLClient` selection. `util::Url` already parses both schemes
+  and defaults the port to 443 for `https://`.
 - `tvshow-srv` and `net::CppHttpClient` both gain a compile dependency on
   this header; pure modules (`net/http_client.hpp`'s `HttpClient` interface,
   `dom`, `css`, `style`, `layout`, `render`) stay untouched — cpp-httplib
