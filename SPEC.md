@@ -2,7 +2,7 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: foundational draft. Locked sections are decided. Open Questions need further carving before code.
+> Status: **M0 complete**. All v1 features implemented and tested. Remaining open questions (Q-10, Q-20) are explicitly deferred post-v1.
 
 ---
 
@@ -18,7 +18,6 @@ The result must be a sound base for test-first development. Render path must be 
 ### 1.2 Non-Goals (v1)
 - JavaScript execution.
 - CSS Grid, animations, transitions, transforms, gradients, shadows.
-- HTTPS (planned, gated on TLS dependency decision — see Open Q-7).
 - Cookies, persistent sessions, auth (Open Q-9).
 - Real images. Only `alt` text in v1; ASCII-art renderer is an interface stub for later.
 - Web compatibility with arbitrary public sites. We render *our* HTML subset cleanly; real-world pages may degrade.
@@ -364,7 +363,7 @@ Per-tab back/forward stack, classic browser semantics. Navigation pushes; Back/F
 Network and HTTP errors render an internal error page (UA-styled HTML). Status line shows compact reason.
 
 ### 15.3 HTTPS
-Out of v1. Adding TLS = pulling OpenSSL into `cpp-httplib`. Decision deferred (Open Q-7).
+`cpp-httplib` is built with `CPPHTTPLIB_OPENSSL_SUPPORT`; `https://` URLs work via `httplib::Client`'s automatic `SSLClient` selection. `util::Url` parses both schemes and defaults the port to 443 for `https://`.
 
 ---
 
@@ -436,9 +435,9 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-14 | Error page styling | **Resolved**: UA-themed — body padding + p margin applied via inline style in error_page_html(). |
 | Q-15 | CI host | **Resolved**: GitHub Actions — `.github/workflows/ci.yml`, Ubuntu latest, clang/Ninja, cmake+ctest. |
 | Q-16 | License | **Resolved**: MIT — `LICENSE` file at repo root, copyright Tomas Macik 2026. |
-| Q-17 | tvision pin | Specific commit / release tag |
+| Q-17 | tvision pin | **Resolved**: pinned to commit `9a7a6439` in `cmake/Tvision.cmake` via `TVSHOW_TVISION_TAG`. |
 | Q-18 | Image renderer plug interface | Resolved: `ImageRenderer::render(int cols, int rows, std::string_view alt, std::string_view src) → vector<string>`. v1 impl: `AltTextRenderer` (writes `[alt]` in row 0). |
-| Q-19 | Config file location and format | `~/.config/tvshow/config.toml`? CLI flags only? |
+| Q-19 | Config file location and format | **Resolved**: `~/.config/tvshow/config.toml` (TOML subset); CLI flags override. XDG_CONFIG_HOME respected. |
 | Q-20 | Form `enctype: multipart/form-data` | v1 / later (tied to file upload, which needs a file dialog) |
 
 ---
