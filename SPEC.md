@@ -421,7 +421,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | # | Topic | Need |
 |---|-------|------|
 | Q-1 | Address bar UX | **Resolved**: modal default; `--address-bar=persistent` opt-in for permanent top bar. |
-| Q-2 | Bookmarks / homepage / start page | Format (file? config? UI menu) |
+| Q-2 | Bookmarks / homepage / start page | **Resolved**: `~/.config/tvshow/bookmarks` (url\ttitle per line). Ctrl-B opens CRUD picker (Enter=open, A=add, D=delete). Loaded at startup, saved on change. |
 | Q-3 | Resize behavior for flex layouts when viewport too narrow | **Resolved**: truncate — overflow clips at viewport edge; no per-container horizontal scrollbar in v1. |
 | Q-4 | UA default stylesheet — how opinionated | Mimic browser defaults vs minimal |
 | Q-5 | Selection / clipboard support | v1 yes/no |

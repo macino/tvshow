@@ -1,6 +1,7 @@
 #pragma once
 
 #define Uses_TView
+#include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
@@ -31,6 +32,7 @@ struct SharedBrowsingState {
     std::vector<std::string> history;         // all visited URLs in order (for autocomplete)
     std::unordered_set<std::string> visited;  // set form of history (for link coloring)
     net::CookieJar cookie_jar;               // session-scoped cookie store
+    BookmarkStore bookmarks;                 // loaded once at startup, persisted on change
 };
 
 // Hosts one loaded Page: renders it, tracks the focused link or form control
@@ -56,6 +58,9 @@ public:
     // Find-in-page: show a dialog, scan the rendered grid, scroll to first hit.
     // Subsequent 'n'/'N' keys cycle through hits; Esc clears.
     void show_find_dialog();
+
+    // Bookmarks: show CRUD picker dialog (Ctrl-B).
+    void show_bookmarks_dialog();
 
     [[nodiscard]] const Page& page() const { return page_; }
     // History for URL-bar autocomplete: shared history when available, else per-window.
@@ -88,6 +93,7 @@ private:
 
     std::vector<std::string> history_;               // per-window, for back/forward only
     std::unordered_set<std::string> local_visited_;  // fallback when shared_ is null
+    BookmarkStore local_bookmarks_;                  // fallback when shared_ is null
     size_t history_pos_ = 0;
 
     SharedBrowsingState* shared_{nullptr};  // non-owning; null in standalone mode

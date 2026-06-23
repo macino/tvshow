@@ -10,6 +10,7 @@
 #define Uses_TStatusDef
 #define Uses_TStatusItem
 #define Uses_TSubMenu
+#include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/browser_window.hpp"
 #include "tvshow/app/commands.hpp"
 #include "tvshow/app/page.hpp"
@@ -322,6 +323,7 @@ Application::Application(AddressBarMode mode)
     : TProgInit(&Application::initStatusLine, &Application::initMenuBar, &Application::initDeskTop),
       mode_(mode) {
     load_history(shared_browsing_state_);
+    shared_browsing_state_.bookmarks = load_bookmarks();
 }
 
 void Application::shutDown() {

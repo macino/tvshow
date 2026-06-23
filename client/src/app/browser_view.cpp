@@ -8,6 +8,8 @@
 #define Uses_TKeys
 #define Uses_TListViewer
 #define Uses_TScrollBar
+#define Uses_TStaticText
+#include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/form.hpp"
@@ -134,6 +136,39 @@ std::vector<char32_t> utf8_to_u32(std::string_view s) {
     }
     return out;
 }
+
+// ── BookmarkPickerDialog ──────────────────────────────────────────────────────
+// Shows the bookmark list. Keys:
+//   Enter / dbl-click  — navigate (endModal cmOK)
+//   'a'                — add current URL (endModal cmYes)
+//   'd' / kbDel        — delete selected (endModal cmNo)
+//   Esc                — cancel
+
+class BookmarkListViewer : public TListViewer {
+public:
+    BookmarkListViewer(TRect r, TScrollBar* sb, std::vector<std::string>* labels)
+        : TListViewer(r, 1, nullptr, sb), labels_(labels) {
+        setRange(static_cast<int>(labels->size()));
+    }
+
+    void getText(char* dest, short item, short maxLen) override {
+        if (item < 0 || item >= static_cast<short>(labels_->size())) { dest[0] = '\0'; return; }
+        const auto& s = (*labels_)[static_cast<size_t>(item)];
+        std::strncpy(dest, s.c_str(), static_cast<size_t>(maxLen));
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        dest[maxLen] = '\0';
+    }
+
+    // Refresh after add/delete.
+    void refresh() {
+        setRange(static_cast<int>(labels_->size()));
+        if (focused >= range) { focusItem(std::max(0, range - 1)); }
+        drawView();
+    }
+
+private:
+    std::vector<std::string>* labels_;
+};
 
 }  // namespace
 
@@ -734,6 +769,10 @@ void BrowserView::handleEvent(TEvent& event) {
         show_find_dialog();
         clearEvent(event);
         break;
+    case 0x0002:  // Ctrl-B
+        show_bookmarks_dialog();
+        clearEvent(event);
+        break;
     case 0x0004:  // Ctrl-D
         debug_overlay_ = !debug_overlay_;
         drawView();
@@ -877,6 +916,111 @@ void BrowserView::navigate_forward() {
 
 void BrowserView::reload() {
     navigate(history_[history_pos_], false);
+}
+
+void BrowserView::show_bookmarks_dialog() {
+    if (owner == nullptr || owner->owner == nullptr) { return; }
+    TGroup* const desk = owner->owner;
+
+    BookmarkStore& store =
+        (shared_ != nullptr) ? shared_->bookmarks : local_bookmarks_;
+
+    // Build display labels: "title  url" or just "url".
+    std::vector<std::string> labels;
+    auto rebuild_labels = [&]() {
+        labels.clear();
+        for (const auto& bm : store.bookmarks()) {
+            labels.push_back(bm.title.empty() ? bm.url : bm.title + "  " + bm.url);
+        }
+    };
+    rebuild_labels();
+
+    constexpr int kDlgW = 70;
+    constexpr int kDlgH = 18;
+    const TRect desk_r = desk->getBounds();
+    const TRect dlg_r{(desk_r.b.x - kDlgW) / 2, (desk_r.b.y - kDlgH) / 2,
+                      (desk_r.b.x + kDlgW) / 2, (desk_r.b.y + kDlgH) / 2};
+
+    // Local subclass — catches 'a'/'d'/Enter/Esc at the dialog level.
+    struct BookmarkDialog : TDialog {
+        BookmarkListViewer* viewer_;
+        std::vector<std::string>* labels_;
+        BookmarkStore* store_;
+        std::string current_url_;
+
+        BookmarkDialog(TRect r, const char* t, BookmarkListViewer* v,
+                       std::vector<std::string>* l, BookmarkStore* s, std::string cu)
+            : TWindowInit(&TWindow::initFrame), TDialog(r, t),
+              viewer_(v), labels_(l), store_(s), current_url_(std::move(cu)) {}
+
+        void sync_labels() {
+            labels_->clear();
+            for (const auto& bm : store_->bookmarks()) {
+                labels_->push_back(bm.title.empty() ? bm.url : bm.title + "  " + bm.url);
+            }
+            viewer_->refresh();
+        }
+
+        void handleEvent(TEvent& event) override {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+            if (event.what != evKeyDown) { TDialog::handleEvent(event); return; }
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+            const unsigned kc = event.keyDown.keyCode;
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+            const unsigned ch = event.keyDown.charScan.charCode;
+
+            if (ch == 'a' || ch == 'A') {
+                if (!store_->contains(current_url_)) {
+                    store_->add(current_url_);
+                    (void)save_bookmarks(*store_);
+                    sync_labels();
+                }
+                clearEvent(event);
+                return;
+            }
+            if ((ch == 'd' || ch == 'D' || kc == kbDel) && viewer_->range > 0) {
+                const int idx = viewer_->focused;
+                const auto& bms = store_->bookmarks();
+                if (idx >= 0 && idx < static_cast<int>(bms.size())) {
+                    store_->remove(bms[static_cast<size_t>(idx)].url);
+                    (void)save_bookmarks(*store_);
+                    sync_labels();
+                }
+                clearEvent(event);
+                return;
+            }
+            if (kc == kbEnter && viewer_->range > 0) {
+                endModal(cmOK);
+                clearEvent(event);
+                return;
+            }
+            if (kc == kbEsc) {
+                endModal(cmCancel);
+                clearEvent(event);
+                return;
+            }
+            TDialog::handleEvent(event);
+        }
+    };
+
+    auto* sb = new TScrollBar({kDlgW - 2, 1, kDlgW - 1, kDlgH - 2});
+    auto* viewer = new BookmarkListViewer({1, 1, kDlgW - 2, kDlgH - 2}, sb, &labels);
+    auto* hint = new TStaticText({1, kDlgH - 2, kDlgW - 1, kDlgH - 1},
+                                 "Enter:open  A:add  D:delete  Esc:cancel");
+    auto* bdlg = new BookmarkDialog(dlg_r, "Bookmarks", viewer, &labels, &store, page_.url);
+    bdlg->insert(sb);
+    bdlg->insert(viewer);
+    bdlg->insert(hint);
+
+    const unsigned short res = desk->execView(bdlg);
+    const short sel = viewer->focused;
+    const int n = static_cast<int>(store.bookmarks().size());
+    TObject::destroy(bdlg);
+
+    if (res == cmOK && sel >= 0 && sel < n) {
+        navigate_to(store.bookmarks()[static_cast<size_t>(sel)].url);
+    }
+    drawView();
 }
 
 }  // namespace tvshow::app

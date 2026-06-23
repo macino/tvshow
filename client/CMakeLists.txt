@@ -4,6 +4,7 @@ add_library(tvshow_core STATIC
     src/util/url.cpp
     src/util/charset.cpp
     src/util/config.cpp
+    src/app/bookmarks.cpp
     src/net/cookie_jar.cpp
     src/net/http_client.cpp
     src/net/fake_http_client.cpp
@@ -76,6 +77,7 @@ set_target_properties(tvshow_paint PROPERTIES
 # the TUI. Kept out of tvshow_core because it does real I/O.
 add_library(tvshow_io STATIC
     src/app/page.cpp
+    src/app/bookmarks_io.cpp
     src/net/cpp_http_client.cpp
     src/util/log.cpp
     src/util/config_io.cpp
