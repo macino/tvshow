@@ -4,6 +4,7 @@ add_executable(tvshow-tests
     layout/types_test.cpp
     util/url_test.cpp
     util/charset_test.cpp
+    util/config_test.cpp
     net/http_client_test.cpp
     net/cookie_jar_test.cpp
     dom/parser_test.cpp

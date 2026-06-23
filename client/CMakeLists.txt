@@ -3,6 +3,7 @@ add_library(tvshow_core STATIC
     src/render/chargrid.cpp
     src/util/url.cpp
     src/util/charset.cpp
+    src/util/config.cpp
     src/net/cookie_jar.cpp
     src/net/http_client.cpp
     src/net/fake_http_client.cpp
@@ -77,6 +78,7 @@ add_library(tvshow_io STATIC
     src/app/page.cpp
     src/net/cpp_http_client.cpp
     src/util/log.cpp
+    src/util/config_io.cpp
 )
 
 target_include_directories(tvshow_io
