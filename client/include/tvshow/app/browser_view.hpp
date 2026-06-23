@@ -51,6 +51,10 @@ public:
     void navigate_forward();
     void reload();
 
+    // Find-in-page: show a dialog, scan the rendered grid, scroll to first hit.
+    // Subsequent 'n'/'N' keys cycle through hits; Esc clears.
+    void show_find_dialog();
+
     [[nodiscard]] const Page& page() const { return page_; }
     // History for URL-bar autocomplete: shared history when available, else per-window.
     [[nodiscard]] const std::vector<std::string>& history() const {
@@ -126,6 +130,15 @@ private:
     // Show a modal option-picker dialog for the given select control.
     void show_select_popup(const layout::FormFocus& fc);
     void submit_form();
+
+    // Find-in-page state.
+    std::string search_term_;
+    std::vector<Point> search_hits_;
+    int search_hit_idx_ = -1;
+    int search_len_ = 0;  // search term length in codepoints
+
+    void find_matches_in_page(std::string_view term);
+    void navigate_to_hit(int dir);  // +1 = next, -1 = prev
 };
 
 }  // namespace tvshow::app

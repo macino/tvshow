@@ -4,6 +4,7 @@
 #define Uses_TDrawBuffer
 #define Uses_TEvent
 #define Uses_TEventQueue
+#define Uses_TInputLine
 #define Uses_TKeys
 #define Uses_TListViewer
 #define Uses_TScrollBar
@@ -24,6 +25,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <cstring>
@@ -83,6 +85,56 @@ private:
     const std::vector<std::string>* labels_;
 };
 
+// Modal dialog with a single input line; closes on Enter or Esc.
+class FindDialog : public TDialog {
+public:
+    FindDialog(const TRect& r, const char* dlg_title)
+        : TWindowInit(&TWindow::initFrame), TDialog(r, dlg_title) {}
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+    void handleEvent(TEvent& event) override {
+        if (event.what == evKeyDown &&
+            event.keyDown.keyCode == kbEnter) {  // NOLINT(cppcoreguidelines-pro-type-union-access)
+            endModal(cmOK);
+            clearEvent(event);
+            return;
+        }
+        TDialog::handleEvent(event);
+    }
+};
+
+// Decode a UTF-8 string to a vector of Unicode codepoints.
+std::vector<char32_t> utf8_to_u32(std::string_view s) {
+    std::vector<char32_t> out;
+    const auto* p = reinterpret_cast<const unsigned char*>(s.data());
+    const auto* end = p + s.size();
+    while (p < end) {
+        char32_t cp = 0;
+        const unsigned char c = *p;
+        if (c < 0x80U) {
+            cp = c;
+            p += 1;
+        } else if (c < 0xE0U && end - p >= 2) {
+            cp = (static_cast<char32_t>(c & 0x1FU) << 6U) | (p[1] & 0x3FU);
+            p += 2;
+        } else if (c < 0xF0U && end - p >= 3) {
+            cp = (static_cast<char32_t>(c & 0x0FU) << 12U) |
+                 (static_cast<char32_t>(p[1] & 0x3FU) << 6U) | (p[2] & 0x3FU);
+            p += 3;
+        } else if (end - p >= 4) {
+            cp = (static_cast<char32_t>(c & 0x07U) << 18U) |
+                 (static_cast<char32_t>(p[1] & 0x3FU) << 12U) |
+                 (static_cast<char32_t>(p[2] & 0x3FU) << 6U) | (p[3] & 0x3FU);
+            p += 4;
+        } else {
+            ++p;
+            continue;
+        }
+        out.push_back(cp);
+    }
+    return out;
+}
+
 }  // namespace
 
 namespace tvshow::app {
@@ -137,6 +189,28 @@ render::CharGrid BrowserView::render_grid() const {
         render::apply_focus(grid, links_[static_cast<size_t>(focused_)].spans);
     } else if (const layout::FormFocus* fc = focused_fc()) {
         render::apply_focus(grid, {fc->span});
+    }
+    if (!search_hits_.empty() && search_len_ > 0) {
+        for (int i = 0; i < static_cast<int>(search_hits_.size()); ++i) {
+            const Point& p = search_hits_[static_cast<size_t>(i)];
+            const bool is_current = (i == search_hit_idx_);
+            for (int dc = 0; dc < search_len_; ++dc) {
+                const int col = p.col + dc;
+                if (col < 0 || col >= grid.cols() || p.row < 0 || p.row >= grid.rows()) {
+                    continue;
+                }
+                const render::Cell cell = grid.at({col, p.row});
+                render::ColorAttr attr = cell.attr;
+                if (is_current) {
+                    attr.bg = 0xFFCC00U;  // amber — current match
+                    attr.fg = 0x000000U;
+                } else {
+                    attr.bg = 0x555500U;  // dark yellow — other matches
+                    attr.fg = 0xFFFFFFU;
+                }
+                grid.put({col, p.row}, cell.cp, attr);
+            }
+        }
     }
     return grid;
 }
@@ -651,6 +725,20 @@ void BrowserView::handleEvent(TEvent& event) {
         navigate_forward();
         clearEvent(event);
         break;
+    case kbCtrlF:
+        show_find_dialog();
+        clearEvent(event);
+        break;
+    case kbEsc:
+        if (!search_term_.empty()) {
+            search_term_.clear();
+            search_hits_.clear();
+            search_hit_idx_ = -1;
+            search_len_ = 0;
+            drawView();
+            clearEvent(event);
+        }
+        break;
     default: {
         const unsigned char_code = keyCode & 0xFFU;
         const bool is_backspace = char_code == 0x08U;
@@ -658,10 +746,109 @@ void BrowserView::handleEvent(TEvent& event) {
         if (focused_fc() != nullptr && (is_backspace || is_printable)) {
             handle_form_input(keyCode);
             clearEvent(event);
+        } else if (!search_hits_.empty() && focused_fc() == nullptr) {
+            if (char_code == 'n') {
+                navigate_to_hit(1);
+                drawView();
+                clearEvent(event);
+            } else if (char_code == 'N') {
+                navigate_to_hit(-1);
+                drawView();
+                clearEvent(event);
+            }
         }
         break;
     }
     }
+}
+
+void BrowserView::show_find_dialog() {
+    if (owner == nullptr || owner->owner == nullptr) {
+        return;
+    }
+    TGroup* const desk = owner->owner;
+    constexpr int kMaxTerm = 127;
+    constexpr int kDlgW = 44;
+    constexpr int kDlgH = 3;
+    const TRect desk_r = desk->getBounds();
+    const TRect dlg_r{(desk_r.b.x - kDlgW) / 2, (desk_r.b.y - kDlgH) / 2,
+                      (desk_r.b.x + kDlgW) / 2, (desk_r.b.y + kDlgH) / 2};
+    auto* dlg = new FindDialog(dlg_r, "Find");
+    const TRect bar_r{1, 1, kDlgW - 2, 2};
+    auto* bar = new TInputLine(bar_r, kMaxTerm);
+    if (!search_term_.empty()) {
+        std::array<char, kMaxTerm + 1> ibuf{};
+        std::strncpy(ibuf.data(), search_term_.c_str(), kMaxTerm);
+        bar->setData(ibuf.data());
+    }
+    dlg->insert(bar);
+    bar->select();
+    const unsigned short res = desk->execView(dlg);
+    std::array<char, kMaxTerm + 1> rbuf{};
+    bar->getData(rbuf.data());
+    TObject::destroy(dlg);
+    if (res != cmOK) {
+        return;
+    }
+    find_matches_in_page(rbuf.data());
+    navigate_to_hit(0);
+    drawView();
+}
+
+void BrowserView::find_matches_in_page(std::string_view term) {
+    search_term_ = std::string(term);
+    search_hits_.clear();
+    search_hit_idx_ = -1;
+    search_len_ = 0;
+    if (term.empty()) {
+        return;
+    }
+    const std::vector<char32_t> needle = utf8_to_u32(term);
+    if (needle.empty()) {
+        return;
+    }
+    search_len_ = static_cast<int>(needle.size());
+    const render::RenderOpts opts{page_.url, &visited_set()};
+    const render::CharGrid grid = render::render(page_.box, form_values_, opts);
+    const int len = static_cast<int>(needle.size());
+    for (int row = 0; row < grid.rows(); ++row) {
+        for (int col = 0; col + len <= grid.cols(); ++col) {
+            bool match = true;
+            for (int k = 0; k < len; ++k) {
+                const char32_t cell_cp = grid.at({col + k, row}).cp;
+                const char32_t n_cp = needle[static_cast<size_t>(k)];
+                const bool eq = (cell_cp < 128U && n_cp < 128U)
+                    ? (static_cast<char32_t>(std::tolower(static_cast<int>(cell_cp))) ==
+                       static_cast<char32_t>(std::tolower(static_cast<int>(n_cp))))
+                    : (cell_cp == n_cp);
+                if (!eq) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                search_hits_.push_back({col, row});
+            }
+        }
+    }
+    if (!search_hits_.empty()) {
+        search_hit_idx_ = 0;
+    }
+}
+
+void BrowserView::navigate_to_hit(int dir) {
+    if (search_hits_.empty()) {
+        return;
+    }
+    const int n = static_cast<int>(search_hits_.size());
+    if (search_hit_idx_ < 0) {
+        search_hit_idx_ = 0;
+    } else {
+        search_hit_idx_ = (search_hit_idx_ + dir + n) % n;
+    }
+    sync_vscroll();
+    const int target_row = search_hits_[static_cast<size_t>(search_hit_idx_)].row;
+    scroll_to(std::max(0, target_row - size.y / 2));
 }
 
 void BrowserView::navigate_back() {
