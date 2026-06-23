@@ -424,7 +424,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-2 | Bookmarks / homepage / start page | **Resolved**: `~/.config/tvshow/bookmarks` (url\ttitle per line). Ctrl-B opens CRUD picker (Enter=open, A=add, D=delete). Loaded at startup, saved on change. |
 | Q-3 | Resize behavior for flex layouts when viewport too narrow | **Resolved**: truncate — overflow clips at viewport edge; no per-container horizontal scrollbar in v1. |
 | Q-4 | UA default stylesheet — how opinionated | Mimic browser defaults vs minimal |
-| Q-5 | Selection / clipboard support | v1 yes/no |
+| Q-5 | Selection / clipboard support | **Resolved**: Ctrl-C copies focused link URL via OSC 52 to terminal clipboard. No text selection. |
 | Q-6 | Mouse support level | Click only, or wheel + drag-to-resize windows |
 | Q-7 | HTTPS via cpp-httplib + OpenSSL | v1 / v1.1 / v2 |
 | Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |

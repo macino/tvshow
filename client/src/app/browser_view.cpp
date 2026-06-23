@@ -28,6 +28,7 @@
 #include <array>
 #include <atomic>
 #include <cctype>
+#include <cstdio>
 #include <chrono>
 #include <cstddef>
 #include <cstring>
@@ -169,6 +170,28 @@ public:
 private:
     std::vector<std::string>* labels_;
 };
+
+// OSC 52 clipboard: write text to the terminal's clipboard selection 'c'.
+// Sequence: ESC ] 52 ; c ; <base64(text)> BEL
+void osc52_copy(std::string_view text) {
+    static constexpr std::string_view k_table =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string b64;
+    b64.reserve(((text.size() + 2) / 3) * 4);
+    const auto* data = reinterpret_cast<const unsigned char*>(text.data());
+    for (std::size_t i = 0; i < text.size(); i += 3) {
+        const unsigned a = data[i];
+        const unsigned b = (i + 1 < text.size()) ? data[i + 1] : 0U;
+        const unsigned c = (i + 2 < text.size()) ? data[i + 2] : 0U;
+        b64 += k_table[(a >> 2U) & 0x3FU];
+        b64 += k_table[((a << 4U) | (b >> 4U)) & 0x3FU];
+        b64 += (i + 1 < text.size()) ? k_table[((b << 2U) | (c >> 6U)) & 0x3FU] : '=';
+        b64 += (i + 2 < text.size()) ? k_table[c & 0x3FU] : '=';
+    }
+    // Write the OSC 52 sequence directly to stdout (bypasses TurboVision drawing).
+    std::printf("\033]52;c;%s\007", b64.c_str());
+    std::fflush(stdout);
+}
 
 }  // namespace
 
@@ -772,6 +795,14 @@ void BrowserView::handleEvent(TEvent& event) {
     case 0x0002:  // Ctrl-B
         show_bookmarks_dialog();
         clearEvent(event);
+        break;
+    case 0x0003:  // Ctrl-C — copy focused link URL via OSC 52
+        if (is_link_focused()) {
+            const std::string abs_url = util::resolve_url(
+                page_.url, links_[static_cast<size_t>(focused_)].href);
+            osc52_copy(abs_url);
+            clearEvent(event);
+        }
         break;
     case 0x0004:  // Ctrl-D
         debug_overlay_ = !debug_overlay_;
