@@ -423,9 +423,9 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-1 | Address bar UX | **Resolved**: modal default; `--address-bar=persistent` opt-in for permanent top bar. |
 | Q-2 | Bookmarks / homepage / start page | **Resolved**: `~/.config/tvshow/bookmarks` (url\ttitle per line). Ctrl-B opens CRUD picker (Enter=open, A=add, D=delete). Loaded at startup, saved on change. |
 | Q-3 | Resize behavior for flex layouts when viewport too narrow | **Resolved**: truncate — overflow clips at viewport edge; no per-container horizontal scrollbar in v1. |
-| Q-4 | UA default stylesheet — how opinionated | Mimic browser defaults vs minimal |
+| Q-4 | UA default stylesheet — how opinionated | **Resolved**: browser-like. h1 underlined+bold, h2 bold with more top margin, h3-h6 proportionally smaller margins; hr rendered via border-top-style: solid; blockquote gets left border + padding; em/strong/a already present. |
 | Q-5 | Selection / clipboard support | **Resolved**: Ctrl-C copies focused link URL via OSC 52 to terminal clipboard. No text selection. |
-| Q-6 | Mouse support level | Click only, or wheel + drag-to-resize windows |
+| Q-6 | Mouse support level | **Resolved**: click (link/form) + scroll wheel (3 rows/tick). No drag-to-resize. |
 | Q-7 | HTTPS via cpp-httplib + OpenSSL | v1 / v1.1 / v2 |
 | Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |
 | Q-9 | Cookies / sessions | **Resolved**: in-memory session CookieJar (RFC 6265 §5 simplified); no persistence, no Secure/SameSite enforcement; per-SharedBrowsingState (shared across tabs). |
@@ -433,7 +433,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
 | Q-12 | Debug overlay (Ctrl-D) detail | **Resolved**: box outlines in magenta (Ctrl-D toggle); focus-order labels and box-dim display deferred. |
 | Q-13 | `<table>` support | **Resolved**: flex-reuse layout in UA stylesheet (ADR 002); no colspan/rowspan. |
-| Q-14 | Error page styling | UA-themed or plain |
+| Q-14 | Error page styling | **Resolved**: UA-themed — body padding + p margin applied via inline style in error_page_html(). |
 | Q-15 | CI host | GitHub Actions / GitLab / local only |
 | Q-16 | License | MIT / Apache-2 / proprietary |
 | Q-17 | tvision pin | Specific commit / release tag |

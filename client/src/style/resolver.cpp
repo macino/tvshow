@@ -185,17 +185,17 @@ footer { display: block; }
 nav { display: block; }
 main { display: block; }
 aside { display: block; }
-h1 { display: block; font-weight: bold; margin-top: 16px; margin-bottom: 8px; }
-h2 { display: block; font-weight: bold; margin-top: 16px; margin-bottom: 8px; }
-h3 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
+h1 { display: block; font-weight: bold; text-decoration: underline; margin-top: 24px; margin-bottom: 8px; }
+h2 { display: block; font-weight: bold; margin-top: 20px; margin-bottom: 8px; }
+h3 { display: block; font-weight: bold; margin-top: 12px; margin-bottom: 4px; }
 h4 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
-h5 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
-h6 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
+h5 { display: block; font-weight: bold; margin-top: 4px; margin-bottom: 0; }
+h6 { display: block; font-weight: bold; margin-top: 4px; margin-bottom: 0; }
 ul { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 16px; }
 ol { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 16px; }
 li { display: block; }
-blockquote { display: block; margin-top: 16px; margin-bottom: 16px; margin-left: 16px; }
-hr { display: block; margin-top: 8px; margin-bottom: 8px; }
+blockquote { display: block; margin-top: 8px; margin-bottom: 8px; margin-left: 8px; padding-left: 8px; border-left-style: solid; }
+hr { display: block; border-top-style: solid; margin-top: 8px; margin-bottom: 8px; }
 span { display: inline; }
 small { display: inline; }
 u { display: inline; text-decoration: underline; }
