@@ -1,7 +1,9 @@
 #include "tvshow/app/application.hpp"
 #include "tvshow/app/browser_window.hpp"
 
+#include <cstdio>
 #include <cstring>
+#include <exception>
 #include <string_view>
 
 auto main(int argc, char** argv) -> int {
@@ -18,10 +20,20 @@ auto main(int argc, char** argv) -> int {
     }
 
     tvshow::app::Application app(mode);
-    if (!initial_url.empty()) {
-        app.open_url(initial_url);
+    try {
+        if (!initial_url.empty()) {
+            app.open_url(initial_url);
+        }
+        app.run();
+    } catch (const std::exception& ex) {
+        app.shutDown();
+        std::fprintf(stderr, "tvshow: fatal error: %s\n", ex.what());
+        return 1;
+    } catch (...) {
+        app.shutDown();
+        std::fprintf(stderr, "tvshow: unknown fatal error\n");
+        return 1;
     }
-    app.run();
     app.shutDown();
     return 0;
 }

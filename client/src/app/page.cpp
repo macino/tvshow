@@ -102,25 +102,27 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<Page> post_page(std::string_view action_url, std::string_view body,
                               layout::Viewport vp) {
+    Fetched fetched;
     const auto parsed = util::Url::parse(action_url);
     if (!parsed) {
-        std::cerr << "tvshow: invalid action URL: " << action_url << '\n';
-        return std::nullopt;
-    }
-    net::CppHttpClient client;
-    const net::Result result = client.post(*parsed, body);
-    Fetched fetched;
-    if (const auto* err = std::get_if<net::NetworkError>(&result)) {
-        fetched = {error_page_html("Network Error", err->message), true};
+        fetched = {error_page_html("Invalid URL",
+                                   "Invalid form action: " + std::string(action_url)),
+                   true};
     } else {
-        const auto& resp = std::get<net::Response>(result);
-        if (resp.status >= 400) {
-            fetched = {
-                error_page_html("HTTP " + std::to_string(resp.status),
-                                "The server returned an error for " + std::string(action_url)),
-                true};
+        net::CppHttpClient client;
+        const net::Result result = client.post(*parsed, body);
+        if (const auto* err = std::get_if<net::NetworkError>(&result)) {
+            fetched = {error_page_html("Network Error", err->message), true};
         } else {
-            fetched = {resp.body, false};
+            const auto& resp = std::get<net::Response>(result);
+            if (resp.status >= 400) {
+                fetched = {
+                    error_page_html("HTTP " + std::to_string(resp.status),
+                                    "The server returned an error for " + std::string(action_url)),
+                    true};
+            } else {
+                fetched = {resp.body, false};
+            }
         }
     }
 
@@ -157,15 +159,16 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
         const std::string path(url.substr(k_file_prefix.size()));
         auto body = read_file(path);
         if (!body) {
-            std::cerr << "tvshow: cannot open file: " << path << '\n';
-            return std::nullopt;
+            fetched = {error_page_html("File Not Found", "Cannot open: " + path), true};
+        } else {
+            fetched = {std::move(*body), false};
         }
-        fetched = {std::move(*body), false};
     } else if (auto parsed = util::Url::parse(url)) {
         fetched = fetch_http(*parsed);
     } else {
-        std::cerr << "tvshow: unsupported or invalid URL: " << url << '\n';
-        return std::nullopt;
+        fetched = {error_page_html("Invalid URL",
+                                   "Unsupported or invalid URL: " + std::string(url)),
+                   true};
     }
 
     auto doc = dom::parse(fetched.html);

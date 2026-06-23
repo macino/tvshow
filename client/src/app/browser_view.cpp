@@ -247,7 +247,11 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
         std::atomic<bool> inner_done{false};
         std::optional<Page> loaded;
         std::thread inner([&]() {
-            loaded = load_page(fetch_url, vp);
+            try {
+                loaded = load_page(fetch_url, vp);
+            } catch (...) {
+                // loaded stays nullopt; apply_loaded_page handles it
+            }
             inner_done.store(true, std::memory_order_release);
         });
 
