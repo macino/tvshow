@@ -9,8 +9,10 @@ namespace tvshow::net {
 // a NetworkError rather than silently downgrading or hanging.
 class CppHttpClient : public HttpClient {
 public:
-    [[nodiscard]] Result get(const util::Url& url, int max_redirects = 5) override;
+    [[nodiscard]] Result get(const util::Url& url, const Headers& extra_headers = {},
+                             int max_redirects = 5) override;
     [[nodiscard]] Result post(const util::Url& url, std::string_view body,
+                              const Headers& extra_headers = {},
                               int max_redirects = 5) override;
 };
 

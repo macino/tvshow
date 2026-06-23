@@ -325,7 +325,8 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
         std::optional<Page> loaded;
         std::thread inner([&]() {
             try {
-                loaded = load_page(fetch_url, vp);
+                net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
+                loaded = load_page(fetch_url, vp, jar);
             } catch (...) {
                 // loaded stays nullopt; apply_loaded_page handles it
             }
@@ -562,7 +563,8 @@ void BrowserView::submit_form() {
     const bool is_post = (method_attr == "post" || method_attr == "POST");
 
     if (is_post) {
-        auto page = post_page(action_url, encoded, {size.x, size.y});
+        net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
+        auto page = post_page(action_url, encoded, {size.x, size.y}, jar);
         if (!page) {
             return;
         }

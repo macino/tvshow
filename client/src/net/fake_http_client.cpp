@@ -19,11 +19,13 @@ void FakeHttpClient::on(std::string url, Response resp) {
                     [r = std::move(resp)](const util::Url&) -> Result { return r; });
 }
 
-Result FakeHttpClient::get(const util::Url& url, int max_redirects) {
+Result FakeHttpClient::get(const util::Url& url, const Headers& /*extra_headers*/,
+                           int max_redirects) {
     return dispatch(url, max_redirects);
 }
 
-Result FakeHttpClient::post(const util::Url& url, std::string_view /*body*/, int max_redirects) {
+Result FakeHttpClient::post(const util::Url& url, std::string_view /*body*/,
+                            const Headers& /*extra_headers*/, int max_redirects) {
     return dispatch(url, max_redirects);
 }
 

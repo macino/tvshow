@@ -428,7 +428,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-6 | Mouse support level | Click only, or wheel + drag-to-resize windows |
 | Q-7 | HTTPS via cpp-httplib + OpenSSL | v1 / v1.1 / v2 |
 | Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |
-| Q-9 | Cookies / sessions | v1 / later |
+| Q-9 | Cookies / sessions | **Resolved**: in-memory session CookieJar (RFC 6265 §5 simplified); no persistence, no Secure/SameSite enforcement; per-SharedBrowsingState (shared across tabs). |
 | Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
 | Q-12 | Debug overlay (Ctrl-D) detail | **Resolved**: box outlines in magenta (Ctrl-D toggle); focus-order labels and box-dim display deferred. |

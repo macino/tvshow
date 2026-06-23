@@ -4,6 +4,7 @@
 #include "tvshow/app/page.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
+#include "tvshow/net/cookie_jar.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
 
@@ -29,6 +30,7 @@ namespace tvshow::app {
 struct SharedBrowsingState {
     std::vector<std::string> history;         // all visited URLs in order (for autocomplete)
     std::unordered_set<std::string> visited;  // set form of history (for link coloring)
+    net::CookieJar cookie_jar;               // session-scoped cookie store
 };
 
 // Hosts one loaded Page: renders it, tracks the focused link or form control

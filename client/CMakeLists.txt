@@ -3,6 +3,7 @@ add_library(tvshow_core STATIC
     src/render/chargrid.cpp
     src/util/url.cpp
     src/util/charset.cpp
+    src/net/cookie_jar.cpp
     src/net/http_client.cpp
     src/net/fake_http_client.cpp
     src/dom/node.cpp

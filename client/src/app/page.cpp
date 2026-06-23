@@ -11,6 +11,7 @@
 #include "tvshow/net/http_client.hpp"
 #include "tvshow/style/resolver.hpp"
 #include "tvshow/style/tree.hpp"
+#include "tvshow/net/cookie_jar.hpp"
 #include "tvshow/util/charset.hpp"
 #include "tvshow/util/log.hpp"
 #include "tvshow/util/url.hpp"
@@ -56,13 +57,24 @@ std::optional<std::string> read_file(std::string_view path) {
     return contents.str();
 }
 
-Fetched fetch_http(const util::Url& url) {
+Fetched fetch_http(const util::Url& url, net::CookieJar* jar) {
     net::CppHttpClient client;
-    const net::Result result = client.get(url);
+    // Inject cookies from the jar if any match this URL.
+    net::Headers req_headers;
+    if (jar != nullptr) {
+        const std::string cookie_val = jar->cookie_header(url.host(), url.path().empty() ? "/" : url.path());
+        if (!cookie_val.empty()) {
+            req_headers["Cookie"] = cookie_val;
+        }
+    }
+    const net::Result result = client.get(url, req_headers);
     if (const auto* err = std::get_if<net::NetworkError>(&result)) {
         return {error_page_html("Network Error", err->message), true};
     }
     const auto& resp = std::get<net::Response>(result);
+    if (jar != nullptr && !resp.set_cookies.empty()) {
+        jar->store(url.host(), resp.set_cookies);
+    }
     if (resp.status >= 400) {
         return {error_page_html("HTTP " + std::to_string(resp.status),
                                 "The server returned an error for " + url.to_string()),
@@ -91,7 +103,7 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
                 util::resolve_file_url(url, href).substr(std::string_view("file://").size()));
         } else if (base) {
             if (const auto resolved = base->resolve(href)) {
-                if (auto fetched = fetch_http(*resolved); !fetched.is_error) {
+                if (auto fetched = fetch_http(*resolved, nullptr); !fetched.is_error) {
                     body = std::move(fetched.html);
                 }
             }
@@ -110,7 +122,7 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<Page> post_page(std::string_view action_url, std::string_view body,
-                              layout::Viewport vp) {
+                              layout::Viewport vp, net::CookieJar* jar) {
     Fetched fetched;
     const auto parsed = util::Url::parse(action_url);
     if (!parsed) {
@@ -119,11 +131,19 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
                    true};
     } else {
         net::CppHttpClient client;
-        const net::Result result = client.post(*parsed, body);
+        net::Headers req_headers;
+        if (jar != nullptr) {
+            const std::string cookie_val = jar->cookie_header(parsed->host(), parsed->path().empty() ? "/" : parsed->path());
+            if (!cookie_val.empty()) { req_headers["Cookie"] = cookie_val; }
+        }
+        const net::Result result = client.post(*parsed, body, req_headers);
         if (const auto* err = std::get_if<net::NetworkError>(&result)) {
             fetched = {error_page_html("Network Error", err->message), true};
         } else {
             const auto& resp = std::get<net::Response>(result);
+            if (jar != nullptr && !resp.set_cookies.empty()) {
+                jar->store(parsed->host(), resp.set_cookies);
+            }
             if (resp.status >= 400) {
                 fetched = {
                     error_page_html("HTTP " + std::to_string(resp.status),
@@ -160,7 +180,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
     return page;
 }
 
-std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
+std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::CookieJar* jar) {
     constexpr std::string_view k_file_prefix = "file://";
 
     Fetched fetched;
@@ -173,7 +193,7 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp) {
             fetched = {std::move(*body), false};
         }
     } else if (auto parsed = util::Url::parse(url)) {
-        fetched = fetch_http(*parsed);
+        fetched = fetch_http(*parsed, jar);
     } else {
         fetched = {error_page_html("Invalid URL",
                                    "Unsupported or invalid URL: " + std::string(url)),

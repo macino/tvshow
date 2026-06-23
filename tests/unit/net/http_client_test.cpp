@@ -99,7 +99,7 @@ TEST_CASE("FakeHttpClient: max_redirects=0 stops at first redirect") {
     redir.headers["location"] = "http://example.com/final";
     client.on("http://example.com/start", std::move(redir));
 
-    const auto result = client.get(parse("http://example.com/start"), 0);
+    const auto result = client.get(parse("http://example.com/start"), {}, 0);
     const auto* r = std::get_if<Response>(&result);
     REQUIRE(r != nullptr);
     CHECK(r->status == 302);

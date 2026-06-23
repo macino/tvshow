@@ -22,8 +22,10 @@ public:
     // Register a fixed Response for a URL.
     void on(std::string url, Response resp);
 
-    [[nodiscard]] Result get(const util::Url& url, int max_redirects = 5) override;
+    [[nodiscard]] Result get(const util::Url& url, const Headers& extra_headers = {},
+                             int max_redirects = 5) override;
     [[nodiscard]] Result post(const util::Url& url, std::string_view body,
+                              const Headers& extra_headers = {},
                               int max_redirects = 5) override;
 
 private:

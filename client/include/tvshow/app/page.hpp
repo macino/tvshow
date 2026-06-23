@@ -3,6 +3,7 @@
 #include "tvshow/dom/node.hpp"
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/types.hpp"
+#include "tvshow/net/cookie_jar.hpp"
 #include "tvshow/style/tree.hpp"
 
 #include <memory>
@@ -31,12 +32,16 @@ struct Page {
 };
 
 // Reads, parses, resolves, and lays out `url` at `vp`.
-// Returns nullopt on read/parse/resolve failure; logs the reason to stderr.
-[[nodiscard]] std::optional<Page> load_page(std::string_view url, layout::Viewport vp);
+// Returns nullopt on read/parse/resolve failure; logs the reason.
+// jar may be null (cookies disabled).
+[[nodiscard]] std::optional<Page> load_page(std::string_view url, layout::Viewport vp,
+                                            net::CookieJar* jar = nullptr);
 
 // Issues a POST to action_url with application/x-www-form-urlencoded body,
 // then parses and lays out the response document.
+// jar may be null (cookies disabled).
 [[nodiscard]] std::optional<Page> post_page(std::string_view action_url, std::string_view body,
-                                            layout::Viewport vp);
+                                            layout::Viewport vp,
+                                            net::CookieJar* jar = nullptr);
 
 }  // namespace tvshow::app

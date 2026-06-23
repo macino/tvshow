@@ -6,6 +6,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <variant>
+#include <vector>
 
 namespace tvshow::net {
 
@@ -16,6 +17,7 @@ struct Response {
     int status = 0;
     Headers headers;
     std::string body;
+    std::vector<std::string> set_cookies;  // all Set-Cookie header values (multi-valued)
 
     [[nodiscard]] std::string content_type() const;
     [[nodiscard]] std::string charset() const;
@@ -39,10 +41,13 @@ public:
     HttpClient& operator=(HttpClient&&) = delete;
 
     // Perform a GET request. Follows redirects (up to max_redirects hops).
-    [[nodiscard]] virtual Result get(const util::Url& url, int max_redirects = 5) = 0;
+    // extra_headers are injected on every hop (e.g., Cookie header).
+    [[nodiscard]] virtual Result get(const util::Url& url, const Headers& extra_headers = {},
+                                     int max_redirects = 5) = 0;
 
     // Perform a POST request with application/x-www-form-urlencoded body.
     [[nodiscard]] virtual Result post(const util::Url& url, std::string_view body,
+                                      const Headers& extra_headers = {},
                                       int max_redirects = 5) = 0;
 };
 
