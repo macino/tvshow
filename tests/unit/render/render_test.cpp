@@ -366,3 +366,24 @@ TEST_CASE("render: ol lis get decimal markers") {
     CHECK(grid.at({1, 1}).cp == U'.');
     CHECK(grid.at({2, 1}).cp == U'b');
 }
+
+// ── table rendering (SPEC §6.6, ADR 002) ─────────────────────────────────────
+
+TEST_CASE("render: table cells rendered as equal-width flex columns") {
+    // Table with 2 cells on a 60-col viewport.
+    // table border: 1 col each side → content width 58
+    // each td: flex-grow 1, padding-left/right 8px (1ch each)
+    // each td border_box ≈ 29 cols, content ≈ 27 cols
+    auto [doc, tree] = make_tree(
+        "<body><table><tr><td>AA</td><td>BB</td></tr></table></body>");
+    const Box box = layout(tree, {60, 24});
+    const CharGrid grid = tvshow::render::render(box);
+    // table solid border: '┌' at top-left (0,0)
+    CHECK(grid.at({0, 0}).cp == U'┌');
+    // 'AA' inside first cell: col 2 (1 border + 1 padding), row 1 (1 border)
+    CHECK(grid.at({2, 1}).cp == U'A');
+    CHECK(grid.at({3, 1}).cp == U'A');
+    // 'BB' inside second cell: starts at col 31 (1 border + 29 for td0 + 1 padding)
+    CHECK(grid.at({31, 1}).cp == U'B');
+    CHECK(grid.at({32, 1}).cp == U'B');
+}

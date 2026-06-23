@@ -377,3 +377,34 @@ TEST_CASE("style::resolve: li not in ul/ol gets no marker") {
     REQUIRE(li != nullptr);
     CHECK(li->style.list_marker == tvshow::style::ListMarker::None);
 }
+
+// ── table layout (SPEC §6.6, ADR 002) ────────────────────────────────────────
+
+TEST_CASE("style::resolve: tr gets display:flex by UA stylesheet") {
+    const auto doc = make_doc("<body><table><tr><td>A</td></tr></table></body>");
+    const auto tree = resolve(doc, no_sheets());
+    REQUIRE(tree.has_value());
+    const auto* tr = find_tag(*tree, "tr");
+    REQUIRE(tr != nullptr);
+    CHECK(tr->style.display == Display::Flex);
+}
+
+TEST_CASE("style::resolve: td gets flex-grow 1 and block display") {
+    const auto doc = make_doc("<body><table><tr><td>A</td></tr></table></body>");
+    const auto tree = resolve(doc, no_sheets());
+    REQUIRE(tree.has_value());
+    const auto* td = find_tag(*tree, "td");
+    REQUIRE(td != nullptr);
+    CHECK(td->style.display == Display::Block);
+    CHECK(td->style.flex_grow == doctest::Approx(1.0));
+}
+
+TEST_CASE("style::resolve: th is bold and flex-grow 1") {
+    const auto doc = make_doc("<body><table><tr><th>H</th></tr></table></body>");
+    const auto tree = resolve(doc, no_sheets());
+    REQUIRE(tree.has_value());
+    const auto* th = find_tag(*tree, "th");
+    REQUIRE(th != nullptr);
+    CHECK(th->style.font_weight == FontWeight::Bold);
+    CHECK(th->style.flex_grow == doctest::Approx(1.0));
+}

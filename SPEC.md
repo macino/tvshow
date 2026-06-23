@@ -176,8 +176,26 @@ Test discipline: tests are written **before** the implementation for any pure mo
 ### 6.5 Images
 `<img src alt width height>` — v1 renders `[alt]`, reserves `width × height` (mapped through px→cell ratio) so layout matches future ASCII-art renderer.
 
-### 6.6 Out of subset
-`script`, `iframe`, `video`, `audio`, `canvas`, `svg`, `table`* — parsed and skipped (children rendered as if their parent were `div`). Tables are deferred to v1.1 (Open Q-13).
+### 6.6 Tables (v1.1)
+
+`table`, `tr`, `td`, `th`, `thead`, `tbody`, `tfoot`, `caption`.
+
+Layout is implemented via the existing flex engine (ADR 002):
+
+| Element | UA display |
+|---------|-----------|
+| `table` | block + `border-style: solid` (outer box-drawing-char frame) |
+| `thead` / `tbody` / `tfoot` | block |
+| `tr` | flex; flex-direction: row |
+| `td` / `th` | block; flex-grow: 1; padding-left/right: 8px |
+| `caption` | block; font-weight: bold |
+| `colgroup` / `col` | none |
+
+Limitations: no `colspan`, no `rowspan`, no CSS `border-collapse`. Rows with unequal cell counts
+produce misaligned columns.
+
+### 6.7 Out of subset
+`script`, `iframe`, `video`, `audio`, `canvas`, `svg` — parsed and skipped (children rendered as if their parent were `div`).
 
 ---
 
@@ -412,7 +430,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 | Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
 | Q-12 | Debug overlay (Ctrl-D) detail | Box outlines, focus order, box dims, all? |
-| Q-13 | `<table>` support | v1.1 priority? Subset (no colspan)? |
+| Q-13 | `<table>` support | **Resolved**: flex-reuse layout in UA stylesheet (ADR 002); no colspan/rowspan. |
 | Q-14 | Error page styling | UA-themed or plain |
 | Q-15 | CI host | GitHub Actions / GitLab / local only |
 | Q-16 | License | MIT / Apache-2 / proprietary |

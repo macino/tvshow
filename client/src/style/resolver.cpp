@@ -219,14 +219,14 @@ script { display: none; }
 noscript { display: none; }
 style { display: none; }
 template { display: none; }
-table { display: block; }
-caption { display: block; }
+table { display: block; border-style: solid; margin-bottom: 16px; }
+caption { display: block; font-weight: bold; }
 thead { display: block; }
 tbody { display: block; }
 tfoot { display: block; }
-tr { display: block; }
-td { display: inline; }
-th { display: inline; font-weight: bold; }
+tr { display: flex; flex-direction: row; }
+td { display: block; flex-grow: 1; padding-left: 8px; padding-right: 8px; }
+th { display: block; flex-grow: 1; padding-left: 8px; padding-right: 8px; font-weight: bold; }
 colgroup { display: none; }
 col { display: none; }
 )css";
