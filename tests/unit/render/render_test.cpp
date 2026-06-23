@@ -342,3 +342,27 @@ TEST_CASE("render: hidden input is not rendered") {
     CHECK(grid.at({0, 0}).cp == U'x');
     CHECK(grid.at({1, 0}).cp == U'y');
 }
+
+// ── list markers ─────────────────────────────────────────────────────────────
+
+TEST_CASE("render: ul li gets bullet marker") {
+    // ul has UA padding-left: 16px (2 cols); li content starts at col 2.
+    // Marker is painted at col 2 - 2 = 0, same row as li content.
+    auto [doc, tree] = make_tree("<body><ul><li>x</li></ul></body>");
+    const Box box = layout(tree, {80, 24});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'•');
+    CHECK(grid.at({2, 0}).cp == U'x');
+}
+
+TEST_CASE("render: ol lis get decimal markers") {
+    auto [doc, tree] = make_tree("<body><ol><li>a</li><li>b</li></ol></body>");
+    const Box box = layout(tree, {80, 24});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'1');
+    CHECK(grid.at({1, 0}).cp == U'.');
+    CHECK(grid.at({2, 0}).cp == U'a');
+    CHECK(grid.at({0, 1}).cp == U'2');
+    CHECK(grid.at({1, 1}).cp == U'.');
+    CHECK(grid.at({2, 1}).cp == U'b');
+}

@@ -415,6 +415,27 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
             }
         }
         paint_border(grid, box.border_box, st.border);
+
+        if (st.list_marker != style::ListMarker::None) {
+            const int row = box.content_box.origin.row;
+            const int col = box.content_box.origin.col - 2;
+            if (col >= 0 && col < grid.cols() && row >= 0 && row < grid.rows()) {
+                const ColorAttr attr = text_attr(st, grid.at({col, row}).attr.bg);
+                if (st.list_marker == style::ListMarker::Disc) {
+                    grid.put({col, row}, U'•', attr);
+                } else {
+                    const int n = st.list_marker_index;
+                    const char32_t d1 = n < 10 ? U'0' + static_cast<char32_t>(n)
+                                                : U'0' + static_cast<char32_t>(n / 10);
+                    const char32_t d2 = n < 10 ? U'.' : U'0' + static_cast<char32_t>(n % 10);
+                    grid.put({col, row}, d1, attr);
+                    if (col + 1 < grid.cols()) {
+                        grid.put({col + 1, row}, d2, attr);
+                    }
+                }
+            }
+        }
+
         paint_text(grid, box.content_box, *box.node, opts);
     }
     for (const auto& child : box.children) {

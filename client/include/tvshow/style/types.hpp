@@ -83,6 +83,7 @@ enum class JustifyContent : uint8_t { FlexStart, FlexEnd, Center, SpaceBetween, 
 enum class AlignItems : uint8_t { FlexStart, FlexEnd, Center, Stretch, Baseline };
 enum class Visibility : uint8_t { Visible, Hidden };
 enum class Overflow : uint8_t { Visible, Hidden, Scroll, Auto };
+enum class ListMarker : uint8_t { None, Disc, Decimal };
 
 // ── Border ───────────────────────────────────────────────────────────────────
 
@@ -123,6 +124,8 @@ struct ComputedStyle {
     Length flex_basis{};
     Visibility visibility = Visibility::Visible;
     Overflow overflow = Overflow::Visible;
+    ListMarker list_marker = ListMarker::None;
+    int list_marker_index = 0;
 };
 
 }  // namespace tvshow::style

@@ -52,6 +52,17 @@ static std::span<const Stylesheet> no_sheets() {
     return {};
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
+static void find_all_tag(const StyledNode& root, std::string_view tag,
+                         std::vector<const StyledNode*>& out) {
+    if (root.node != nullptr && root.node->tag == tag) {
+        out.push_back(&root);
+    }
+    for (const auto& child : root.children) {
+        find_all_tag(child, tag, out);
+    }
+}
+
 // ── parse_color ───────────────────────────────────────────────────────────────
 
 TEST_CASE("style::parse_color: known named colors") {
@@ -329,4 +340,40 @@ TEST_CASE("style::resolve: border-color is applied per side") {
     for (const auto& side : div->style.border) {
         CHECK(side.color.g == 255);
     }
+}
+
+// ── list markers ─────────────────────────────────────────────────────────────
+
+TEST_CASE("style::resolve: li in ul gets Disc list marker") {
+    const auto doc = make_doc("<body><ul><li>A</li></ul></body>");
+    const auto tree = resolve(doc, no_sheets());
+    REQUIRE(tree.has_value());
+    const auto* li = find_tag(*tree, "li");
+    REQUIRE(li != nullptr);
+    CHECK(li->style.list_marker == tvshow::style::ListMarker::Disc);
+    CHECK(li->style.list_marker_index == 0);
+}
+
+TEST_CASE("style::resolve: li in ol gets Decimal marker with 1-based index") {
+    const auto doc = make_doc("<body><ol><li>A</li><li>B</li><li>C</li></ol></body>");
+    const auto tree = resolve(doc, no_sheets());
+    REQUIRE(tree.has_value());
+    std::vector<const StyledNode*> lis;
+    find_all_tag(*tree, "li", lis);
+    REQUIRE(lis.size() == 3);
+    CHECK(lis[0]->style.list_marker == tvshow::style::ListMarker::Decimal);
+    CHECK(lis[0]->style.list_marker_index == 1);
+    CHECK(lis[1]->style.list_marker == tvshow::style::ListMarker::Decimal);
+    CHECK(lis[1]->style.list_marker_index == 2);
+    CHECK(lis[2]->style.list_marker == tvshow::style::ListMarker::Decimal);
+    CHECK(lis[2]->style.list_marker_index == 3);
+}
+
+TEST_CASE("style::resolve: li not in ul/ol gets no marker") {
+    const auto doc = make_doc("<body><li>alone</li></body>");
+    const auto tree = resolve(doc, no_sheets());
+    REQUIRE(tree.has_value());
+    const auto* li = find_tag(*tree, "li");
+    REQUIRE(li != nullptr);
+    CHECK(li->style.list_marker == tvshow::style::ListMarker::None);
 }

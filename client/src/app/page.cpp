@@ -39,8 +39,9 @@ struct Fetched {
 
 std::string error_page_html(std::string_view title, std::string_view detail) {
     std::ostringstream out;
-    out << "<!doctype html><html><head><title>" << title << "</title></head><body><h1>" << title
-        << "</h1><p>" << detail << "</p></body></html>";
+    out << "<!doctype html><html><head><title>" << title << "</title>"
+        << "<style>body{padding:16px;}p{margin-top:8px;}</style>"
+        << "</head><body><h1>" << title << "</h1><p>" << detail << "</p></body></html>";
     return out.str();
 }
 

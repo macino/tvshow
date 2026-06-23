@@ -761,6 +761,26 @@ StyledNode build_node(const dom::Node& node, const ComputedStyle& parent_style,
             node, parent_style,
             std::span<const dom::Node* const>(ancestor_stack.data(), ancestor_stack.size()),
             sheets);
+
+        if (node.tag == "li" && !ancestor_stack.empty()) {
+            const dom::Node* parent = ancestor_stack.back();
+            if (parent->tag == "ul") {
+                sn.style.list_marker = ListMarker::Disc;
+            } else if (parent->tag == "ol") {
+                sn.style.list_marker = ListMarker::Decimal;
+                int idx = 1;
+                for (const auto& sib : parent->children) {
+                    if (sib.get() == &node) {
+                        break;
+                    }
+                    if (sib->kind == dom::NodeKind::Element && sib->tag == "li") {
+                        ++idx;
+                    }
+                }
+                sn.style.list_marker_index = idx;
+            }
+        }
+
         ancestor_stack.push_back(&node);
         for (const auto& child : node.children) {
             sn.children.push_back(build_node(*child, sn.style, sheets, ancestor_stack));
