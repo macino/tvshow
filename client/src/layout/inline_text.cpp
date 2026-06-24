@@ -1,6 +1,7 @@
 #include "tvshow/layout/inline_text.hpp"
 
 #include "tvshow/dom/node.hpp"
+#include "tvshow/layout/form.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/style/tree.hpp"
 #include "tvshow/style/types.hpp"
@@ -103,14 +104,31 @@ void collect_tokens(const style::StyledNode& sn, style::WhiteSpace ws, std::stri
             pending.active = false;
             out.push_back({U'\n', &child.style, href});
         } else if (is_inline_descendant(child)) {
-            std::string_view child_href = href;
-            if (child.node->tag == "a") {
-                const std::string_view a_href = child.node->attr("href");
-                if (!a_href.empty()) {
-                    child_href = a_href;
+            const FormControlKind fck = form_control_kind(*child.node);
+            if (fck != FormControlKind::None && fck != FormControlKind::Hidden) {
+                // Inline form control: emit N placeholder tokens so the word-break
+                // algorithm reserves the correct width.  The first token carries a
+                // widget pointer so layout_block can build a child Box for it.
+                // Placeholder tokens (cp == U'\0') are skipped by place_inline.
+                if (pending.active) {
+                    out.push_back({U' ', &child.style, pending.href});
+                    pending.active = false;
                 }
+                const auto [wc, wr] = form_control_size(*child.node);
+                out.push_back({U'\0', &child.style, {}, &child});  // first: carries widget ptr
+                for (int k = 1; k < wc; ++k) {
+                    out.push_back({U'\0', &child.style, {}});       // continuation placeholders
+                }
+            } else {
+                std::string_view child_href = href;
+                if (child.node->tag == "a") {
+                    const std::string_view a_href = child.node->attr("href");
+                    if (!a_href.empty()) {
+                        child_href = a_href;
+                    }
+                }
+                collect_tokens(child, ws, child_href, out, pending);
             }
-            collect_tokens(child, ws, child_href, out, pending);
         }
     }
 }
@@ -248,7 +266,11 @@ std::vector<PlacedToken> place_inline(const style::StyledNode& sn, CellRect cont
             if (col >= max_col) {
                 break;  // clipped — content overflows its box
             }
-            placed.push_back({{col, content_box.origin.row + row}, tok});
+            // Placeholder tokens (cp == U'\0') reserve column space for inline
+            // form controls but are never written to the grid directly.
+            if (tok.cp != U'\0') {
+                placed.push_back({{col, content_box.origin.row + row}, tok});
+            }
             ++col;
         }
     }

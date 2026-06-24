@@ -14,10 +14,21 @@ namespace tvshow::layout {
 // came from (text color/weight/etc. can differ per inline span). `href` is
 // the target of the nearest enclosing `<a href>`, or empty if the character
 // isn't part of a link (SPEC §12.1 focusable elements).
+//
+// Form controls (checkbox, radio, text input, …) that appear in an inline
+// context are represented as a run of placeholder tokens (cp == U'\0').
+// The FIRST placeholder token in the run carries a non-null `widget` pointer
+// to the StyledNode for that control; subsequent placeholders in the same run
+// have `widget == nullptr`.  Each placeholder occupies exactly one column so
+// the word-break algorithm treats the whole run as an unbreakable atom of
+// form_control_size().cols wide.  `place_inline` skips placeholder tokens so
+// they are never written to the character grid directly — the layout engine
+// creates a child Box for the control at the token's column position instead.
 struct InlineToken {
     char32_t cp = 0;
     const style::ComputedStyle* style = nullptr;
     std::string_view href;
+    const style::StyledNode* widget = nullptr;  // non-null on first placeholder of inline widget
 };
 
 using InlineLine = std::vector<InlineToken>;

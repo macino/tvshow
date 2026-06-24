@@ -93,10 +93,6 @@ EdgePx compute_margin(const style::Edges& mar, int avail_w, int avail_h) noexcep
 
 // ── Inline content measurement ────────────────────────────────────────────────
 
-int inline_rows(const style::StyledNode& sn, int content_w) {
-    return static_cast<int>(break_inline(sn, content_w).size());
-}
-
 bool has_inline_content(const style::StyledNode& sn) noexcept {
     return std::ranges::any_of(sn.children, [](const style::StyledNode& child) {
         if (child.node == nullptr) {
@@ -207,14 +203,19 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
             continue;
         }
         if (fck != FormControlKind::None) {
-            const auto [cols, rows] = form_control_size(*child.node);
-            const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
-            Box fc_box;
-            fc_box.node = &child;
-            fc_box.border_box = {{content_origin.col, y + cmar.top}, {cols, rows}};
-            fc_box.content_box = fc_box.border_box;
-            y += cmar.top + rows + cmar.bottom;
-            children.push_back(std::move(fc_box));
+            if (child.style.display == style::Display::Block) {
+                // Block-display controls (textarea): placed as a block child here.
+                const auto [cols, rows] = form_control_size(*child.node);
+                const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
+                Box fc_box;
+                fc_box.node = &child;
+                fc_box.border_box = {{content_origin.col, y + cmar.top}, {cols, rows}};
+                fc_box.content_box = fc_box.border_box;
+                y += cmar.top + rows + cmar.bottom;
+                children.push_back(std::move(fc_box));
+            }
+            // Inline/InlineBlock controls (input, button, select) participate in
+            // the inline flow and are placed below via the break_inline scan.
             continue;
         }
         if (child.node->tag == "img") {
@@ -242,7 +243,24 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     }
 
     if (has_inline_content(sn)) {
-        y += inline_rows(sn, content_w);
+        const auto lines = break_inline(sn, content_w);
+        // Create child boxes for any inline form controls found in the line flow.
+        for (int line_idx = 0; line_idx < static_cast<int>(lines.size()); ++line_idx) {
+            int col = 0;
+            for (const auto& tok : lines[static_cast<size_t>(line_idx)]) {
+                if (tok.widget != nullptr) {
+                    const auto [wc, wr] = form_control_size(*tok.widget->node);
+                    Box fc_box;
+                    fc_box.node = tok.widget;
+                    fc_box.border_box = {
+                        {content_origin.col + col, content_origin.row + line_idx}, {wc, wr}};
+                    fc_box.content_box = fc_box.border_box;
+                    children.push_back(std::move(fc_box));
+                }
+                ++col;
+            }
+        }
+        y += static_cast<int>(lines.size());
     }
 
     // Text browser: explicit height on block containers produces blank rows without

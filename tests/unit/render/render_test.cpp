@@ -334,6 +334,49 @@ TEST_CASE("render: submit button draws [ Label ]") {
     CHECK(grid.at({4, 0}).cp == U']');
 }
 
+TEST_CASE("render: inline checkbox does not overwrite adjacent label text") {
+    // "<p><input type='checkbox'> Subscribe</p>" — checkbox is 3 cols wide,
+    // then a space, then "Subscribe".  No character should be overwritten.
+    auto [doc, tree] =
+        make_tree(R"(<body><p><input type="checkbox"> Subscribe</p></body>)");
+    const Box box = layout(tree, {40, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+    CHECK(grid.at({1, 0}).cp == U' ');
+    CHECK(grid.at({2, 0}).cp == U']');
+    CHECK(grid.at({3, 0}).cp == U' ');   // separator space from text node
+    CHECK(grid.at({4, 0}).cp == U'S');   // "Subscribe" starts here
+    CHECK(grid.at({5, 0}).cp == U'u');
+}
+
+TEST_CASE("render: inline radio with label text does not overlap") {
+    auto [doc, tree] =
+        make_tree(R"(<body><p><input type="radio" checked> Plan A</p></body>)");
+    const Box box = layout(tree, {40, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'(');
+    CHECK(grid.at({1, 0}).cp == U'\x2022');  // U+2022 BULLET
+    CHECK(grid.at({2, 0}).cp == U')');
+    CHECK(grid.at({3, 0}).cp == U' ');
+    CHECK(grid.at({4, 0}).cp == U'P');
+}
+
+TEST_CASE("render: text input inline mid-sentence") {
+    // "A [hello     ] B" — text input of size 10 (= 12 cols) between words.
+    auto [doc, tree] =
+        make_tree(R"(<body><p>A <input type="text" size="10" value="hi"> B</p></body>)");
+    const Box box = layout(tree, {40, 3});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'A');
+    CHECK(grid.at({1, 0}).cp == U' ');
+    CHECK(grid.at({2, 0}).cp == U'[');   // input starts here
+    CHECK(grid.at({3, 0}).cp == U'h');
+    CHECK(grid.at({4, 0}).cp == U'i');
+    CHECK(grid.at({13, 0}).cp == U']');  // size=10 → width=12, bracket at col 13
+    CHECK(grid.at({14, 0}).cp == U' ');
+    CHECK(grid.at({15, 0}).cp == U'B');
+}
+
 TEST_CASE("render: hidden input is not rendered") {
     auto [doc, tree] = make_tree(R"(<body>x<input type="hidden" value="secret">y</body>)");
     const Box box = layout(tree, {20, 3});
