@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><title>Debug: CSS properties</title>
+<style>
+.box { display: block; border: 1px solid; margin: 4px 0; padding: 4px; }
+.red { color: #ff4444; }
+.green { color: #44ff44; }
+.blue { color: #4488ff; }
+.bg-dark { background: #222244; color: #eeeeff; }
+.bold { font-weight: bold; }
+.italic { font-style: italic; }
+.underline { text-decoration: underline; }
+.strike { text-decoration: line-through; }
+.center { text-align: center; }
+.right { text-align: right; }
+.dbl { border-style: double; }
+.dashed { border-style: dashed; }
+.pad-big { padding: 8px 16px; }
+</style>
+</head>
+<body>
+<h2>Colors</h2>
+<p class="red">Red text #ff4444</p>
+<p class="green">Green text #44ff44</p>
+<p class="blue">Blue text #4488ff</p>
+<div class="box bg-dark">Dark background with light text</div>
+
+<h2>Font styles</h2>
+<p class="bold">Bold text</p>
+<p class="italic">Italic text</p>
+<p class="underline">Underlined text</p>
+<p class="strike">Strikethrough text</p>
+
+<h2>Text alignment</h2>
+<p class="center">Centered text</p>
+<p class="right">Right-aligned text</p>
+
+<h2>Borders</h2>
+<div class="box">Solid border (default)</div>
+<div class="box dbl">Double border</div>
+<div class="box dashed">Dashed border</div>
+<div class="box pad-big">Big padding (8px 16px)</div>
+
+<h2>Nested</h2>
+<div class="box">
+  Outer box
+  <div class="box bg-dark">Inner box with different background</div>
+  Back in outer
+</div>
+</body></html>

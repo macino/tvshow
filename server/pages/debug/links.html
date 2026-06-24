@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><title>Debug: Links and navigation</title></head>
+<body>
+<h1>Links and navigation</h1>
+
+<h2>Internal links</h2>
+<p>
+  <a href="/pages/debug/elements.html">Elements page</a> |
+  <a href="/pages/debug/css-props.html">CSS properties</a> |
+  <a href="/pages/debug/flex.html">Flex layout</a> |
+  <a href="/pages/debug/inline-controls.html">Inline controls</a>
+</p>
+
+<h2>Fragment links (this page)</h2>
+<p>
+  <a href="#section-a">Section A</a> |
+  <a href="#section-b">Section B</a> |
+  <a href="#section-c">Section C</a>
+</p>
+
+<h2>Multiple inline links</h2>
+<p>
+  This paragraph has <a href="/pages/debug/elements.html">link one</a> and
+  <a href="/pages/debug/css-props.html">link two</a> and
+  <a href="/pages/debug/flex.html">link three</a> embedded in running text.
+  Tab through them to verify focus order is left-to-right, top-to-bottom.
+</p>
+
+<h2>Long link text</h2>
+<p><a href="/pages/debug/long.html">This is a link with a very long label that might wrap across multiple lines depending on viewport width</a></p>
+
+<h2>Adjacent links (no space)</h2>
+<p><a href="/pages/debug/elements.html">LinkA</a><a href="/pages/debug/css-props.html">LinkB</a><a href="/pages/debug/flex.html">LinkC</a></p>
+
+<h2>Visited link appearance</h2>
+<p>After visiting a page, its links should appear in a different colour (purple). Navigate away and back to see the effect.</p>
+
+<h2 id="section-a">Section A</h2>
+<p>You jumped here from the fragment link above. <a href="#section-b">Continue to B</a></p>
+
+<h2 id="section-b">Section B</h2>
+<p>Section B. <a href="#section-c">Continue to C</a></p>
+
+<h2 id="section-c">Section C</h2>
+<p>Section C — bottom. <a href="#">Back to top</a></p>
+</body></html>

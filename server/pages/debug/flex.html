@@ -1,0 +1,71 @@
+<!doctype html>
+<html><head><title>Debug: Flex layout</title>
+<style>
+.row { display: flex; flex-direction: row; gap: 4px; margin: 4px 0; }
+.col { display: flex; flex-direction: column; gap: 2px; }
+.item { border: 1px solid; padding: 2px 4px; }
+.grow1 { flex-grow: 1; }
+.grow2 { flex-grow: 2; }
+.sb { justify-content: space-between; }
+.sa { justify-content: space-around; }
+.center { justify-content: center; }
+.end { justify-content: flex-end; }
+.ai-c { align-items: center; }
+.ai-e { align-items: flex-end; }
+.tall { padding: 8px 4px; }
+</style>
+</head>
+<body>
+<h2>Row — default</h2>
+<div class="row">
+  <div class="item">A</div>
+  <div class="item">B</div>
+  <div class="item">C</div>
+</div>
+
+<h2>Row — space-between</h2>
+<div class="row sb">
+  <div class="item">Left</div>
+  <div class="item">Center</div>
+  <div class="item">Right</div>
+</div>
+
+<h2>Row — space-around</h2>
+<div class="row sa">
+  <div class="item">X</div>
+  <div class="item">Y</div>
+  <div class="item">Z</div>
+</div>
+
+<h2>Row — flex-grow (1:2)</h2>
+<div class="row">
+  <div class="item grow1">grow:1</div>
+  <div class="item grow2">grow:2</div>
+</div>
+
+<h2>Row — align-items center</h2>
+<div class="row ai-c">
+  <div class="item">Short</div>
+  <div class="item tall">Taller item</div>
+  <div class="item">Short</div>
+</div>
+
+<h2>Column</h2>
+<div class="col" style="width:50%">
+  <div class="item">Col A</div>
+  <div class="item">Col B</div>
+  <div class="item">Col C</div>
+</div>
+
+<h2>Nested flex</h2>
+<div class="row">
+  <div class="col item grow1">
+    <div class="item">1-1</div>
+    <div class="item">1-2</div>
+  </div>
+  <div class="col item grow1">
+    <div class="item">2-1</div>
+    <div class="item">2-2</div>
+  </div>
+</div>
+</body></html>

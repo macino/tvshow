@@ -82,9 +82,18 @@ auto main(int argc, char** argv) -> int {
         serve_page(res, pages_dir + "/index.html");
     });
 
-    svr.Get(R"(/pages/(\w+)\.html)",
+    // Match /pages/<path>.html where <path> may include subdirectories.
+    // The character class allows word chars, hyphens, and forward slashes;
+    // a leading .. is rejected to prevent path traversal.
+    svr.Get(R"(/pages/([\w][\w/\-]*)\.html)",
             [pages_dir](const httplib::Request& req, httplib::Response& res) {
-                serve_page(res, pages_dir + "/" + req.matches[1].str() + ".html");
+                const std::string rel = req.matches[1].str();
+                // Reject any attempt at path traversal.
+                if (rel.find("..") != std::string::npos) {
+                    res.status = 400;
+                    return;
+                }
+                serve_page(res, pages_dir + "/" + rel + ".html");
             });
 
     svr.Get("/pages/errors/404", [](const httplib::Request&, httplib::Response& res) {
