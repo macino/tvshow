@@ -356,15 +356,18 @@ TEST_CASE("render: ul li gets bullet marker") {
 }
 
 TEST_CASE("render: ol lis get decimal markers") {
+    // ol padding-left: 24px = 3 cols.  Marker: "1." at col 0-1, gap at col 2, content at col 3.
     auto [doc, tree] = make_tree("<body><ol><li>a</li><li>b</li></ol></body>");
     const Box box = layout(tree, {80, 24});
     const CharGrid grid = tvshow::render::render(box);
     CHECK(grid.at({0, 0}).cp == U'1');
     CHECK(grid.at({1, 0}).cp == U'.');
-    CHECK(grid.at({2, 0}).cp == U'a');
+    CHECK(grid.at({2, 0}).cp == U' ');  // gap between marker and content
+    CHECK(grid.at({3, 0}).cp == U'a');
     CHECK(grid.at({0, 1}).cp == U'2');
     CHECK(grid.at({1, 1}).cp == U'.');
-    CHECK(grid.at({2, 1}).cp == U'b');
+    CHECK(grid.at({2, 1}).cp == U' ');
+    CHECK(grid.at({3, 1}).cp == U'b');
 }
 
 // ── table rendering (SPEC §6.6, ADR 002) ─────────────────────────────────────

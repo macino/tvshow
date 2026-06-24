@@ -476,6 +476,33 @@ void Application::handleEvent(TEvent& event) {
     }
 }
 
+TRect Application::next_window_bounds() {
+    constexpr int kCascadeCols = 2;
+    constexpr int kCascadeRows = 1;
+    constexpr int kMinWidth = 20;
+    constexpr int kMinHeight = 6;
+
+    const TRect desk = deskTop->getExtent();
+    const int dw = desk.b.x - desk.a.x;
+    const int dh = desk.b.y - desk.a.y;
+
+    // Each step shifts the origin by (kCascadeCols, kCascadeRows) and shrinks
+    // the window by the same amount so windows don't go off-screen.
+    const int max_steps_h = std::max(0, (dw - kMinWidth) / kCascadeCols);
+    const int max_steps_v = std::max(0, (dh - kMinHeight) / kCascadeRows);
+    const int max_steps = std::min(max_steps_h, max_steps_v);
+    if (max_steps > 0) {
+        cascade_step_ = cascade_step_ % max_steps;
+    } else {
+        cascade_step_ = 0;
+    }
+
+    const int x0 = desk.a.x + cascade_step_ * kCascadeCols;
+    const int y0 = desk.a.y + cascade_step_ * kCascadeRows;
+    ++cascade_step_;
+    return {x0, y0, desk.b.x, desk.b.y};
+}
+
 void Application::open_url(std::string_view url) {
     const layout::Viewport vp{std::max(1, deskTop->size.x), std::max(1, deskTop->size.y)};
     auto page = load_page(url, vp);
@@ -483,7 +510,7 @@ void Application::open_url(std::string_view url) {
         return;
     }
 
-    const TRect bounds = deskTop->getExtent();
+    const TRect bounds = next_window_bounds();
     auto* win = new BrowserWindow(bounds, mode_, std::move(*page), &shared_browsing_state_);
     deskTop->insert(win);
 }

@@ -192,7 +192,7 @@ h4 { display: block; font-weight: bold; margin-top: 8px; margin-bottom: 0; }
 h5 { display: block; font-weight: bold; margin-top: 4px; margin-bottom: 0; }
 h6 { display: block; font-weight: bold; margin-top: 4px; margin-bottom: 0; }
 ul { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 16px; }
-ol { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 16px; }
+ol { display: block; margin-top: 0; margin-bottom: 16px; padding-left: 24px; }
 li { display: block; }
 blockquote { display: block; margin-top: 8px; margin-bottom: 8px; margin-left: 8px; padding-left: 8px; border-left-style: solid; }
 hr { display: block; border-top-style: solid; margin-top: 8px; margin-bottom: 8px; }
@@ -600,6 +600,30 @@ bool apply_box_props(ComputedStyle& style, std::string_view prop, std::string_vi
         apply_border_side(style.border[2], val);
     } else if (prop == "border-left") {
         apply_border_side(style.border[3], val);
+    } else if (prop == "border-top-style") {
+        style.border[0].style = parse_border_style_val(val);
+    } else if (prop == "border-right-style") {
+        style.border[1].style = parse_border_style_val(val);
+    } else if (prop == "border-bottom-style") {
+        style.border[2].style = parse_border_style_val(val);
+    } else if (prop == "border-left-style") {
+        style.border[3].style = parse_border_style_val(val);
+    } else if (prop == "border-top-width") {
+        style.border[0].width = parse_length(val);
+    } else if (prop == "border-right-width") {
+        style.border[1].width = parse_length(val);
+    } else if (prop == "border-bottom-width") {
+        style.border[2].width = parse_length(val);
+    } else if (prop == "border-left-width") {
+        style.border[3].width = parse_length(val);
+    } else if (prop == "border-top-color") {
+        style.border[0].color = parse_color(val);
+    } else if (prop == "border-right-color") {
+        style.border[1].color = parse_color(val);
+    } else if (prop == "border-bottom-color") {
+        style.border[2].color = parse_color(val);
+    } else if (prop == "border-left-color") {
+        style.border[3].color = parse_color(val);
     } else if (prop == "border-style") {
         const BorderStyle bs = parse_border_style_val(val);
         for (auto& side : style.border) {

@@ -31,6 +31,10 @@ public:
 private:
     AddressBarMode mode_;
     SharedBrowsingState shared_browsing_state_;  // shared across all tabs
+    int cascade_step_ = 0;  // incremented on each open_url() for window staggering
+
+    // Returns the next cascaded window bounds (2 cols, 1 row offset per step).
+    TRect next_window_bounds();
 
     // Returns the focused BrowserWindow in the desktop, or nullptr.
     static BrowserWindow* active_browser_window();

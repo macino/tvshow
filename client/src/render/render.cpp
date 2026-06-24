@@ -418,18 +418,26 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
 
         if (st.list_marker != style::ListMarker::None) {
             const int row = box.content_box.origin.row;
-            const int col = box.content_box.origin.col - 2;
-            if (col >= 0 && col < grid.cols() && row >= 0 && row < grid.rows()) {
-                const ColorAttr attr = text_attr(st, grid.at({col, row}).attr.bg);
+            const int content_col = box.content_box.origin.col;
+            if (row >= 0 && row < grid.rows()) {
+                const ColorAttr attr = text_attr(st, grid.at({content_col, row}).attr.bg);
                 if (st.list_marker == style::ListMarker::Disc) {
-                    grid.put({col, row}, U'•', attr);
+                    // "• content" — bullet at col-2, col-1 blank, content at col.
+                    const int col = content_col - 2;
+                    if (col >= 0 && col < grid.cols()) {
+                        grid.put({col, row}, U'•', attr);
+                    }
                 } else {
+                    // "1. content" — digit at col-3, period at col-2, col-1 blank, content at col.
                     const int n = st.list_marker_index;
+                    const int col = content_col - 3;
                     const char32_t d1 = n < 10 ? U'0' + static_cast<char32_t>(n)
                                                 : U'0' + static_cast<char32_t>(n / 10);
                     const char32_t d2 = n < 10 ? U'.' : U'0' + static_cast<char32_t>(n % 10);
-                    grid.put({col, row}, d1, attr);
-                    if (col + 1 < grid.cols()) {
+                    if (col >= 0 && col < grid.cols()) {
+                        grid.put({col, row}, d1, attr);
+                    }
+                    if (col + 1 >= 0 && col + 1 < grid.cols()) {
                         grid.put({col + 1, row}, d2, attr);
                     }
                 }
