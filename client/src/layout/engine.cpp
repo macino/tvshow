@@ -154,6 +154,60 @@ ImgSize img_cell_size(const dom::Node& node) noexcept {
     return {cols, rows};
 }
 
+// ── Table column width computation ───────────────────────────────────────────
+
+int measure_text_width(const style::StyledNode& sn, int avail_w) {
+    const auto lines = break_inline(sn, avail_w);
+    int max_w = 0;
+    for (const auto& line : lines) {
+        max_w = std::max(max_w, static_cast<int>(line.size()));
+    }
+    return max_w;
+}
+
+// Compute max content width per column across all rows in a table.
+std::vector<int> compute_table_col_widths(const style::StyledNode& table_sn, int content_w) {
+    std::vector<int> col_widths;
+    for (const auto& section_or_row : table_sn.children) {
+        if (section_or_row.node == nullptr) { continue; }
+        // Handle thead/tbody/tfoot wrappers or direct tr children.
+        const auto& rows = (section_or_row.node->tag == "tr")
+                               ? std::vector<const style::StyledNode*>{&section_or_row}
+                               : [&]() {
+                                     std::vector<const style::StyledNode*> out;
+                                     for (const auto& c : section_or_row.children) {
+                                         if (c.node != nullptr && c.node->tag == "tr") {
+                                             out.push_back(&c);
+                                         }
+                                     }
+                                     return out;
+                                 }();
+        for (const auto* row : rows) {
+            int col_idx = 0;
+            for (const auto& cell : row->children) {
+                if (cell.node == nullptr || cell.node->kind != dom::NodeKind::Element) {
+                    continue;
+                }
+                if (cell.node->tag != "td" && cell.node->tag != "th") { continue; }
+                const EdgePx cpad = compute_padding(cell.style.padding, content_w, 0);
+                const int text_w = measure_text_width(cell, content_w);
+                const int cell_w = cpad.left + text_w + cpad.right;
+                if (static_cast<int>(col_widths.size()) <= col_idx) {
+                    col_widths.resize(static_cast<size_t>(col_idx + 1), 0);
+                }
+                col_widths[static_cast<size_t>(col_idx)] =
+                    std::max(col_widths[static_cast<size_t>(col_idx)], cell_w);
+                ++col_idx;
+            }
+        }
+    }
+    return col_widths;
+}
+
+// Thread-local table column widths context for layout_flex to use.
+// Set by layout_block when processing <table>, cleared after.
+thread_local const std::vector<int>* g_table_col_widths = nullptr;
+
 // ── Forward declarations (mutual recursion) ───────────────────────────────────
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -188,6 +242,15 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     const CellPos border_origin{origin.col + mar.left, origin.row + mar.top};
     const CellPos content_origin{border_origin.col + brd.left + pad.left,
                                  border_origin.row + brd.top + pad.top};
+
+    // Table column alignment: compute column widths for <table> elements.
+    std::vector<int> table_cols;
+    const bool is_table = sn.node != nullptr && sn.node->tag == "table";
+    const std::vector<int>* prev_col_widths = g_table_col_widths;
+    if (is_table) {
+        table_cols = compute_table_col_widths(sn, content_w);
+        g_table_col_widths = &table_cols;
+    }
 
     // Lay out block-level children.
     std::vector<Box> children;
@@ -267,6 +330,10 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     // adding visible content.  img and form controls are already sized above.
     const int content_h = std::max(0, y - content_origin.row);
 
+    if (is_table) {
+        g_table_col_widths = prev_col_widths;
+    }
+
     Box box;
     box.node = &sn;
     box.border_box = {border_origin,
@@ -290,7 +357,11 @@ struct FlexItem {
 // hidden form controls. Returns items in source order.
 std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_row, int content_main,
                                          int avail_cross) {
+    // Table row: use pre-computed column widths if available.
+    const bool is_tr = sn.node != nullptr && sn.node->tag == "tr" && g_table_col_widths != nullptr;
+
     std::vector<FlexItem> items;
+    int col_idx = 0;
     for (const auto& child : sn.children) {
         if (child.node == nullptr || child.node->kind != dom::NodeKind::Element) {
             continue;
@@ -306,19 +377,25 @@ std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_ro
             const auto [icols, irows] = img_cell_size(*child.node);
             const int base = is_row ? icols : irows;
             items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink});
+            ++col_idx;
             continue;
         }
 
         int base = 0;
-        const auto& fb = child.style.flex_basis;
-        if (!fb.is_auto) {
-            base = is_row ? resolve_h(fb, content_main) : resolve_v(fb, avail_cross);
-        } else if (is_row && !child.style.width.is_auto) {
-            base = resolve_h(child.style.width, content_main);
-        } else if (!is_row && !child.style.height.is_auto) {
-            base = resolve_v(child.style.height, avail_cross);
+        if (is_tr && is_row && col_idx < static_cast<int>(g_table_col_widths->size())) {
+            base = (*g_table_col_widths)[static_cast<size_t>(col_idx)];
+        } else {
+            const auto& fb = child.style.flex_basis;
+            if (!fb.is_auto) {
+                base = is_row ? resolve_h(fb, content_main) : resolve_v(fb, avail_cross);
+            } else if (is_row && !child.style.width.is_auto) {
+                base = resolve_h(child.style.width, content_main);
+            } else if (!is_row && !child.style.height.is_auto) {
+                base = resolve_v(child.style.height, avail_cross);
+            }
         }
         items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink});
+        ++col_idx;
     }
     return items;
 }
@@ -554,14 +631,80 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
 
 }  // namespace
 
+// Apply position offsets to a laid-out box (SPEC §20 Q-25).
+// relative: offset from normal-flow position.
+// absolute: offset from parent content origin (simplified — no containing block search).
+void apply_position_offsets(Box& box, CellPos parent_content_origin, int parent_w, int parent_h) {
+    if (box.node == nullptr) { return; }
+    const auto& st = box.node->style;
+    if (st.position == style::Position::Relative) {
+        int dx = 0;
+        int dy = 0;
+        if (!st.left_offset.is_auto) {
+            dx = resolve_h(st.left_offset, parent_w);
+        } else if (!st.right_offset.is_auto) {
+            dx = -resolve_h(st.right_offset, parent_w);
+        }
+        if (!st.top.is_auto) {
+            dy = resolve_v(st.top, parent_h);
+        } else if (!st.bottom.is_auto) {
+            dy = -resolve_v(st.bottom, parent_h);
+        }
+        box.border_box.origin.col += dx;
+        box.border_box.origin.row += dy;
+        box.content_box.origin.col += dx;
+        box.content_box.origin.row += dy;
+    } else if (st.position == style::Position::Absolute) {
+        if (!st.left_offset.is_auto) {
+            const int x = parent_content_origin.col + resolve_h(st.left_offset, parent_w);
+            const int dx = x - box.border_box.origin.col;
+            box.border_box.origin.col += dx;
+            box.content_box.origin.col += dx;
+        } else if (!st.right_offset.is_auto) {
+            const int x = parent_content_origin.col + parent_w -
+                          resolve_h(st.right_offset, parent_w) - box.border_box.size.cols;
+            const int dx = x - box.border_box.origin.col;
+            box.border_box.origin.col += dx;
+            box.content_box.origin.col += dx;
+        }
+        if (!st.top.is_auto) {
+            const int y = parent_content_origin.row + resolve_v(st.top, parent_h);
+            const int dy = y - box.border_box.origin.row;
+            box.border_box.origin.row += dy;
+            box.content_box.origin.row += dy;
+        } else if (!st.bottom.is_auto) {
+            const int y = parent_content_origin.row + parent_h -
+                          resolve_v(st.bottom, parent_h) - box.border_box.size.rows;
+            const int dy = y - box.border_box.origin.row;
+            box.border_box.origin.row += dy;
+            box.content_box.origin.row += dy;
+        }
+    }
+    for (auto& child : box.children) {
+        apply_position_offsets(child, box.content_box.origin, box.content_box.size.cols,
+                               box.content_box.size.rows);
+    }
+}
+
 Box layout(const style::StyledNode& root, Viewport vp) {
     Box root_box = layout_block(root, {0, 0}, vp.cols, vp.rows);
-    // Width auto already stretches to the viewport (see layout_block); height
-    // auto shrink-wraps to content, which would leave the rest of a short
-    // page unpainted. Stretch the root box to the full viewport so render
-    // has a background to paint over.
+    apply_position_offsets(root_box, {0, 0}, vp.cols, vp.rows);
     root_box.border_box.size.rows = std::max(root_box.border_box.size.rows, vp.rows);
     return root_box;
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+const Box* hit_test(const Box& root, Point pt) {
+    if (!root.border_box.contains(pt)) {
+        return nullptr;
+    }
+    for (auto it = root.children.rbegin(); it != root.children.rend(); ++it) {
+        const Box* found = hit_test(*it, pt);
+        if (found != nullptr) {
+            return found;
+        }
+    }
+    return &root;
 }
 
 }  // namespace tvshow::layout

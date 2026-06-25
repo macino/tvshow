@@ -175,7 +175,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
         return std::nullopt;
     }
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
-    Page page{std::string(action_url), std::move(*doc), std::move(styled_tree), {}};
+    Page page{std::string(action_url), std::move(*doc), std::move(sheets), std::move(styled_tree), {}};
     page.box = layout::layout(*page.tree, vp);
     return page;
 }
@@ -223,17 +223,16 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
     }
 
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
-    Page page{std::string(url), std::move(*doc), std::move(styled_tree), {}};
+    Page page{std::string(url), std::move(*doc), std::move(sheets), std::move(styled_tree), {}};
     page.box = layout::layout(*page.tree, vp);
 
-    // Auto-simplify: when author CSS hides all content (e.g. JS-dependent
-    // pages that render blank), rebuild the style tree with UA stylesheet only.
     if (!fetched.is_error && render::is_mostly_blank(render::render(page.box))) {
         const std::vector<css::Stylesheet> no_author;
         if (auto fallback_tree = style::resolve(page.doc, no_author)) {
             page.tree = std::make_unique<style::StyledNode>(std::move(*fallback_tree));
             page.box = layout::layout(*page.tree, vp);
             page.fallback = true;
+            page.sheets.clear();
         }
     }
 

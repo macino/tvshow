@@ -245,6 +245,9 @@ const css::Stylesheet& ua_stylesheet() {
 
 namespace {
 
+// Thread-local hover state for pseudo-class matching.
+thread_local const std::unordered_set<const dom::Node*>* g_hovered_nodes = nullptr;
+
 bool match_simple(const css::SimpleSel& s, const dom::Node& node) {
     if (node.kind != dom::NodeKind::Element) {
         return false;
@@ -261,7 +264,10 @@ bool match_simple(const css::SimpleSel& s, const dom::Node& node) {
     case css::SimpleSel::Kind::AttrExists:
         return !node.attr(s.value).empty();
     case css::SimpleSel::Kind::PseudoClass:
-        return false;  // :hover/:focus not matchable statically
+        if (s.value == "hover" && g_hovered_nodes != nullptr) {
+            return g_hovered_nodes->count(&node) > 0;
+        }
+        return false;
     }
     return false;
 }
@@ -685,6 +691,22 @@ bool apply_other_props(ComputedStyle& style, std::string_view prop, std::string_
         } else {
             style.overflow = Overflow::Visible;
         }
+    } else if (prop == "position") {
+        if (val == "relative") {
+            style.position = Position::Relative;
+        } else if (val == "absolute") {
+            style.position = Position::Absolute;
+        } else {
+            style.position = Position::Static;
+        }
+    } else if (prop == "top") {
+        style.top = parse_length(val);
+    } else if (prop == "bottom") {
+        style.bottom = parse_length(val);
+    } else if (prop == "left") {
+        style.left_offset = parse_length(val);
+    } else if (prop == "right") {
+        style.right_offset = parse_length(val);
     } else {
         return false;
     }
@@ -819,10 +841,12 @@ StyledNode build_node(const dom::Node& node, const ComputedStyle& parent_style,
 }  // namespace
 
 std::optional<StyledNode> resolve(const dom::Document& doc,
-                                  std::span<const css::Stylesheet> author_sheets) {
+                                  std::span<const css::Stylesheet> author_sheets,
+                                  const ResolveOpts& opts) {
     if (!doc.root) {
         return std::nullopt;
     }
+    g_hovered_nodes = opts.hovered;
     std::vector<const css::Stylesheet*> sheets;
     sheets.reserve(author_sheets.size());
     for (const auto& s : author_sheets) {
@@ -830,7 +854,9 @@ std::optional<StyledNode> resolve(const dom::Document& doc,
     }
     std::vector<const dom::Node*> ancestor_stack;
     const ComputedStyle root_initial{};
-    return build_node(*doc.root, root_initial, sheets, ancestor_stack);
+    auto result = build_node(*doc.root, root_initial, sheets, ancestor_stack);
+    g_hovered_nodes = nullptr;
+    return result;
 }
 
 }  // namespace tvshow::style

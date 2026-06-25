@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -493,6 +495,18 @@ bool is_mostly_blank(const CharGrid& grid) noexcept {
 
 namespace {
 
+void put_debug_str(CharGrid& grid, int col, int row, std::string_view s) {
+    constexpr ColorAttr k_dim{0xCC44CCU, 0x000000U};
+    int c = col;
+    for (char ch : s) {
+        if (c >= 0 && c < grid.cols() && row >= 0 && row < grid.rows()) {
+            const auto bg = grid.at({c, row}).attr.bg;
+            grid.put({c, row}, static_cast<char32_t>(ch), {k_dim.fg, bg});
+        }
+        ++c;
+    }
+}
+
 void draw_box_outline(CharGrid& grid, const layout::Box& box) {
     const Rect& r = box.border_box;
     if (r.size.cols < 1 || r.size.rows < 1) { return; }
@@ -518,18 +532,27 @@ void draw_box_outline(CharGrid& grid, const layout::Box& box) {
         return;
     }
 
-    safe_put(c0, r0, U'┌');  // ┌
-    safe_put(c1, r0, U'┐');  // ┐
-    safe_put(c0, r1, U'└');  // └
-    safe_put(c1, r1, U'┘');  // ┘
+    safe_put(c0, r0, U'┌');
+    safe_put(c1, r0, U'┐');
+    safe_put(c0, r1, U'└');
+    safe_put(c1, r1, U'┘');
 
     for (int c = c0 + 1; c < c1; ++c) {
-        safe_put(c, r0, U'─');  // ─
+        safe_put(c, r0, U'─');
         safe_put(c, r1, U'─');
     }
     for (int row = r0 + 1; row < r1; ++row) {
-        safe_put(c0, row, U'│');  // │
+        safe_put(c0, row, U'│');
         safe_put(c1, row, U'│');
+    }
+
+    // Paint WxH dimension label inside the box, top-right.
+    char dim_buf[24];
+    std::snprintf(dim_buf, sizeof(dim_buf), "%dx%d", r.size.cols, r.size.rows);
+    const int label_len = static_cast<int>(std::strlen(dim_buf));
+    const int label_col = c1 - label_len;
+    if (label_col > c0 && r.size.rows >= 2) {
+        put_debug_str(grid, label_col, r0, dim_buf);
     }
 
     for (const auto& child : box.children) {

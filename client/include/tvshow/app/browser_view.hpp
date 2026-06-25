@@ -19,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -149,6 +150,12 @@ private:
     void navigate_to_hit(int dir);  // +1 = next, -1 = prev
 
     bool debug_overlay_ = false;  // Ctrl-D toggles box-outline overlay
+
+    // Hover state: the DOM node currently under the mouse, plus its ancestors.
+    const dom::Node* hovered_node_ = nullptr;
+    std::unordered_set<const dom::Node*> hovered_set_;
+    void update_hover(Point content_pt);
+    void restyle_for_hover();
 };
 
 }  // namespace tvshow::app

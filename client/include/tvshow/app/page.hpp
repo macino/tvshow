@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tvshow/css/types.hpp"
 #include "tvshow/dom/node.hpp"
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/types.hpp"
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace tvshow::app {
 
@@ -25,9 +27,9 @@ namespace tvshow::app {
 struct Page {
     std::string url;
     dom::Document doc;
+    std::vector<css::Stylesheet> sheets;
     std::unique_ptr<style::StyledNode> tree;
     layout::Box box;
-    // True when author CSS was skipped because the initial render was blank.
     bool fallback = false;
 };
 

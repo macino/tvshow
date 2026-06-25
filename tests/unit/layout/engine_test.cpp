@@ -166,3 +166,77 @@ TEST_CASE("layout: block child positioned inside parent content box") {
     CHECK(div->border_box.origin.col == body->content_box.origin.col);
     CHECK(div->border_box.origin.row == body->content_box.origin.row);
 }
+
+// ── table column alignment ──────────────────────────────────────────────────
+
+// NOLINTNEXTLINE(misc-no-recursion)
+static std::vector<const Box*> find_all_boxes(const Box& root, std::string_view tag) {
+    std::vector<const Box*> out;
+    if (root.node != nullptr && root.node->node != nullptr && root.node->node->tag == tag) {
+        out.push_back(&root);
+    }
+    for (const auto& child : root.children) {
+        auto sub = find_all_boxes(child, tag);
+        out.insert(out.end(), sub.begin(), sub.end());
+    }
+    return out;
+}
+
+TEST_CASE("layout: table cells align to max column width across rows") {
+    auto [doc, tree] = make_tree(
+        "<body><table>"
+        "<tr><td>Hello</td><td>Hi</td></tr>"
+        "<tr><td>X</td><td>World!</td></tr>"
+        "</table></body>");
+    const Box root = layout(tree, {80, 24});
+
+    // gumbo auto-inserts <tbody>, so find rows by tag.
+    const auto rows = find_all_boxes(root, "tr");
+    REQUIRE(rows.size() >= 2);
+    REQUIRE(rows[0]->children.size() >= 2);
+    REQUIRE(rows[1]->children.size() >= 2);
+
+    // Cell widths should match across rows (same column = same width).
+    CHECK(rows[0]->children[0].border_box.size.cols == rows[1]->children[0].border_box.size.cols);
+    CHECK(rows[0]->children[1].border_box.size.cols == rows[1]->children[1].border_box.size.cols);
+}
+
+// ── position: relative ──────────────────────────────────────────────────────
+
+TEST_CASE("layout: position:relative offsets box from normal-flow position") {
+    auto [doc, tree] = make_tree("<body><div></div></body>",
+                                 "div { position: relative; left: 16px; top: 16px; }");
+    const Box root = layout(tree, {80, 24});
+    const auto* div = find_box(root, "div");
+    REQUIRE(div != nullptr);
+    CHECK(div->border_box.origin.col == 2);  // 16px / 8 = 2 cols
+    CHECK(div->border_box.origin.row == 1);  // 16px / 16 = 1 row
+}
+
+TEST_CASE("layout: position:relative with right/bottom offsets in negative direction") {
+    auto [doc, tree] = make_tree(
+        "<body><div style='padding-top: 32px; padding-left: 16px;'>"
+        "<p>x</p></div></body>",
+        "p { position: relative; right: 8px; bottom: 16px; }");
+    const Box root = layout(tree, {80, 24});
+    const auto* p = find_box(root, "p");
+    REQUIRE(p != nullptr);
+    CHECK(p->border_box.origin.col == 1);  // 16px pad / 8 = col 2, minus right 8px/8 = 1 → col 1
+    CHECK(p->border_box.origin.row == 1);  // 32px pad / 16 = row 2, minus bottom 16px/16 = 1 → row 1
+}
+
+// ── position: absolute ──────────────────────────────────────────────────────
+
+TEST_CASE("layout: position:absolute places box relative to parent content origin") {
+    auto [doc, tree] = make_tree(
+        "<body><div style='position: relative; padding: 16px;'>"
+        "<p>x</p></div></body>",
+        "p { position: absolute; left: 8px; top: 16px; }");
+    const Box root = layout(tree, {80, 24});
+    const auto* div = find_box(root, "div");
+    const auto* p = find_box(root, "p");
+    REQUIRE(div != nullptr);
+    REQUIRE(p != nullptr);
+    CHECK(p->border_box.origin.col == div->content_box.origin.col + 1);  // left: 8px = 1ch
+    CHECK(p->border_box.origin.row == div->content_box.origin.row + 1);  // top: 16px = 1row
+}

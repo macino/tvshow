@@ -460,6 +460,27 @@ TEST_CASE("render: apply_debug_overlay draws corners on a multi-row box") {
     CHECK(grid.at({0, 0}).attr.fg == 0xFF00FFU);  // magenta
 }
 
+TEST_CASE("render: apply_debug_overlay paints WxH label inside multi-row box") {
+    CharGrid grid(20, 5);
+    const tvshow::render::ColorAttr plain{0xFFFFFFU, 0x000000U};
+    for (int r = 0; r < 5; ++r) {
+        for (int c = 0; c < 20; ++c) {
+            grid.put({c, r}, U' ', plain);
+        }
+    }
+
+    Box root;
+    root.border_box = {{0, 0}, {20, 5}};
+
+    tvshow::render::apply_debug_overlay(grid, root);
+
+    // "20x5" label at top-right inside the box: cols 15..18 on row 0
+    CHECK(grid.at({15, 0}).cp == U'2');
+    CHECK(grid.at({16, 0}).cp == U'0');
+    CHECK(grid.at({17, 0}).cp == U'x');
+    CHECK(grid.at({18, 0}).cp == U'5');
+}
+
 TEST_CASE("render: apply_debug_overlay single-row box uses bracket markers") {
     CharGrid grid(5, 1);
     const tvshow::render::ColorAttr plain{0xFFFFFFU, 0x000000U};

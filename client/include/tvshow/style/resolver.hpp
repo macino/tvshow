@@ -8,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <unordered_set>
 
 namespace tvshow::style {
 
@@ -20,11 +21,17 @@ namespace tvshow::style {
 // The built-in UA default stylesheet. Parsed once; returns a stable reference.
 [[nodiscard]] const css::Stylesheet& ua_stylesheet();
 
+// Dynamic pseudo-class state for style resolution.
+struct ResolveOpts {
+    const std::unordered_set<const dom::Node*>* hovered = nullptr;
+};
+
 // Resolve computed styles for the entire DOM tree.
 // author_sheets: in cascade order (index 0 = lowest priority, last = highest).
 // Returns a StyledNode tree rooted at doc.root (the <html> element).
 // Returns std::nullopt only if doc.root is null.
 [[nodiscard]] std::optional<StyledNode> resolve(const dom::Document& doc,
-                                                std::span<const css::Stylesheet> author_sheets);
+                                                std::span<const css::Stylesheet> author_sheets,
+                                                const ResolveOpts& opts = {});
 
 }  // namespace tvshow::style

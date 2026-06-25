@@ -7,10 +7,13 @@
 #define Uses_TInputLine
 #define Uses_TKeys
 #define Uses_TListViewer
+#define Uses_TFrame
 #define Uses_TScrollBar
+#define Uses_TWindow
 #define Uses_TStaticText
 #include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/page.hpp"
+#include "tvshow/layout/box.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/form.hpp"
 #include "tvshow/layout/form_data.hpp"
@@ -19,6 +22,7 @@
 #include "tvshow/paint/paint.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
+#include "tvshow/style/resolver.hpp"
 #include "tvshow/types.hpp"
 #include "tvshow/util/url.hpp"
 
@@ -201,7 +205,7 @@ BrowserView::BrowserView(const TRect& bounds, Page page, SharedBrowsingState* sh
     : TView(bounds), page_(std::move(page)), shared_(shared) {
     growMode = gfGrowHiX | gfGrowHiY;
     options |= ofSelectable | ofFirstClick;
-    eventMask |= evKeyDown | evMouseDown | evMouseWheel;
+    eventMask |= evKeyDown | evMouseDown | evMouseWheel | evMouseMove;
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
     history_.push_back(page_.url);
@@ -328,6 +332,24 @@ void BrowserView::sync_vscroll() {
     const int limit = scroll_limit();
     const int pg = std::max(1, size.y - 1);
     vscroll_->setParams(scroll_row_, 0, limit, pg, 1);
+
+    // Update window title with scroll position indicator.
+    if (owner != nullptr) {
+        const int total = page_.box.border_box.size.rows;
+        if (total > size.y) {
+            const int pct = (total > 0) ? (scroll_row_ * 100 / total) : 0;
+            char title_buf[512];
+            std::snprintf(title_buf, sizeof(title_buf), "%s [%d%%]",
+                          page_.url.c_str(), pct);
+            auto* win = dynamic_cast<TWindow*>(owner);
+            if (win != nullptr) {
+                // Frees old title and allocates new one.
+                delete[] win->title;  // NOLINT
+                win->title = newStr(title_buf);
+                win->frame->drawView();
+            }
+        }
+    }
 }
 
 void BrowserView::scroll_to(int row) {
@@ -695,6 +717,15 @@ bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
 void BrowserView::handleEvent(TEvent& event) {
     TView::handleEvent(event);
 
+    // Mouse move: update hover state.
+    if (event.what == evMouseMove) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        const TPoint local = makeLocal(event.mouse.where);
+        update_hover({local.x, local.y + scroll_row_});
+        clearEvent(event);
+        return;
+    }
+
     // Mouse wheel scroll.
     if (event.what == evMouseWheel) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
@@ -1051,6 +1082,34 @@ void BrowserView::show_bookmarks_dialog() {
     if (res == cmOK && sel >= 0 && sel < n) {
         navigate_to(store.bookmarks()[static_cast<size_t>(sel)].url);
     }
+    drawView();
+}
+
+void BrowserView::update_hover(Point content_pt) {
+    const layout::Box* box = layout::hit_test(page_.box, content_pt);
+    const dom::Node* node = (box != nullptr && box->node != nullptr) ? box->node->node : nullptr;
+    if (node == hovered_node_) {
+        return;
+    }
+    hovered_node_ = node;
+    hovered_set_.clear();
+    if (node != nullptr) {
+        // Build ancestor chain: walk up through the box tree is hard, so
+        // just put the hovered node itself. CSS :hover on ancestors would
+        // need a parent-pointer walk, but for v1 this covers the common case.
+        hovered_set_.insert(node);
+    }
+    restyle_for_hover();
+}
+
+void BrowserView::restyle_for_hover() {
+    const style::ResolveOpts opts{hovered_set_.empty() ? nullptr : &hovered_set_};
+    auto new_tree = style::resolve(page_.doc, page_.sheets, opts);
+    if (!new_tree) {
+        return;
+    }
+    page_.tree = std::make_unique<style::StyledNode>(std::move(*new_tree));
+    relayout();
     drawView();
 }
 

@@ -11,6 +11,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -25,6 +26,8 @@ using tvshow::style::parse_length;
 using tvshow::style::resolve;
 using tvshow::style::StyledNode;
 using tvshow::style::TextDecoration;
+namespace css = tvshow::css;
+namespace style = tvshow::style;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -407,4 +410,64 @@ TEST_CASE("style::resolve: th is bold and flex-grow 1") {
     REQUIRE(th != nullptr);
     CHECK(th->style.font_weight == FontWeight::Bold);
     CHECK(th->style.flex_grow == doctest::Approx(1.0));
+}
+
+// ── position property ────────────────────────────────────────────────────────
+
+TEST_CASE("style::resolve: position:relative is parsed") {
+    const auto doc = make_doc("<body><div>x</div></body>");
+    auto sheet = css::parse("div { position: relative; top: 8px; left: 16px; }");
+    REQUIRE(sheet.has_value());
+    const std::vector<css::Stylesheet> sheets{std::move(*sheet)};
+    const auto tree = resolve(doc, sheets);
+    REQUIRE(tree.has_value());
+    const auto* div = find_tag(*tree, "div");
+    REQUIRE(div != nullptr);
+    CHECK(div->style.position == style::Position::Relative);
+    CHECK(div->style.top.value == doctest::Approx(8.0));
+    CHECK(div->style.left_offset.value == doctest::Approx(16.0));
+}
+
+TEST_CASE("style::resolve: position:absolute is parsed") {
+    const auto doc = make_doc("<body><div>x</div></body>");
+    auto sheet = css::parse("div { position: absolute; right: 8px; bottom: 16px; }");
+    REQUIRE(sheet.has_value());
+    const std::vector<css::Stylesheet> sheets{std::move(*sheet)};
+    const auto tree = resolve(doc, sheets);
+    REQUIRE(tree.has_value());
+    const auto* div = find_tag(*tree, "div");
+    REQUIRE(div != nullptr);
+    CHECK(div->style.position == style::Position::Absolute);
+    CHECK(div->style.right_offset.value == doctest::Approx(8.0));
+    CHECK(div->style.bottom.value == doctest::Approx(16.0));
+}
+
+// ── :hover pseudo-class ──────────────────────────────────────────────────────
+
+TEST_CASE("style::resolve: :hover pseudo-class applies when node is hovered") {
+    const auto doc = make_doc("<body><div>x</div></body>");
+    auto sheet = css::parse("div:hover { color: #ff0000; }");
+    REQUIRE(sheet.has_value());
+    const std::vector<css::Stylesheet> sheets{std::move(*sheet)};
+
+    // Without hover: default color.
+    const auto tree1 = resolve(doc, sheets);
+    REQUIRE(tree1.has_value());
+    const auto* div1 = find_tag(*tree1, "div");
+    REQUIRE(div1 != nullptr);
+    CHECK(div1->style.color.none);
+
+    // With hover on div: red color.
+    const tvshow::dom::Node* div_node = find_tag(*tree1, "div")->node;
+    REQUIRE(div_node != nullptr);
+    std::unordered_set<const tvshow::dom::Node*> hovered{div_node};
+    const style::ResolveOpts opts{&hovered};
+    const auto tree2 = resolve(doc, sheets, opts);
+    REQUIRE(tree2.has_value());
+    const auto* div2 = find_tag(*tree2, "div");
+    REQUIRE(div2 != nullptr);
+    CHECK(!div2->style.color.none);
+    CHECK(div2->style.color.r == 255);
+    CHECK(div2->style.color.g == 0);
+    CHECK(div2->style.color.b == 0);
 }

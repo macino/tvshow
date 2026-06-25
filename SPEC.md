@@ -206,7 +206,7 @@ produce misaligned columns.
 3. `<style>` blocks.
 4. Inline `style="..."`.
 
-Cascade order, specificity, and `!important` follow CSS spec. Katana provides selector ASTs; our matcher implements descendant, child, class, id, tag, attribute existence, `:hover` (Open Q-10), `:focus`.
+Cascade order, specificity, and `!important` follow CSS spec. Katana provides selector ASTs; our matcher implements descendant, child, class, id, tag, attribute existence, `:hover` (M1 — mouse-over hit-test, style recalc on change), `:focus`.
 
 ### 7.2 Honored Properties
 | Group | Properties |
@@ -216,6 +216,7 @@ Cascade order, specificity, and `!important` follow CSS spec. Katana provides se
 | Box | `width`, `height`, `min-width`, `max-width` (px, %, ch), `margin`, `padding`, `border`, `border-style`, `border-color`, `border-width`; individual longhands `border-{top,right,bottom,left}-{style,width,color}` (all 12) |
 | Display | `display: block | inline | inline-block | flex | none` |
 | Flex | `flex-direction`, `justify-content`, `align-items`, `gap` (single value), `flex-grow`, `flex-shrink`, `flex-basis` |
+| Position | `position` (static/relative/absolute), `top`, `right`, `bottom`, `left` (px, %, ch) |
 | Other | `visibility`, `overflow` (visible/hidden/scroll/auto) |
 
 `px`, `%`, `em` (relative to parent font size = 1 cell row by default), `ch` (= 1 column), `rem` (= 1 row).

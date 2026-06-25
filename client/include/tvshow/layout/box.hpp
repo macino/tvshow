@@ -16,4 +16,8 @@ struct Box {
     std::vector<Box> children;
 };
 
+// Hit-test: find the deepest box containing the given point.
+// Returns nullptr if no box contains the point.
+[[nodiscard]] const Box* hit_test(const Box& root, Point pt);
+
 }  // namespace tvshow::layout
