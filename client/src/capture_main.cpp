@@ -5,6 +5,7 @@
 #include "tvshow/render/render.hpp"
 
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <string>
 
@@ -59,6 +60,22 @@ int main(int argc, char* argv[]) {
         std::cout << '\n';
     }
     std::cout << std::string(static_cast<size_t>(cols), '-') << '\n';
+
+    // Color sample — find first non-space cell per row.
+    std::cout << "Color samples:\n";
+    for (int sr = 0; sr < std::min(grid.rows(), 45); ++sr) {
+        for (int sc = 0; sc < grid.cols(); ++sc) {
+            const auto c = grid.at({sc, sr});
+            if (c.cp > U' ') {
+                std::cout << "  row " << sr << " col " << sc << ": bg=#"
+                          << std::hex << std::setfill('0') << std::setw(6) << c.attr.bg
+                          << " fg=#" << std::setw(6) << c.attr.fg
+                          << " cp=U+" << std::setw(4) << static_cast<unsigned>(c.cp)
+                          << std::dec << '\n';
+                break;
+            }
+        }
+    }
 
     // Link inventory
     if (!links.empty()) {

@@ -3,6 +3,8 @@
 #include "tvshow/layout/types.hpp"
 #include "tvshow/net/cpp_http_client.hpp"
 #include "tvshow/net/http_client.hpp"
+#include "tvshow/render/chargrid.hpp"
+#include "tvshow/render/render.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <doctest/doctest.h>
@@ -31,6 +33,32 @@ TEST_CASE("integration: typography page parses and lays out") {
     auto page = load_page(server.base_url() + "/pages/typography.html", Viewport{80, 24});
     REQUIRE(page.has_value());
     CHECK(page->doc.title == "Typography");
+}
+
+TEST_CASE("integration: theme CSS applies different background colors") {
+    const ServerFixture server;
+    auto tv = load_page(server.base_url() + "/pages/themes.html", Viewport{80, 25});
+    auto dk = load_page(server.base_url() + "/pages/themes-dark.html", Viewport{80, 25});
+    auto lt = load_page(server.base_url() + "/pages/themes-light.html", Viewport{80, 25});
+    REQUIRE(tv.has_value());
+    REQUIRE(dk.has_value());
+    REQUIRE(lt.has_value());
+
+    CHECK(tv->sheets.size() >= 1);
+    CHECK(dk->sheets.size() >= 1);
+    CHECK(lt->sheets.size() >= 1);
+
+    const auto grid_tv = tvshow::render::render(tv->box);
+    const auto grid_dk = tvshow::render::render(dk->box);
+    const auto grid_lt = tvshow::render::render(lt->box);
+
+    const auto bg_tv = grid_tv.at({5, 5}).attr.bg;
+    const auto bg_dk = grid_dk.at({5, 5}).attr.bg;
+    const auto bg_lt = grid_lt.at({5, 5}).attr.bg;
+
+    CHECK(bg_tv != bg_dk);
+    CHECK(bg_tv != bg_lt);
+    CHECK(bg_dk != bg_lt);
 }
 
 TEST_CASE("integration: 404 route renders an internal error page") {
