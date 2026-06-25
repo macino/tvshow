@@ -2,7 +2,7 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: **M0 complete**. All v1 features implemented and tested. Remaining open questions (Q-10, Q-20) are explicitly deferred post-v1.
+> Status: **M0 complete**. M1 in progress — navigation UX, hover, debug overlay, image rendering, table columns, CSS position, scroll indicator.
 
 ---
 
@@ -405,7 +405,7 @@ The pipeline is deterministic given (input bytes, viewport size, color depth, te
 
 `util::log` writes to `~/.cache/tvshow/log` by default; `--log-level` flag controls verbosity (debug / info / warn / error). Log module lives in `tvshow_io` (impure). Path `"-"` forces stderr-only output.
 
-Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in magenta over the rendered CharGrid. Applies to every box in the layout tree. Focus order display and box-dimension labels are deferred to a later milestone.
+Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in magenta over the rendered CharGrid. Applies to every box in the layout tree. Focus order display and box-dimension labels are M1 scope (Q-22, M1-debug-overlay).
 
 ---
 
@@ -432,7 +432,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-7 | HTTPS via cpp-httplib + OpenSSL | **Resolved**: already implemented — CPPHTTPLIB_OPENSSL_SUPPORT enabled in cmake/HttpLib.cmake, OpenSSL linked; Url::parse accepts https:// and maps port to 443; httplib::Client auto-selects SSLClient. |
 | Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |
 | Q-9 | Cookies / sessions | **Resolved**: in-memory session CookieJar (RFC 6265 §5 simplified); no persistence, no Secure/SameSite enforcement; per-SharedBrowsingState (shared across tabs). |
-| Q-10 | `:hover` semantics in terminal | Equate to "mouse over" only? Skip? |
+| Q-10 | `:hover` semantics in terminal | **M1**: equate to mouse-over (TV mouse tracking already active). Apply `:hover` styles when mouse enters a box's hit-test area; remove on leave. No keyboard equivalent. |
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
 | Q-12 | Debug overlay (Ctrl-D) detail | **Resolved**: box outlines in magenta (Ctrl-D toggle); focus-order labels and box-dim display deferred. |
 | Q-13 | `<table>` support | **Resolved**: flex-reuse layout in UA stylesheet (ADR 002); no colspan/rowspan. |
@@ -442,7 +442,25 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-17 | tvision pin | **Resolved**: pinned to commit `9a7a6439` in `cmake/Tvision.cmake` via `TVSHOW_TVISION_TAG`. |
 | Q-18 | Image renderer plug interface | Resolved: `ImageRenderer::render(int cols, int rows, std::string_view alt, std::string_view src) → vector<string>`. v1 impl: `AltTextRenderer` (writes `[alt]` in row 0). |
 | Q-19 | Config file location and format | **Resolved**: `~/.config/tvshow/config.toml` (TOML subset); CLI flags override. XDG_CONFIG_HOME respected. |
-| Q-20 | Form `enctype: multipart/form-data` | v1 / later (tied to file upload, which needs a file dialog) |
+| Q-20 | Form `enctype: multipart/form-data` | Deferred (tied to file upload, needs file dialog). |
+| Q-21 | Navigation history UX | **M1**: back/forward stack exists (`navigate_back`/`navigate_forward`). Expose via Alt-Left / Alt-Right keybindings. Show current position in status bar or title. |
+| Q-22 | Debug overlay enrichment | **M1**: extend Ctrl-D overlay with box dimensions (WxH in cells) and focus-order index labels. Deferred from Q-12. |
+| Q-23 | `<img>` ASCII-art renderer | **M1**: add `BrailleRenderer` (or similar) behind `ImageRenderer` interface. Fetch image bytes, quantize to braille dots. Config chooses renderer (`alt` default, `braille` opt-in). |
+| Q-24 | Table column alignment | **M1**: compute max column widths across all rows; distribute evenly or proportionally. Replace current flex-reuse sizing which misaligns on unequal cell counts. |
+| Q-25 | CSS `position: relative/absolute` | **M1**: add `position` property to §7.2. `relative` offsets from normal-flow position. `absolute` positions relative to nearest positioned ancestor. `top`, `left`, `right`, `bottom` in px/ch/%. |
+| Q-26 | Scroll position indicator | **M1**: vertical scroll indicator in right gutter or status bar showing current viewport position (e.g. `[42%]` or `[12/87]`). |
+
+### 20.1 Milestone 1 (M1) Scope
+
+| ID | Feature | Scope | Depends on |
+|----|---------|-------|------------|
+| M1-nav-history | Navigation back/forward UX | Keybindings (Alt-Left/Right), status bar position indicator | Q-21 |
+| M1-hover | `:hover` pseudo-class | Mouse-over hit-test → style recalc → repaint | Q-10 |
+| M1-debug-overlay | Debug overlay enrichment | Box dimensions + focus-order labels in Ctrl-D overlay | Q-22 |
+| M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` impl behind `ImageRenderer` interface | Q-23 |
+| M1-table-cols | Table column alignment | Cross-row max-width column sizing | Q-24 |
+| M1-css-position | CSS `position: relative/absolute` | New layout pass for positioned elements; `top/left/right/bottom` | Q-25 |
+| M1-scroll-indicator | Scroll position indicator | Viewport position in gutter or status bar | Q-26 |
 
 ---
 
