@@ -121,6 +121,30 @@ cap "tvshow-tabs" "$SHOTS/tabs.png" 3
 kclose "$S"; sleep 0.5
 
 # ════════════════════════════════════════════════════════════════════
+# M1 feature screenshots
+# ════════════════════════════════════════════════════════════════════
+
+echo ""
+echo "=== M1 features ==="
+
+# tables — column alignment demo
+shot "tables" "$BASE/pages/tables.html" "$SHOTS/tables.png"
+
+# position — relative/absolute positioning
+shot "position" "$BASE/pages/position.html" "$SHOTS/position.png"
+
+# hover — static shot (hover needs mouse interaction, capture at rest)
+shot "hover" "$BASE/pages/hover.html" "$SHOTS/hover.png"
+
+# debug overlay — Ctrl-D on elements page
+echo "$SHOTS/debug-overlay.png"
+S=/tmp/tvshow-ss-dbgovl-$$.sock
+open_kitty "$S" "tvshow-dbgovl" "$CLIENT" "$BASE/pages/debug/elements.html"
+sleep 3; kkey "$S" ctrl+d
+cap "tvshow-dbgovl" "$SHOTS/debug-overlay.png" 1
+kclose "$S"; sleep 0.5
+
+# ════════════════════════════════════════════════════════════════════
 # BUG screenshots — inline control overlap
 # ════════════════════════════════════════════════════════════════════
 

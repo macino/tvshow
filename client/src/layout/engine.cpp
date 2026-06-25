@@ -249,7 +249,11 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     const std::vector<int>* prev_col_widths = g_table_col_widths;
     if (is_table) {
         table_cols = compute_table_col_widths(sn, content_w);
+        // table_cols outlives all recursive layout calls below; restored before return.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdangling-pointer"
         g_table_col_widths = &table_cols;
+#pragma GCC diagnostic pop
     }
 
     // Lay out block-level children.

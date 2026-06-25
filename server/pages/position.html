@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+<title>Position</title>
+<style>
+body { padding: 8px; }
+.container {
+  position: relative;
+  border: solid;
+  padding: 16px;
+  margin-bottom: 16px;
+  min-width: 40ch;
+}
+.badge {
+  position: absolute;
+  right: 8px;
+  top: 0;
+  color: #ff0000;
+}
+.shifted {
+  position: relative;
+  left: 16px;
+  top: 16px;
+  border: dashed;
+  padding: 8px;
+}
+.overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background-color: #333300;
+  color: #ffff00;
+}
+</style>
+</head>
+<body>
+<h1>CSS Position</h1>
+
+<h2>Relative offset</h2>
+<p>Normal paragraph before the shifted element.</p>
+<div class="shifted">This div is shifted right 2 cols and down 1 row from its normal position.</div>
+
+<h2>Absolute positioning</h2>
+<div class="container">
+  <p>This container has position:relative. The badge is position:absolute at top-right.</p>
+  <span class="badge">[NEW]</span>
+</div>
+
+<div class="container">
+  <p>Another container with an absolute overlay at top-left.</p>
+  <div class="overlay">OVERLAY</div>
+</div>
+</body>
+</html>

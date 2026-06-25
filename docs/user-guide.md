@@ -128,9 +128,13 @@ Press **Enter** on a submit button (or an `input type="submit"`) to submit the f
 
 ---
 
+## Hover
+
+`:hover` CSS styles are supported. Move the mouse over elements to see hover effects (background changes, color changes, border highlights). The browser re-resolves styles and repaints on each hover change.
+
 ## Images
 
-tvshow v1 does not render images. An `<img>` tag shows `[alt text]` in the space reserved by the `width`/`height` attributes. The reserved space matches the dimensions a future ASCII-art renderer would use.
+An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `width`/`height` attributes. A braille-dot renderer is available for rendering actual image content as Unicode braille patterns (U+2800..U+28FF) when image data is pre-fetched.
 
 ---
 
@@ -164,6 +168,10 @@ tvshow v1 does not render images. An `<img>` tag shows `[alt text]` in the space
 | ↑ / ↓ | Scroll one row |
 | PgUp / PgDn | Scroll one page |
 | Home / End | Top / bottom of page |
+| Ctrl-D | Toggle debug overlay (box outlines + dimensions) |
+| Ctrl-F | Find in page |
+| Ctrl-B | Bookmarks |
+| Ctrl-C | Copy focused link URL |
 | Alt-X | Quit |
 
 ---
@@ -178,10 +186,20 @@ Logs are written to `~/.cache/tvshow/log`. Use `--log-level debug` for verbose o
 
 ---
 
-## Known limitations (v1)
+## Scroll indicator
+
+When a page is taller than the viewport, the window title shows the current scroll position as a percentage (e.g. `[42%]`).
+
+## Debug overlay
+
+Press **Ctrl-D** to toggle box outlines drawn in magenta over the rendered page. Each box shows its dimensions (WxH in cells) at the top-right corner.
+
+---
+
+## Known limitations
 
 - No JavaScript.
 - Session cookies only (not persisted across restarts).
-- Images show `[alt]` text only.
-- Tables are rendered as block containers (no column alignment).
+- Images default to `[alt]` text (braille renderer requires pre-fetched image data).
 - No text selection; Ctrl-C copies the focused link URL only.
+- `:hover` applies to the directly hovered element only (not ancestors).

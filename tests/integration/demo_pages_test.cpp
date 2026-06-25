@@ -23,7 +23,7 @@ TEST_CASE("integration: landing page lists sample pages") {
     REQUIRE(page.has_value());
     CHECK(page->doc.title == "tvshow demo server");
     const auto links = collect_links(page->box);
-    CHECK(links.size() == 5);
+    CHECK(links.size() == 8);
 }
 
 TEST_CASE("integration: typography page parses and lays out") {
