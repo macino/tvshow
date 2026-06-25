@@ -213,7 +213,7 @@ Cascade order, specificity, and `!important` follow CSS spec. Katana provides se
 |-------|-----------|
 | Color | `color`, `background-color`, `background` (color shorthand only) |
 | Text | `font-weight` (normal/bold), `font-style` (normal/italic), `text-decoration` (none/underline), `text-align` (left/right/center), `white-space` (normal/pre/nowrap) |
-| Box | `width`, `height`, `min-width`, `max-width` (px, %, ch), `margin`, `padding`, `border`, `border-style`, `border-color`, `border-width` |
+| Box | `width`, `height`, `min-width`, `max-width` (px, %, ch), `margin`, `padding`, `border`, `border-style`, `border-color`, `border-width`; individual longhands `border-{top,right,bottom,left}-{style,width,color}` (all 12) |
 | Display | `display: block | inline | inline-block | flex | none` |
 | Flex | `flex-direction`, `justify-content`, `align-items`, `gap` (single value), `flex-grow`, `flex-shrink`, `flex-basis` |
 | Other | `visibility`, `overflow` (visible/hidden/scroll/auto) |
@@ -277,6 +277,8 @@ Standard CSS block flow. Block boxes stack vertically; inline boxes flow horizon
 ### 10.2 Inline Formatting Context
 Line boxes built greedily. `white-space: pre` preserves newlines and runs of spaces. `white-space: nowrap` disables wrapping — overflow handled per `overflow` property.
 
+Inline-display form controls (`input`, `button`, `select`) participate in the inline flow as unbreakable atoms of their widget width (`form_control_size().cols`). The word-break algorithm treats each control as a single non-space word; line wrapping and text-alignment apply to it exactly as to any word token. The control's grid position is derived from the line-break result — not from a separate block-child placement pass — so label text and widget cannot overlap.
+
 ### 10.3 Flex
 v1 supports `flex-direction: row | column`, `justify-content: flex-start | flex-end | center | space-between | space-around`, `align-items: flex-start | flex-end | center | stretch`, `gap`, `flex-grow`, `flex-shrink`, `flex-basis`. No wrapping (`flex-wrap: nowrap` only). Overflow truncates at the viewport edge (Q-3 resolved).
 
@@ -299,6 +301,8 @@ Viewport = inner content area of the active `TBrowserWindow` (after subtracting 
 
 ### 11.3 Browser Window (Tab)
 `TBrowserWindow : TWindow` is one tab. Per-window state: current URL, document, history stack, scroll offset, focused element id. Multiple `TBrowserWindow` instances live in the desktop as MDI children.
+
+New windows open with a cascade offset so they are not fully obscured: each successive window shifts +2 cols and +1 row from the previous. The offset counter wraps when it would push the window off-screen.
 
 ### 11.4 Address Bar
 Default: modal `TInputDialog` opened via Ctrl-L. `--address-bar=persistent` switches to a permanent one-row `TInputLine` at the top of each browser window, shrinking the content viewport by one row. Both modes accept a URL, validate it via `Url::parse`, and trigger navigation. (Q-1 resolved.)
