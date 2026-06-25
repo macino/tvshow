@@ -84,7 +84,7 @@ These tags are parsed but their rendering is degraded:
 
 | Tag | Fallback |
 |-----|---------|
-| `<table>`, `<tr>`, `<td>`, `<th>` | Children rendered as block `div` (no column alignment) |
+| `<table>`, `<tr>`, `<td>`, `<th>` | Rendered via flex layout with cross-row column alignment |
 | `<script>` | Entirely ignored |
 | `<iframe>`, `<video>`, `<audio>`, `<canvas>`, `<svg>` | Entirely ignored |
 
@@ -113,7 +113,7 @@ Specificity and `!important` follow the CSS spec.
 | Descendant | `nav a`, `div p` |
 | Child | `ul > li` |
 | Attribute existence | `input[required]` |
-| Pseudo-class | `:focus` (applied to focused links and controls) |
+| Pseudo-class | `:focus` (focused links/controls), `:hover` (mouse-over) |
 
 ### Honored properties
 
@@ -157,6 +157,8 @@ Alpha is discarded in v1. Colors are mapped to truecolor, 256-color, or 16-color
 | Property | Values |
 |----------|--------|
 | `display` | `block`, `inline`, `inline-block`, `flex`, `none` |
+| `position` | `static`, `relative`, `absolute` |
+| `top`, `right`, `bottom`, `left` | `px`, `%`, `ch` (used with `relative`/`absolute`) |
 | `visibility` | `visible`, `hidden` |
 | `overflow` | `visible`, `hidden`, `scroll`, `auto` |
 | `flex-direction` | `row`, `column` |
@@ -294,3 +296,72 @@ Flex row layout:
 tvshow follows HTTP redirects (`301`, `302`, `303`, `307`, `308`) up to 5 hops. Error responses (`4xx`, `5xx`) are displayed as built-in error pages.
 
 Character encoding: UTF-8 is assumed if not specified in `Content-Type` or a `<meta charset>` tag.
+
+---
+
+## Themes
+
+tvshow ships three CSS themes optimized for terminal rendering. Link one from the demo server or copy it into your own project:
+
+```html
+<link rel="stylesheet" href="/styles/tvision.css">
+<!-- or: dark.css, light.css -->
+```
+
+| Theme | Look |
+|-------|------|
+| `tvision` | Classic TurboVision — cyan/yellow on dark blue, double borders |
+| `dark` | Modern dark — white on near-black, subtle borders |
+| `light` | Light — dark text on white/grey, clean borders |
+
+### Provided CSS classes
+
+All three themes share the same class names:
+
+**Layout:** `.row`, `.col`, `.grow`, `.center`, `.right`
+
+**Components:**
+| Class | Purpose |
+|-------|---------|
+| `.panel`, `.card` | Bordered container with padding |
+| `.panel-title`, `.card-title` | Bold heading inside a panel/card |
+| `.btn` | Default button |
+| `.btn-primary` | Primary action button |
+| `.btn-danger` | Destructive action button |
+| `.nav` | Horizontal flex nav bar with bottom border |
+| `.alert` | Bordered message box |
+| `.alert-info`, `.alert-success`, `.alert-warning`, `.alert-error` | Colored alert variants |
+| `.form-group` | Block wrapper for form field + label |
+| `.form-label` | Bold label above a form control |
+| `.muted` | Dim secondary text |
+| `.bold` | Bold text |
+
+**Example — dashboard with tvision theme:**
+
+```html
+<!doctype html>
+<html>
+<head>
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="/styles/tvision.css">
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Home</a>
+    <a href="/status">Status</a>
+  </div>
+  <h1>Dashboard</h1>
+  <div class="alert alert-success">All systems operational.</div>
+  <div class="row">
+    <div class="card grow">
+      <p class="card-title">CPU</p>
+      <p>42%</p>
+    </div>
+    <div class="card grow">
+      <p class="card-title">Memory</p>
+      <p>2.1G / 8G</p>
+    </div>
+  </div>
+</body>
+</html>
+```

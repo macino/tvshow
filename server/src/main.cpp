@@ -96,6 +96,22 @@ auto main(int argc, char** argv) -> int {
                 serve_page(res, pages_dir + "/" + rel + ".html");
             });
 
+    // Serve CSS stylesheets from pages/styles/.
+    svr.Get(R"(/styles/([\w][\w\-]*)\.css)",
+            [pages_dir](const httplib::Request& req, httplib::Response& res) {
+                const std::string rel = req.matches[1].str();
+                if (rel.find("..") != std::string::npos) {
+                    res.status = 400;
+                    return;
+                }
+                const std::string body = read_file(pages_dir + "/styles/" + rel + ".css");
+                if (body.empty()) {
+                    res.status = 404;
+                    return;
+                }
+                res.set_content(body, "text/css");
+            });
+
     svr.Get("/pages/errors/404", [](const httplib::Request&, httplib::Response& res) {
         res.status = 404;
         res.set_content("<!doctype html><html><body><h1>404 Not Found</h1>"

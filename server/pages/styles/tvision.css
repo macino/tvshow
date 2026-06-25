@@ -1,0 +1,152 @@
+/* tvshow theme: tvision
+ * Classic TurboVision look — cyan/yellow on dark blue, double borders.
+ * Usage: <link rel="stylesheet" href="/styles/tvision.css">
+ */
+
+/* ── base ──────────────────────────────────────────────────────── */
+body {
+  color: #ffff55;
+  background-color: #000080;
+  padding: 8px;
+}
+
+/* ── headings ──────────────────────────────────────────────────── */
+h1 { color: #55ffff; }
+h2 { color: #55ffff; }
+h3 { color: #55ffff; }
+
+/* ── links ─────────────────────────────────────────────────────── */
+a { color: #55ff55; }
+a:hover { color: #ffff55; background-color: #008000; }
+
+/* ── panels / cards ────────────────────────────────────────────── */
+.panel, .card {
+  border: double;
+  border-color: #55ffff;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #000055;
+}
+
+.panel-title, .card-title {
+  font-weight: bold;
+  color: #55ffff;
+}
+
+/* ── buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border: solid;
+  border-color: #aaaaaa;
+  padding: 8px;
+  color: #000000;
+  background-color: #aaaaaa;
+}
+.btn:hover {
+  background-color: #55ffff;
+  color: #000000;
+}
+
+.btn-primary {
+  background-color: #55ffff;
+  border-color: #55ffff;
+  color: #000080;
+}
+.btn-primary:hover {
+  background-color: #ffffff;
+}
+
+.btn-danger {
+  background-color: #ff5555;
+  border-color: #ff5555;
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background-color: #ff0000;
+}
+
+/* ── tables ────────────────────────────────────────────────────── */
+table {
+  border-color: #55ffff;
+}
+th {
+  background-color: #000055;
+  color: #55ffff;
+  font-weight: bold;
+}
+td {
+  color: #ffff55;
+}
+
+/* ── alerts / status ───────────────────────────────────────────── */
+.alert {
+  border: solid;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.alert-info {
+  border-color: #55ffff;
+  color: #55ffff;
+  background-color: #000044;
+}
+.alert-success {
+  border-color: #55ff55;
+  color: #55ff55;
+  background-color: #003300;
+}
+.alert-warning {
+  border-color: #ffff55;
+  color: #ffff55;
+  background-color: #333300;
+}
+.alert-error {
+  border-color: #ff5555;
+  color: #ff5555;
+  background-color: #330000;
+}
+
+/* ── nav ───────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  border-bottom: solid;
+  border-color: #55ffff;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* ── layout helpers ────────────────────────────────────────────── */
+.row { display: flex; flex-direction: row; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex-grow: 1; }
+.center { text-align: center; }
+.right { text-align: right; }
+.muted { color: #888888; }
+.bold { font-weight: bold; }
+
+/* ── hr ────────────────────────────────────────────────────────── */
+hr {
+  border-color: #55ffff;
+}
+
+/* ── code / pre ────────────────────────────────────────────────── */
+code { color: #55ff55; }
+pre {
+  border: solid;
+  border-color: #555555;
+  padding: 8px;
+  background-color: #000033;
+}
+
+/* ── form styling ──────────────────────────────────────────────── */
+.form-group {
+  display: block;
+  margin-bottom: 8px;
+}
+.form-label {
+  display: block;
+  color: #55ffff;
+  font-weight: bold;
+  margin-bottom: 4px;
+}

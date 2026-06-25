@@ -1,0 +1,152 @@
+/* tvshow theme: dark
+ * Modern dark theme — white on near-black, subtle borders.
+ * Usage: <link rel="stylesheet" href="/styles/dark.css">
+ */
+
+/* ── base ──────────────────────────────────────────────────────── */
+body {
+  color: #cccccc;
+  background-color: #1a1a1a;
+  padding: 8px;
+}
+
+/* ── headings ──────────────────────────────────────────────────── */
+h1 { color: #ffffff; }
+h2 { color: #dddddd; }
+h3 { color: #bbbbbb; }
+
+/* ── links ─────────────────────────────────────────────────────── */
+a { color: #6699ff; }
+a:hover { color: #99bbff; background-color: #333355; }
+
+/* ── panels / cards ────────────────────────────────────────────── */
+.panel, .card {
+  border: solid;
+  border-color: #444444;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #222222;
+}
+
+.panel-title, .card-title {
+  font-weight: bold;
+  color: #ffffff;
+}
+
+/* ── buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border: solid;
+  border-color: #555555;
+  padding: 8px;
+  color: #cccccc;
+  background-color: #333333;
+}
+.btn:hover {
+  background-color: #444444;
+  color: #ffffff;
+}
+
+.btn-primary {
+  background-color: #2255aa;
+  border-color: #2255aa;
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: #3366cc;
+}
+
+.btn-danger {
+  background-color: #aa2222;
+  border-color: #aa2222;
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background-color: #cc3333;
+}
+
+/* ── tables ────────────────────────────────────────────────────── */
+table {
+  border-color: #444444;
+}
+th {
+  background-color: #2a2a2a;
+  color: #ffffff;
+  font-weight: bold;
+}
+td {
+  color: #cccccc;
+}
+
+/* ── alerts / status ───────────────────────────────────────────── */
+.alert {
+  border: solid;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.alert-info {
+  border-color: #336699;
+  color: #6699cc;
+  background-color: #1a2a3a;
+}
+.alert-success {
+  border-color: #338833;
+  color: #66cc66;
+  background-color: #1a2a1a;
+}
+.alert-warning {
+  border-color: #998833;
+  color: #cccc66;
+  background-color: #2a2a1a;
+}
+.alert-error {
+  border-color: #993333;
+  color: #cc6666;
+  background-color: #2a1a1a;
+}
+
+/* ── nav ───────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  border-bottom: solid;
+  border-color: #444444;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* ── layout helpers ────────────────────────────────────────────── */
+.row { display: flex; flex-direction: row; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex-grow: 1; }
+.center { text-align: center; }
+.right { text-align: right; }
+.muted { color: #666666; }
+.bold { font-weight: bold; }
+
+/* ── hr ────────────────────────────────────────────────────────── */
+hr {
+  border-color: #444444;
+}
+
+/* ── code / pre ────────────────────────────────────────────────── */
+code { color: #66cc66; }
+pre {
+  border: solid;
+  border-color: #333333;
+  padding: 8px;
+  background-color: #111111;
+}
+
+/* ── form styling ──────────────────────────────────────────────── */
+.form-group {
+  display: block;
+  margin-bottom: 8px;
+}
+.form-label {
+  display: block;
+  color: #aaaaaa;
+  font-weight: bold;
+  margin-bottom: 4px;
+}

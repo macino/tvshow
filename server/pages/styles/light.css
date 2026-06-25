@@ -1,0 +1,152 @@
+/* tvshow theme: light
+ * Light terminal theme — dark text on white/grey, clean borders.
+ * Usage: <link rel="stylesheet" href="/styles/light.css">
+ */
+
+/* ── base ──────────────────────────────────────────────────────── */
+body {
+  color: #222222;
+  background-color: #eeeeee;
+  padding: 8px;
+}
+
+/* ── headings ──────────────────────────────────────────────────── */
+h1 { color: #111111; }
+h2 { color: #222222; }
+h3 { color: #333333; }
+
+/* ── links ─────────────────────────────────────────────────────── */
+a { color: #0055aa; }
+a:hover { color: #003377; background-color: #ccddee; }
+
+/* ── panels / cards ────────────────────────────────────────────── */
+.panel, .card {
+  border: solid;
+  border-color: #aaaaaa;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #ffffff;
+}
+
+.panel-title, .card-title {
+  font-weight: bold;
+  color: #111111;
+}
+
+/* ── buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border: solid;
+  border-color: #999999;
+  padding: 8px;
+  color: #222222;
+  background-color: #dddddd;
+}
+.btn:hover {
+  background-color: #cccccc;
+  color: #000000;
+}
+
+.btn-primary {
+  background-color: #0055aa;
+  border-color: #0055aa;
+  color: #ffffff;
+}
+.btn-primary:hover {
+  background-color: #004488;
+}
+
+.btn-danger {
+  background-color: #cc2222;
+  border-color: #cc2222;
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background-color: #aa1111;
+}
+
+/* ── tables ────────────────────────────────────────────────────── */
+table {
+  border-color: #999999;
+}
+th {
+  background-color: #dddddd;
+  color: #111111;
+  font-weight: bold;
+}
+td {
+  color: #222222;
+}
+
+/* ── alerts / status ───────────────────────────────────────────── */
+.alert {
+  border: solid;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.alert-info {
+  border-color: #4488cc;
+  color: #224488;
+  background-color: #ddeeff;
+}
+.alert-success {
+  border-color: #44aa44;
+  color: #226622;
+  background-color: #ddeedd;
+}
+.alert-warning {
+  border-color: #ccaa33;
+  color: #886600;
+  background-color: #ffeecc;
+}
+.alert-error {
+  border-color: #cc4444;
+  color: #882222;
+  background-color: #ffdddd;
+}
+
+/* ── nav ───────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  border-bottom: solid;
+  border-color: #aaaaaa;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* ── layout helpers ────────────────────────────────────────────── */
+.row { display: flex; flex-direction: row; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex-grow: 1; }
+.center { text-align: center; }
+.right { text-align: right; }
+.muted { color: #888888; }
+.bold { font-weight: bold; }
+
+/* ── hr ────────────────────────────────────────────────────────── */
+hr {
+  border-color: #aaaaaa;
+}
+
+/* ── code / pre ────────────────────────────────────────────────── */
+code { color: #006600; }
+pre {
+  border: solid;
+  border-color: #cccccc;
+  padding: 8px;
+  background-color: #f5f5f5;
+}
+
+/* ── form styling ──────────────────────────────────────────────── */
+.form-group {
+  display: block;
+  margin-bottom: 8px;
+}
+.form-label {
+  display: block;
+  color: #444444;
+  font-weight: bold;
+  margin-bottom: 4px;
+}

@@ -136,6 +136,11 @@ shot "position" "$BASE/pages/position.html" "$SHOTS/position.png"
 # hover — static shot (hover needs mouse interaction, capture at rest)
 shot "hover" "$BASE/pages/hover.html" "$SHOTS/hover.png"
 
+# themes — all three variants
+shot "theme-tv"    "$BASE/pages/themes.html"       "$SHOTS/theme-tvision.png"
+shot "theme-dark"  "$BASE/pages/themes-dark.html"  "$SHOTS/theme-dark.png"
+shot "theme-light" "$BASE/pages/themes-light.html" "$SHOTS/theme-light.png"
+
 # debug overlay — Ctrl-D on elements page
 echo "$SHOTS/debug-overlay.png"
 S=/tmp/tvshow-ss-dbgovl-$$.sock

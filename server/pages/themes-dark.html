@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+<title>Theme showcase — dark</title>
+<link rel="stylesheet" href="/styles/dark.css">
+</head>
+<body>
+
+<div class="nav">
+  <a href="/pages/themes.html">tvision</a>
+  <a href="/pages/themes-dark.html">dark</a>
+  <a href="/pages/themes-light.html">light</a>
+</div>
+
+<h1>tvshow themes</h1>
+<p>CSS themes for terminal web apps. Switch themes above.</p>
+
+<h2>Navigation</h2>
+<div class="nav">
+  <a href="#">Home</a>
+  <a href="#">Dashboard</a>
+  <a href="#">Settings</a>
+  <a href="#">Help</a>
+</div>
+
+<h2>Alerts</h2>
+<div class="alert alert-info">Info: system is operating normally.</div>
+<div class="alert alert-success">Success: changes saved.</div>
+<div class="alert alert-warning">Warning: disk usage above 80%.</div>
+<div class="alert alert-error">Error: connection to database lost.</div>
+
+<h2>Cards</h2>
+<div class="row">
+  <div class="card grow">
+    <p class="card-title">Server status</p>
+    <p>CPU: 42% | Mem: 2.1G / 8G</p>
+  </div>
+  <div class="card grow">
+    <p class="card-title">Deployments</p>
+    <p>Last: 2h ago | Next: pending</p>
+  </div>
+</div>
+
+<h2>Buttons</h2>
+<div class="row">
+  <div class="btn">Default</div>
+  <div class="btn btn-primary">Primary</div>
+  <div class="btn btn-danger">Danger</div>
+</div>
+
+<h2>Table</h2>
+<table>
+<tr><th>Service</th><th>Status</th><th>Uptime</th></tr>
+<tr><td>API</td><td>Running</td><td>14d 2h</td></tr>
+<tr><td>Worker</td><td>Running</td><td>14d 2h</td></tr>
+<tr><td>Scheduler</td><td>Stopped</td><td>-</td></tr>
+</table>
+
+<h2>Form</h2>
+<form action="/echo" method="get">
+  <div class="form-group">
+    <label class="form-label">Username</label>
+    <input type="text" value="">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Role</label>
+    <select>
+      <option value="admin">Admin</option>
+      <option value="user">User</option>
+      <option value="viewer">Viewer</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <input type="checkbox"> Enable notifications
+  </div>
+  <div class="btn btn-primary"><input type="submit" value="Save"></div>
+</form>
+
+<h2>Code</h2>
+<pre>$ tvshow http://localhost:8080/
+Fetching...
+200 OK (text/html, 1.2K)</pre>
+
+<hr>
+<p class="muted center">tvshow theme: dark</p>
+
+</body>
+</html>
