@@ -11,6 +11,7 @@ A terminal "web browser" built with TurboVision. An HTTP server returns HTML+CSS
 | End users | [docs/user-guide.md](docs/user-guide.md) |
 | Contributors | [docs/contributing.md](docs/contributing.md) |
 | Server / app authors | [docs/server-guide.md](docs/server-guide.md) |
+| PHP server authors | [server/php/](server/php/) — PHP HTML helper library |
 | C++ library embedders | [docs/embedding.md](docs/embedding.md) |
 | Full specification | [SPEC.md](SPEC.md) |
 

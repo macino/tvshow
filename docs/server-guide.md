@@ -365,3 +365,98 @@ All three themes share the same class names:
 </body>
 </html>
 ```
+
+---
+
+## PHP helper library
+
+`server/php/` ships a zero-dependency PHP 8.1+ library that generates tvshow-compatible HTML by construction. It enforces correct units, theme class names, and form encoding so you don't have to track the subset manually.
+
+### Installation (Composer)
+
+```sh
+composer require tvshow/php
+# — or point composer.json at the local path:
+# "repositories": [{"type": "path", "url": "path/to/server/php"}]
+```
+
+Without Composer, `require_once` the three source files directly (see examples).
+
+### API overview
+
+**`Page`** — full document builder:
+
+```php
+use Tvshow\Page;
+
+$page = new Page('Dashboard', Page::THEME_TVISION);
+$page->body(/* ...strings... */);
+echo $page->render();
+```
+
+Themes: `Page::THEME_TVISION`, `Page::THEME_DARK`, `Page::THEME_LIGHT`, or `null` for no built-in stylesheet.
+
+**`Html`** — element and layout helpers (all return strings):
+
+```php
+use Tvshow\Html;
+
+Html::h1('Title')
+Html::p('Text', 'class')
+Html::a('/path', 'Label')
+Html::div($content, $class, $style)
+Html::ul(['item 1', 'item 2'])
+Html::img('/img.png', 'Alt text', 320, 160)   // width/height in px, snapped to cell grid
+
+// theme-class shortcuts
+Html::nav([Html::a('/', 'Home'), Html::a('/about', 'About')])
+Html::row([Html::card('CPU', Html::p('42%')), Html::card('Memory', Html::p('2G'))])
+Html::card('Title', $body)
+Html::panel('Title', $body)
+Html::alert('Message', 'success')   // types: info|success|warning|error
+Html::muted('secondary text')
+Html::bold('emphasis')
+```
+
+**`Form`** — form controls:
+
+```php
+use Tvshow\Form;
+
+Form::open('/login', 'post')           // enctype always omitted (no multipart)
+Form::group('Label', Form::text('name'))
+Form::text('name', $value, $placeholder, $id)
+Form::password('name')
+Form::textarea('name', $rows, $value)
+Form::checkbox('name', '1', $checked, 'Label')
+Form::radio('name', 'value', $checked, 'Label')
+Form::select('name', ['a' => 'Option A', 'b' => 'Option B'], $selected)
+Form::hidden('token', $csrf)
+Form::submit('Login', 'btn btn-primary')
+Form::close()
+```
+
+### Full example
+
+```php
+<?php
+use Tvshow\Html, Tvshow\Form, Tvshow\Page;
+
+$page = new Page('Dashboard', Page::THEME_TVISION);
+$page->body(
+    Html::nav([Html::a('/', 'Home'), Html::a('/status', 'Status')]),
+    Html::h1('Dashboard'),
+    Html::alert('All systems operational.', 'success'),
+    Html::row([
+        Html::card('CPU',    Html::p('42%')),
+        Html::card('Memory', Html::p('2.1 G / 8 G')),
+    ]),
+    Form::open('/search', 'get'),
+    Form::group('Query', Form::text('q')),
+    Form::submit('Search'),
+    Form::close()
+);
+echo $page->render();
+```
+
+More examples in `server/php/examples/`: `hello.php`, `dashboard.php`, `form-login.php`.
