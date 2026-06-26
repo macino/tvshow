@@ -1,0 +1,152 @@
+/* tvshow theme: amber
+ * Amber phosphor CRT — monochrome retro, single amber hue, double borders.
+ * Usage: <link rel="stylesheet" href="/styles/amber.css">
+ */
+
+/* ── base ──────────────────────────────────────────────────────── */
+body {
+  color: #ffb300;
+  background-color: #0d0d00;
+  padding: 8px;
+}
+
+/* ── headings ──────────────────────────────────────────────────── */
+h1 { color: #ffd000; }
+h2 { color: #ffb300; }
+h3 { color: #cc8800; }
+
+/* ── links ─────────────────────────────────────────────────────── */
+a { color: #ffcc00; }
+a:hover { color: #ffffff; background-color: #2a2200; }
+
+/* ── panels / cards ────────────────────────────────────────────── */
+.panel, .card {
+  border: double;
+  border-color: #cc8800;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #1a1400;
+}
+
+.panel-title, .card-title {
+  font-weight: bold;
+  color: #ffd000;
+}
+
+/* ── buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border: solid;
+  border-color: #886600;
+  padding: 8px;
+  color: #ffb300;
+  background-color: #2a2200;
+}
+.btn:hover {
+  background-color: #3a3100;
+  color: #ffd000;
+}
+
+.btn-primary {
+  background-color: #ffb300;
+  border-color: #ffb300;
+  color: #0d0d00;
+}
+.btn-primary:hover {
+  background-color: #ffd000;
+}
+
+.btn-danger {
+  background-color: #ff4400;
+  border-color: #ff4400;
+  color: #0d0d00;
+}
+.btn-danger:hover {
+  background-color: #ff6600;
+}
+
+/* ── tables ────────────────────────────────────────────────────── */
+table {
+  border-color: #886600;
+}
+th {
+  background-color: #1a1400;
+  color: #ffd000;
+  font-weight: bold;
+}
+td {
+  color: #ffb300;
+}
+
+/* ── alerts / status ───────────────────────────────────────────── */
+.alert {
+  border: solid;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.alert-info {
+  border-color: #ffcc00;
+  color: #ffcc00;
+  background-color: #1a1400;
+}
+.alert-success {
+  border-color: #99cc00;
+  color: #99cc00;
+  background-color: #001a00;
+}
+.alert-warning {
+  border-color: #ff8800;
+  color: #ff8800;
+  background-color: #1a0d00;
+}
+.alert-error {
+  border-color: #ff4400;
+  color: #ff4400;
+  background-color: #1a0000;
+}
+
+/* ── nav ───────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  border-bottom: solid;
+  border-color: #886600;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* ── layout helpers ────────────────────────────────────────────── */
+.row { display: flex; flex-direction: row; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex-grow: 1; }
+.center { text-align: center; }
+.right { text-align: right; }
+.muted { color: #886600; }
+.bold { font-weight: bold; }
+
+/* ── hr ────────────────────────────────────────────────────────── */
+hr {
+  border-color: #886600;
+}
+
+/* ── code / pre ────────────────────────────────────────────────── */
+code { color: #ffd000; }
+pre {
+  border: solid;
+  border-color: #443300;
+  padding: 8px;
+  background-color: #0a0a00;
+}
+
+/* ── form styling ──────────────────────────────────────────────── */
+.form-group {
+  display: block;
+  margin-bottom: 8px;
+}
+.form-label {
+  display: block;
+  color: #cc8800;
+  font-weight: bold;
+  margin-bottom: 4px;
+}

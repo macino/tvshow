@@ -14,9 +14,12 @@ namespace Tvshow;
  */
 class Page
 {
-    public const THEME_TVISION = 'tvision';
-    public const THEME_DARK    = 'dark';
-    public const THEME_LIGHT   = 'light';
+    public const THEME_TVISION   = 'tvision';
+    public const THEME_DARK      = 'dark';
+    public const THEME_LIGHT     = 'light';
+    public const THEME_SOLARIZED = 'solarized';
+    public const THEME_GRUVBOX   = 'gruvbox';
+    public const THEME_AMBER     = 'amber';
 
     private string $title;
     private ?string $theme;

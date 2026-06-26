@@ -1,0 +1,152 @@
+/* tvshow theme: gruvbox
+ * Gruvbox Dark — warm earthy tones, high readability.
+ * Usage: <link rel="stylesheet" href="/styles/gruvbox.css">
+ */
+
+/* ── base ──────────────────────────────────────────────────────── */
+body {
+  color: #ebdbb2;
+  background-color: #282828;
+  padding: 8px;
+}
+
+/* ── headings ──────────────────────────────────────────────────── */
+h1 { color: #fabd2f; }
+h2 { color: #b8bb26; }
+h3 { color: #8ec07c; }
+
+/* ── links ─────────────────────────────────────────────────────── */
+a { color: #83a598; }
+a:hover { color: #fabd2f; background-color: #3c3836; }
+
+/* ── panels / cards ────────────────────────────────────────────── */
+.panel, .card {
+  border: solid;
+  border-color: #504945;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: #3c3836;
+}
+
+.panel-title, .card-title {
+  font-weight: bold;
+  color: #fabd2f;
+}
+
+/* ── buttons ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  border: solid;
+  border-color: #504945;
+  padding: 8px;
+  color: #ebdbb2;
+  background-color: #3c3836;
+}
+.btn:hover {
+  background-color: #504945;
+  color: #fbf1c7;
+}
+
+.btn-primary {
+  background-color: #458588;
+  border-color: #458588;
+  color: #282828;
+}
+.btn-primary:hover {
+  background-color: #83a598;
+}
+
+.btn-danger {
+  background-color: #cc241d;
+  border-color: #cc241d;
+  color: #fbf1c7;
+}
+.btn-danger:hover {
+  background-color: #fb4934;
+}
+
+/* ── tables ────────────────────────────────────────────────────── */
+table {
+  border-color: #504945;
+}
+th {
+  background-color: #3c3836;
+  color: #fabd2f;
+  font-weight: bold;
+}
+td {
+  color: #ebdbb2;
+}
+
+/* ── alerts / status ───────────────────────────────────────────── */
+.alert {
+  border: solid;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.alert-info {
+  border-color: #458588;
+  color: #83a598;
+  background-color: #1d2021;
+}
+.alert-success {
+  border-color: #98971a;
+  color: #b8bb26;
+  background-color: #1d2021;
+}
+.alert-warning {
+  border-color: #d79921;
+  color: #fabd2f;
+  background-color: #1d2021;
+}
+.alert-error {
+  border-color: #cc241d;
+  color: #fb4934;
+  background-color: #1d2021;
+}
+
+/* ── nav ───────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  border-bottom: solid;
+  border-color: #504945;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* ── layout helpers ────────────────────────────────────────────── */
+.row { display: flex; flex-direction: row; gap: 8px; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.grow { flex-grow: 1; }
+.center { text-align: center; }
+.right { text-align: right; }
+.muted { color: #928374; }
+.bold { font-weight: bold; }
+
+/* ── hr ────────────────────────────────────────────────────────── */
+hr {
+  border-color: #504945;
+}
+
+/* ── code / pre ────────────────────────────────────────────────── */
+code { color: #b8bb26; }
+pre {
+  border: solid;
+  border-color: #3c3836;
+  padding: 8px;
+  background-color: #1d2021;
+}
+
+/* ── form styling ──────────────────────────────────────────────── */
+.form-group {
+  display: block;
+  margin-bottom: 8px;
+}
+.form-label {
+  display: block;
+  color: #d5c4a1;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
