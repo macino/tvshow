@@ -336,6 +336,7 @@ auto Application::initStatusLine(TRect r) -> TStatusLine* {
     return new TStatusLine(r, *new TStatusDef(0, 0xFFFF) +
                                   *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
                                   *new TStatusItem("~Alt-\x11~ Back", kbAltLeft, cmBack) +
+                                  *new TStatusItem("~Ctrl-R~ Reload", kbCtrlR, cmReload) +
                                   *new TStatusItem("~Ctrl-L~ URL", kbCtrlL, cmOpenUrl) +
                                   *new TStatusItem(nullptr, kbF10, cmMenu));
 }
@@ -346,12 +347,12 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
         r, *new TSubMenu("~F~ile", kbAltF) +
                *new TMenuItem("~N~ew Tab", cmNewTab, kbCtrlT, hcNoContext, "Ctrl-T") +
                *new TMenuItem("~O~pen URL...", cmOpenUrl, kbCtrlL, hcNoContext, "Ctrl-L") +
-               *new TMenuItem("~R~eload", cmReload, kbF5, hcNoContext, "F5") +
                *new TMenuItem("~C~lose Tab", cmCloseTab, kbCtrlW, hcNoContext, "Ctrl-W") +
                newLine() + *new TMenuItem("E~x~it", cmQuit, kbAltX, hcNoContext, "Alt-X") +
                *new TSubMenu("~N~avigate", kbAltN) +
                *new TMenuItem("~B~ack", cmBack, kbNoKey, hcNoContext, "Alt-\x11") +
                *new TMenuItem("~F~orward", cmForward, kbNoKey, hcNoContext, "Alt-\x10") +
+               *new TMenuItem("~R~eload", cmReload, kbCtrlR, hcNoContext, "Ctrl-R") +
                *new TSubMenu("~V~iew", kbAltV) +
                *new TMenuItem("~C~ascade", cmCascade, kbNoKey, hcNoContext) +
                *new TMenuItem("~T~ile", cmTile, kbNoKey, hcNoContext) +
@@ -408,6 +409,16 @@ void Application::idle() {
 }
 
 void Application::handleEvent(TEvent& event) {
+    // Handle F5 as reload shortcut (in addition to Ctrl+R in menu).
+    if (event.what == evKeyDown &&  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        event.keyDown.keyCode == kbF5) {  // NOLINT(cppcoreguidelines-pro-type-union-access)
+        clearEvent(event);
+        if (BrowserWindow* win = active_browser_window()) {
+            win->reload();
+        }
+        return;
+    }
+
     TApplication::handleEvent(event);
     if (event.what != evCommand) {  // NOLINT(cppcoreguidelines-pro-type-union-access)
         return;
