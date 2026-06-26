@@ -468,194 +468,42 @@ More examples in `server/php/examples/`: `hello.php`, `dashboard.php`, `form-log
 
 ## Theme showcase
 
-Each theme renders the same components. Box-drawing characters are chosen per theme.
+Screenshots taken with kitty (truecolor). Each demo page is live at `/pages/themes-*.html`.
 
 ### tvision
 
-| Role | Color |
-|------|-------|
-| Background | #000080 |
-| Foreground | #ffff55 |
-| Headings | #55ffff |
-| Links | #55ff55 |
-| Accent (primary) | #55ffff |
-| Danger | #ff5555 |
-| Muted | #888888 |
+Classic TurboVision — cyan/yellow on dark blue, double-border panels.
 
-```
- tvision  dark  light  solarized  gruvbox  amber
-──────────────────────────────────────────────────
-tvision theme
-
-╔═════════════════════╗ ╔═════════════════════╗
-║ Server              ║ ║ Deploy              ║
-║ CPU 42% | Mem 2.1G  ║ ║ Last: 2h ago        ║
-╚═════════════════════╝ ╚═════════════════════╝
-
-┌──────────────────────┐  Info: system operational.
-│ info alert           │  Success: deployed.
-└──────────────────────┘  Warning: disk 80%.
-                          Error: DB connection lost.
-
-[ Default ]  [ Primary ]  [ Danger ]
-```
+![tvision theme](screenshots/themes/tvision.png)
 
 ### dark
 
-| Role | Color |
-|------|-------|
-| Background | #1a1a1a |
-| Foreground | #cccccc |
-| Headings | #ffffff |
-| Links | #6699ff |
-| Accent (primary) | #2255aa |
-| Danger | #aa2222 |
-| Muted | #666666 |
+Modern dark — near-black background, subtle borders, blue accent.
 
-```
- tvision  dark  light  solarized  gruvbox  amber
-──────────────────────────────────────────────────
-dark theme
-
-┌─────────────────────┐ ┌─────────────────────┐
-│ Server              │ │ Deploy              │
-│ CPU 42% | Mem 2.1G  │ │ Last: 2h ago        │
-└─────────────────────┘ └─────────────────────┘
-
-┌──────────────────────┐
-│ Info: system oper.   │  Success: deployed.
-└──────────────────────┘  Warning: disk 80%.
-                          Error: DB connection lost.
-
-[ Default ]  [ Primary ]  [ Danger ]
-```
+![dark theme](screenshots/themes/dark.png)
 
 ### light
 
-| Role | Color |
-|------|-------|
-| Background | #eeeeee |
-| Foreground | #222222 |
-| Headings | #111111 |
-| Links | #0055aa |
-| Accent (primary) | #0055aa |
-| Danger | #cc2222 |
-| Muted | #888888 |
+Light terminal — grey/white background, dark text, clean borders.
 
-```
- tvision  dark  light  solarized  gruvbox  amber
-──────────────────────────────────────────────────
-light theme
-
-┌─────────────────────┐ ┌─────────────────────┐
-│ Server              │ │ Deploy              │
-│ CPU 42% | Mem 2.1G  │ │ Last: 2h ago        │
-└─────────────────────┘ └─────────────────────┘
-
-┌──────────────────────┐
-│ Info: system oper.   │  Success: deployed.
-└──────────────────────┘  Warning: disk 80%.
-                          Error: DB connection lost.
-
-[ Default ]  [ Primary ]  [ Danger ]
-```
+![light theme](screenshots/themes/light.png)
 
 ### solarized
 
-| Role | Color |
-|------|-------|
-| Background | #002b36 |
-| Foreground | #839496 |
-| Heading h1 | #268bd2 |
-| Heading h2 | #2aa198 |
-| Heading h3 | #859900 |
-| Links | #268bd2 |
-| Accent (primary) | #268bd2 |
-| Danger | #dc322f |
-| Muted | #586e75 |
+Solarized Dark — iconic low-contrast palette. bg `#002b36`, accents blue/teal/green.
 
-```
- tvision  dark  light  solarized  gruvbox  amber
-──────────────────────────────────────────────────
-solarized theme
-
-┌─────────────────────┐ ┌─────────────────────┐
-│ Server              │ │ Deploy              │
-│ CPU 42% | Mem 2.1G  │ │ Last: 2h ago        │
-└─────────────────────┘ └─────────────────────┘
-
-┌──────────────────────┐
-│ Info: system oper.   │  Success: deployed.
-└──────────────────────┘  Warning: disk 80%.
-                          Error: DB connection lost.
-
-[ Default ]  [ Primary ]  [ Danger ]
-```
+![solarized theme](screenshots/themes/solarized.png)
 
 ### gruvbox
 
-| Role | Color |
-|------|-------|
-| Background | #282828 |
-| Foreground | #ebdbb2 |
-| Heading h1 | #fabd2f |
-| Heading h2 | #b8bb26 |
-| Heading h3 | #8ec07c |
-| Links | #83a598 |
-| Accent (primary) | #458588 |
-| Danger | #cc241d |
-| Muted | #928374 |
+Gruvbox Dark — warm earthy tones. bg `#282828`, h1 `#fabd2f`, info `#458588`.
 
-```
- tvision  dark  light  solarized  gruvbox  amber
-──────────────────────────────────────────────────
-gruvbox theme
-
-┌─────────────────────┐ ┌─────────────────────┐
-│ Server              │ │ Deploy              │
-│ CPU 42% | Mem 2.1G  │ │ Last: 2h ago        │
-└─────────────────────┘ └─────────────────────┘
-
-┌──────────────────────┐
-│ Info: system oper.   │  Success: deployed.
-└──────────────────────┘  Warning: disk 80%.
-                          Error: DB connection lost.
-
-[ Default ]  [ Primary ]  [ Danger ]
-```
+![gruvbox theme](screenshots/themes/gruvbox.png)
 
 ### amber
 
-| Role | Color |
-|------|-------|
-| Background | #0d0d00 |
-| Foreground | #ffb300 |
-| Heading h1 | #ffd000 |
-| Heading h2 | #ffb300 |
-| Heading h3 | #cc8800 |
-| Links | #ffcc00 |
-| Accent (primary) | #ffb300 on #0d0d00 |
-| Danger | #ff4400 |
-| Muted | #886600 |
+Amber phosphor CRT — monochrome retro, double-border panels, single amber hue.
 
-Panels and cards use `border: double` like tvision.
-
-```
- tvision  dark  light  solarized  gruvbox  amber
-──────────────────────────────────────────────────
-amber theme
-
-╔═════════════════════╗ ╔═════════════════════╗
-║ Server              ║ ║ Deploy              ║
-║ CPU 42% | Mem 2.1G  ║ ║ Last: 2h ago        ║
-╚═════════════════════╝ ╚═════════════════════╝
-
-┌──────────────────────┐
-│ Info: system oper.   │  Success: deployed.
-└──────────────────────┘  Warning: disk 80%.
-                          Error: DB connection lost.
-
-[ Default ]  [ Primary ]  [ Danger ]
-```
+![amber theme](screenshots/themes/amber.png)
 
 Live demo pages: `/pages/themes.html` (tvision), `/pages/themes-dark.html`, `/pages/themes-light.html`, `/pages/themes-solarized.html`, `/pages/themes-gruvbox.html`, `/pages/themes-amber.html`.
