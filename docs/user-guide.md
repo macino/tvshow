@@ -71,7 +71,7 @@ Back/Forward navigate the per-tab history stack.
 
 ### Reload
 
-Press **F5** to reload the current page.
+Press **Ctrl-R** or **F5** to reload the current page. A spinner animates while loading.
 
 ---
 
@@ -143,8 +143,8 @@ An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `wi
 | Menu | Items |
 |------|-------|
 | **≡ tvshow** | About, Quit (Alt-X) |
-| **File** | New Tab (Ctrl-T), Open URL (Ctrl-L), Reload (F5), Close Tab (Ctrl-W) |
-| **Navigate** | Back (Alt-←), Forward (Alt-→), Stop (Esc), Home |
+| **File** | New Tab (Ctrl-T), Open URL (Ctrl-L), Close Tab (Ctrl-W) |
+| **Navigate** | Back (Alt-←), Forward (Alt-→), Reload (Ctrl-R), Stop (Esc), Home |
 | **View** | Toggle Address Bar, Toggle Status, Cascade, Tile |
 | **Window** | List of open tabs |
 
@@ -157,6 +157,7 @@ An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `wi
 | Ctrl-L | Open address bar |
 | Ctrl-T | New tab |
 | Ctrl-W | Close tab |
+| Ctrl-R | Reload |
 | F5 | Reload |
 | Alt-← | Back |
 | Alt-→ | Forward |

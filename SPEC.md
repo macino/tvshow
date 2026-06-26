@@ -295,8 +295,8 @@ Viewport = inner content area of the active `TBrowserWindow` (after subtracting 
 
 ### 11.2 Menu bar
 - **≡ tvshow** — About, Quit
-- **File** — New Tab (Ctrl-T), Open URL (Ctrl-L), Reload (F5), Close Tab (Ctrl-W)
-- **Navigate** — Back (Alt-←), Forward (Alt-→), Stop (Esc), Home
+- **File** — New Tab (Ctrl-T), Open URL (Ctrl-L), Close Tab (Ctrl-W)
+- **Navigate** — Back (Alt-←), Forward (Alt-→), Reload (Ctrl-R), Stop (Esc), Home
 - **View** — Toggle Address Bar, Toggle Status, Cascade, Tile
 - **Window** — list of open tabs
 
@@ -309,7 +309,7 @@ New windows open with a cascade offset so they are not fully obscured: each succ
 Default: modal `TInputDialog` opened via Ctrl-L. `--address-bar=persistent` switches to a permanent one-row `TInputLine` at the top of each browser window, shrinking the content viewport by one row. Both modes accept a URL, validate it via `Url::parse`, and trigger navigation. (Q-1 resolved.)
 
 ### 11.5 Status Line
-Shows: current URL on hover, focused link target, loading/error state, key hints (`F5 Reload  Alt-← Back  Ctrl-L URL`).
+Shows: current URL on hover, focused link target, loading/error state, key hints (`Ctrl-R Reload  Alt-← Back  Ctrl-L URL`).
 
 ---
 
