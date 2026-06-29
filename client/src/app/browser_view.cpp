@@ -1,5 +1,8 @@
 #include "tvshow/app/browser_view.hpp"
 
+#include "tvshow/app/builtin_themes.hpp"
+#include "tvshow/css/parser.hpp"
+
 #define Uses_TDialog
 #define Uses_TDrawBuffer
 #define Uses_TEvent
@@ -1153,15 +1156,44 @@ void BrowserView::update_hover(Point content_pt) {
     restyle_for_hover();
 }
 
+// Returns the stylesheet list to use for style resolution: the forced theme
+// overrides the page's own author sheets when ForcedStyle != Auto.
+const std::vector<css::Stylesheet>& BrowserView::effective_sheets() const {
+    if (shared_ == nullptr || shared_->forced_style == ForcedStyle::Auto) {
+        return page_.sheets;
+    }
+    const char* css_src = nullptr;
+    switch (shared_->forced_style) {
+        case ForcedStyle::Tvision: css_src = k_css_tvision; break;
+        case ForcedStyle::Light:   css_src = k_css_light;   break;
+        case ForcedStyle::Dark:    css_src = k_css_dark;    break;
+        default: return page_.sheets;
+    }
+    if (forced_sheets_css_ != css_src) {
+        forced_sheets_css_ = css_src;
+        forced_sheets_.clear();
+        if (auto sheet = css::parse(css_src)) {
+            forced_sheets_.push_back(std::move(*sheet));
+        }
+    }
+    return forced_sheets_;
+}
+
 void BrowserView::restyle_for_hover() {
     const style::ResolveOpts opts{hovered_set_.empty() ? nullptr : &hovered_set_};
-    auto new_tree = style::resolve(page_.doc, page_.sheets, opts);
+    auto new_tree = style::resolve(page_.doc, effective_sheets(), opts);
     if (!new_tree) {
         return;
     }
     page_.tree = std::make_unique<style::StyledNode>(std::move(*new_tree));
     relayout();
     drawView();
+}
+
+void BrowserView::apply_forced_style() {
+    forced_sheets_css_ = nullptr;  // invalidate cache so effective_sheets() re-parses
+    forced_sheets_.clear();
+    restyle_for_hover();           // re-resolves + relayout + drawView
 }
 
 }  // namespace tvshow::app

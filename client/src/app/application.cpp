@@ -356,6 +356,11 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
                *new TSubMenu("~V~iew", kbAltV) +
                *new TMenuItem("~C~ascade", cmCascade, kbNoKey, hcNoContext) +
                *new TMenuItem("~T~ile", cmTile, kbNoKey, hcNoContext) +
+               newLine() +
+               *new TMenuItem("Style: ~A~uto",    cmStyleAuto,    kbNoKey, hcNoContext) +
+               *new TMenuItem("Style: ~t~vision", cmStyleTvision, kbNoKey, hcNoContext) +
+               *new TMenuItem("Style: ~L~ight",   cmStyleLight,   kbNoKey, hcNoContext) +
+               *new TMenuItem("Style: ~D~ark",    cmStyleDark,    kbNoKey, hcNoContext) +
                *new TSubMenu("~W~indow", kbAltW) +
                *new TMenuItem("~W~indow List...", cmWindowList, kbNoKey, hcNoContext));
 }
@@ -482,6 +487,25 @@ void Application::handleEvent(TEvent& event) {
         clearEvent(event);
         show_window_list();
         return;
+    case cmStyleAuto:
+    case cmStyleTvision:
+    case cmStyleLight:
+    case cmStyleDark: {
+        const unsigned short cmd = event.message.command;
+        clearEvent(event);
+        const ForcedStyle fs = (cmd == cmStyleTvision) ? ForcedStyle::Tvision
+                             : (cmd == cmStyleLight)   ? ForcedStyle::Light
+                             : (cmd == cmStyleDark)    ? ForcedStyle::Dark
+                                                       : ForcedStyle::Auto;
+        shared_browsing_state_.forced_style = fs;
+        // Apply to all open windows.
+        deskTop->forEach([](TView* v, void*) {
+            if (auto* bw = dynamic_cast<BrowserWindow*>(v)) {
+                bw->apply_forced_style();
+            }
+        }, nullptr);
+        return;
+    }
     default:
         return;
     }

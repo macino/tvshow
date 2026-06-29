@@ -3,6 +3,7 @@
 #define Uses_TView
 #include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/page.hpp"
+#include "tvshow/css/types.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
 #include "tvshow/net/cookie_jar.hpp"
@@ -27,6 +28,8 @@ struct TScrollBar;
 
 namespace tvshow::app {
 
+enum class ForcedStyle { Auto, Tvision, Light, Dark };
+
 // History and visited-URL state shared across all browser tabs in one process.
 // Owned by Application, passed by pointer to each BrowserView.
 struct SharedBrowsingState {
@@ -34,6 +37,7 @@ struct SharedBrowsingState {
     std::unordered_set<std::string> visited;  // set form of history (for link coloring)
     net::CookieJar cookie_jar;               // session-scoped cookie store
     BookmarkStore bookmarks;                 // loaded once at startup, persisted on change
+    ForcedStyle forced_style = ForcedStyle::Auto;
 };
 
 // Hosts one loaded Page: renders it, tracks the focused link or form control
@@ -81,6 +85,10 @@ public:
     // Called from Application::idle() on the main thread to animate the spinner
     // and apply a completed page load.
     void tick_if_loading();
+
+    // Re-resolve and re-render using the currently selected forced style.
+    // Called when shared_->forced_style changes.
+    void apply_forced_style();
 
 private:
     Page page_;
@@ -160,6 +168,11 @@ private:
     std::unordered_set<const dom::Node*> hovered_set_;
     void update_hover(Point content_pt);
     void restyle_for_hover();
+
+    // Forced-style sheet cache: parsed once per style selection.
+    mutable const char* forced_sheets_css_ = nullptr;
+    mutable std::vector<css::Stylesheet> forced_sheets_;
+    const std::vector<css::Stylesheet>& effective_sheets() const;
 };
 
 }  // namespace tvshow::app

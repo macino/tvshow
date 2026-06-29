@@ -46,6 +46,9 @@ public:
     // Called from Application::idle() to animate spinner or apply a completed load.
     void tick_if_loading();
 
+    // Re-render all tabs using the current forced style.
+    void apply_forced_style() { view_->apply_forced_style(); }
+
     // Returns the URL of the currently displayed page.
     [[nodiscard]] std::string_view current_url() const { return view_->page().url; }
 
