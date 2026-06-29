@@ -421,7 +421,7 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
         if (st.list_marker != style::ListMarker::None) {
             const int row = box.content_box.origin.row;
             const int content_col = box.content_box.origin.col;
-            if (row >= 0 && row < grid.rows()) {
+            if (row >= 0 && row < grid.rows() && content_col >= 0 && content_col < grid.cols()) {
                 const ColorAttr attr = text_attr(st, grid.at({content_col, row}).attr.bg);
                 if (st.list_marker == style::ListMarker::Disc) {
                     // "• content" — bullet at col-2, col-1 blank, content at col.
