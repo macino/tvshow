@@ -516,7 +516,14 @@ TRect Application::next_window_bounds() {
 
 void Application::open_url(std::string_view url) {
     const layout::Viewport vp{std::max(1, deskTop->size.x), std::max(1, deskTop->size.y)};
-    auto page = load_page(url, vp);
+    std::optional<Page> page;
+    try {
+        page = load_page(url, vp);
+    } catch (const std::exception& e) {
+        page = load_page_from_error("Load Error", e.what(), vp);
+    } catch (...) {
+        page = load_page_from_error("Load Error", "Unknown error while loading page.", vp);
+    }
     if (!page) {
         return;
     }

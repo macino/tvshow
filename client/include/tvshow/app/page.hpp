@@ -39,6 +39,12 @@ struct Page {
 [[nodiscard]] std::optional<Page> load_page(std::string_view url, layout::Viewport vp,
                                             net::CookieJar* jar = nullptr);
 
+// Builds a Page containing an error HTML document (for exception fallbacks).
+// Does not return nullopt; any internal failure falls back to a minimal grid.
+[[nodiscard]] std::optional<Page> load_page_from_error(std::string_view title,
+                                                       std::string_view detail,
+                                                       layout::Viewport vp);
+
 // Issues a POST to action_url with application/x-www-form-urlencoded body,
 // then parses and lays out the response document.
 // jar may be null (cookies disabled).

@@ -254,4 +254,17 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
     return page;
 }
 
+std::optional<Page> load_page_from_error(std::string_view title, std::string_view detail,
+                                         layout::Viewport vp) {
+    const std::string html = error_page_html(title, detail);
+    auto doc = dom::parse(html);
+    if (!doc) return std::nullopt;
+    auto tree = style::resolve(*doc, {});
+    if (!tree) return std::nullopt;
+    auto styled = std::make_unique<style::StyledNode>(std::move(*tree));
+    Page page{"", std::move(*doc), {}, std::move(styled), {}};
+    page.box = layout::layout(*page.tree, vp);
+    return page;
+}
+
 }  // namespace tvshow::app
