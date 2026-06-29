@@ -48,4 +48,9 @@ void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans);
 // Corners: ┌┐└┘  edges: ─ │
 void apply_debug_overlay(CharGrid& grid, const layout::Box& root);
 
+// Returns a new grid with runs of blank rows (all cells are U' ') collapsed
+// to at most `max_consecutive`. Useful for graphics-heavy pages where images
+// and unsupported elements leave large empty stretches.
+[[nodiscard]] CharGrid collapse_blank_rows(const CharGrid& grid, int max_consecutive = 2);
+
 }  // namespace tvshow::render

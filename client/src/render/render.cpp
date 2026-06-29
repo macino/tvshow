@@ -566,4 +566,42 @@ void apply_debug_overlay(CharGrid& grid, const layout::Box& root) {
     draw_box_outline(grid, root);
 }
 
+CharGrid collapse_blank_rows(const CharGrid& src, int max_consecutive) {
+    const int cols = src.cols();
+    const int rows = src.rows();
+
+    auto row_is_blank = [&](int r) {
+        for (int c = 0; c < cols; ++c) {
+            if (src.at({c, r}).cp != U' ') return false;
+        }
+        return true;
+    };
+
+    std::vector<int> keep;
+    keep.reserve(static_cast<size_t>(rows));
+    int blank_run = 0;
+    for (int r = 0; r < rows; ++r) {
+        if (row_is_blank(r)) {
+            ++blank_run;
+            if (blank_run <= max_consecutive) keep.push_back(r);
+        } else {
+            blank_run = 0;
+            keep.push_back(r);
+        }
+    }
+
+    const int new_rows = static_cast<int>(keep.size());
+    CharGrid out(cols, std::max(new_rows, 1));
+    for (int dst = 0; dst < new_rows; ++dst) {
+        const int src_r = keep[static_cast<size_t>(dst)];
+        for (int c = 0; c < cols; ++c) {
+            const Cell& cell = src.at({c, src_r});
+            if (cell.cp != U' ' || cell.attr != ColorAttr{}) {
+                out.put({c, dst}, cell.cp, cell.attr);
+            }
+        }
+    }
+    return out;
+}
+
 }  // namespace tvshow::render

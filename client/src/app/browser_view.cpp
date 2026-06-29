@@ -246,7 +246,8 @@ const layout::FormFocus* BrowserView::focused_fc() const {
 
 render::CharGrid BrowserView::render_grid() const {
     const render::RenderOpts opts{page_.url, &visited_set()};
-    render::CharGrid grid = render::render(page_.box, form_values_, opts);
+    render::CharGrid grid = render::collapse_blank_rows(
+        render::render(page_.box, form_values_, opts));
     if (is_link_focused()) {
         render::apply_focus(grid, links_[static_cast<size_t>(focused_)].spans);
     } else if (const layout::FormFocus* fc = focused_fc()) {
@@ -920,7 +921,8 @@ void BrowserView::find_matches_in_page(std::string_view term) {
     }
     search_len_ = static_cast<int>(needle.size());
     const render::RenderOpts opts{page_.url, &visited_set()};
-    const render::CharGrid grid = render::render(page_.box, form_values_, opts);
+    const render::CharGrid grid = render::collapse_blank_rows(
+        render::render(page_.box, form_values_, opts));
     const int len = static_cast<int>(needle.size());
     for (int row = 0; row < grid.rows(); ++row) {
         for (int col = 0; col + len <= grid.cols(); ++col) {
