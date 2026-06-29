@@ -516,21 +516,16 @@ TRect Application::next_window_bounds() {
 
 void Application::open_url(std::string_view url) {
     const layout::Viewport vp{std::max(1, deskTop->size.x), std::max(1, deskTop->size.y)};
-    std::optional<Page> page;
-    try {
-        page = load_page(url, vp);
-    } catch (const std::exception& e) {
-        page = load_page_from_error("Load Error", e.what(), vp);
-    } catch (...) {
-        page = load_page_from_error("Load Error", "Unknown error while loading page.", vp);
-    }
-    if (!page) {
-        return;
-    }
+    // Open the window immediately with a blank page so the spinner is visible,
+    // then kick off the async load — same path as navigating from an existing window.
+    auto blank = load_page_from_error("", "", vp);
+    if (!blank) return;
+    blank->url = std::string(url);
 
     const TRect bounds = next_window_bounds();
-    auto* win = new BrowserWindow(bounds, mode_, std::move(*page), &shared_browsing_state_);
+    auto* win = new BrowserWindow(bounds, mode_, std::move(*blank), &shared_browsing_state_);
     deskTop->insert(win);
+    win->navigate(url);
 }
 
 }  // namespace tvshow::app
