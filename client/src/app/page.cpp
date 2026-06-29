@@ -234,6 +234,21 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
             page.fallback = true;
             page.sheets.clear();
         }
+        // If fallback render is still blank, the page likely requires JavaScript.
+        if (render::is_mostly_blank(render::render(page.box))) {
+            const std::string err_html = error_page_html(
+                "JavaScript Required",
+                "This page renders content with JavaScript, which tvshow does not support. "
+                "Try a text/print version of the page if available.");
+            if (auto err_doc = dom::parse(err_html)) {
+                if (auto err_tree = style::resolve(*err_doc, {})) {
+                    page.doc = std::move(*err_doc);
+                    page.tree = std::make_unique<style::StyledNode>(std::move(*err_tree));
+                    page.box = layout::layout(*page.tree, vp);
+                    page.sheets.clear();
+                }
+            }
+        }
     }
 
     return page;
