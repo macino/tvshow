@@ -36,26 +36,29 @@ ushort style_flags(const render::ColorAttr& a) noexcept {
     return flags;
 }
 
-// Encode one code point as UTF-8 — tvision's TDrawBuffer::moveStr takes the
-// cell text as UTF-8 bytes, not a code point.
-std::string utf8_encode(char32_t cp) {
-    std::string out;
+// Encode one code point as UTF-8 into `out` (must have room for 5 bytes).
+// Returns number of bytes written.
+int utf8_encode_into(char32_t cp, char* out) {
     if (cp < 0x80) {
-        out.push_back(static_cast<char>(cp));
-    } else if (cp < 0x800) {
-        out.push_back(static_cast<char>(0xC0U | (cp >> 6U)));
-        out.push_back(static_cast<char>(0x80U | (cp & 0x3FU)));
-    } else if (cp < 0x10000) {
-        out.push_back(static_cast<char>(0xE0U | (cp >> 12U)));
-        out.push_back(static_cast<char>(0x80U | ((cp >> 6U) & 0x3FU)));
-        out.push_back(static_cast<char>(0x80U | (cp & 0x3FU)));
-    } else {
-        out.push_back(static_cast<char>(0xF0U | (cp >> 18U)));
-        out.push_back(static_cast<char>(0x80U | ((cp >> 12U) & 0x3FU)));
-        out.push_back(static_cast<char>(0x80U | ((cp >> 6U) & 0x3FU)));
-        out.push_back(static_cast<char>(0x80U | (cp & 0x3FU)));
+        out[0] = static_cast<char>(cp);
+        return 1;
     }
-    return out;
+    if (cp < 0x800) {
+        out[0] = static_cast<char>(0xC0U | (cp >> 6U));
+        out[1] = static_cast<char>(0x80U | (cp & 0x3FU));
+        return 2;
+    }
+    if (cp < 0x10000) {
+        out[0] = static_cast<char>(0xE0U | (cp >> 12U));
+        out[1] = static_cast<char>(0x80U | ((cp >> 6U) & 0x3FU));
+        out[2] = static_cast<char>(0x80U | (cp & 0x3FU));
+        return 3;
+    }
+    out[0] = static_cast<char>(0xF0U | (cp >> 18U));
+    out[1] = static_cast<char>(0x80U | ((cp >> 12U) & 0x3FU));
+    out[2] = static_cast<char>(0x80U | ((cp >> 6U) & 0x3FU));
+    out[3] = static_cast<char>(0x80U | (cp & 0x3FU));
+    return 4;
 }
 
 }  // namespace
@@ -66,8 +69,9 @@ void draw_row(const render::CharGrid& grid, int row, TDrawBuffer& buf) {
         // NOLINTNEXTLINE(misc-include-cleaner)
         const TColorAttr attr(to_desired(cell.attr.fg), to_desired(cell.attr.bg),
                               style_flags(cell.attr));
-        const std::string text = utf8_encode(cell.cp);
-        buf.moveStr(static_cast<ushort>(col), TStringView(text.data(), text.size()), attr, 1);
+        char utf8[5] = {};
+        const int utf8_len = utf8_encode_into(cell.cp, utf8);
+        buf.moveStr(static_cast<ushort>(col), TStringView(utf8, static_cast<size_t>(utf8_len)), attr, 1);
     }
 }
 

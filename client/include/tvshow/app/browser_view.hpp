@@ -139,7 +139,9 @@ private:
 
     void relayout();
     void sync_vscroll();
-    [[nodiscard]] render::CharGrid render_grid() const;
+    // Ensures display_grid_ is up-to-date. Rebuilds base_grid_ if base_dirty_,
+    // then applies focus/search overlays if overlay state changed.
+    void ensure_display_grid() const;
     void navigate(const std::string& url, bool push_history);
     // Hit-test pt (content coords) against links/form controls, handle and clear
     // event on hit. Returns true if the event was consumed.
@@ -173,6 +175,17 @@ private:
     mutable const char* forced_sheets_css_ = nullptr;
     mutable std::vector<css::Stylesheet> forced_sheets_;
     const std::vector<css::Stylesheet>& effective_sheets() const;
+
+    // Two-level render cache.
+    // base_grid_: full render + collapse; rebuilt only when layout/style changes.
+    // display_grid_: base + focus/search overlays; rebuilt when overlay state changes.
+    mutable std::optional<render::CharGrid> base_grid_;
+    mutable bool base_dirty_ = true;
+    mutable std::optional<render::CharGrid> display_grid_;
+    mutable bool overlay_dirty_ = true;
+    mutable int cached_focused_ = -2;
+    mutable std::vector<Point> cached_hits_;
+    mutable int cached_hit_idx_ = -2;
 };
 
 }  // namespace tvshow::app

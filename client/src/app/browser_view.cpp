@@ -291,43 +291,64 @@ static std::vector<layout::CellRect> map_spans(const std::vector<layout::CellRec
     return out;
 }
 
-render::CharGrid BrowserView::render_grid() const {
-    const render::RenderOpts opts{page_.url, &visited_set()};
-    auto [grid, kept] = render::collapse_blank_rows(
-        render::render(page_.box, form_values_, opts));
-    // Cache the row mapping for hit-test coordinate translation.
-    const_cast<BrowserView*>(this)->kept_rows_ = kept;
-    if (is_link_focused()) {
-        render::apply_focus(grid, map_spans(links_[static_cast<size_t>(focused_)].spans, kept));
-    } else if (const layout::FormFocus* fc = focused_fc()) {
-        render::apply_focus(grid, map_spans({fc->span}, kept));
+void BrowserView::ensure_display_grid() const {
+    auto* self = const_cast<BrowserView*>(this);
+
+    if (base_dirty_) {
+        const render::RenderOpts opts{page_.url, &visited_set()};
+        auto [grid, kept] = render::collapse_blank_rows(
+            render::render(page_.box, form_values_, opts));
+        self->base_grid_ = std::move(grid);
+        self->kept_rows_ = std::move(kept);
+        self->base_dirty_ = false;
+        self->overlay_dirty_ = true;
     }
-    if (!search_hits_.empty() && search_len_ > 0) {
-        for (int i = 0; i < static_cast<int>(search_hits_.size()); ++i) {
-            const Point& p = search_hits_[static_cast<size_t>(i)];
-            const bool is_current = (i == search_hit_idx_);
-            for (int dc = 0; dc < search_len_; ++dc) {
-                const int col = p.col + dc;
-                if (col < 0 || col >= grid.cols() || p.row < 0 || p.row >= grid.rows()) {
-                    continue;
+
+    const bool focus_changed = (focused_ != cached_focused_);
+    const bool hits_changed  = (search_hits_ != cached_hits_ || search_hit_idx_ != cached_hit_idx_);
+
+    if (overlay_dirty_ || focus_changed || hits_changed) {
+        self->display_grid_ = *base_grid_;  // copy base, then apply overlays
+        render::CharGrid& g = *self->display_grid_;
+
+        if (is_link_focused()) {
+            render::apply_focus(g, map_spans(links_[static_cast<size_t>(focused_)].spans, kept_rows_));
+        } else if (const layout::FormFocus* fc = focused_fc()) {
+            render::apply_focus(g, map_spans({fc->span}, kept_rows_));
+        }
+
+        if (!search_hits_.empty() && search_len_ > 0) {
+            for (int i = 0; i < static_cast<int>(search_hits_.size()); ++i) {
+                const Point& p = search_hits_[static_cast<size_t>(i)];
+                const bool is_current = (i == search_hit_idx_);
+                for (int dc = 0; dc < search_len_; ++dc) {
+                    const int col = p.col + dc;
+                    if (col < 0 || col >= g.cols() || p.row < 0 || p.row >= g.rows()) {
+                        continue;
+                    }
+                    const render::Cell cell = g.at({col, p.row});
+                    render::ColorAttr attr = cell.attr;
+                    if (is_current) {
+                        attr.bg = 0xFFCC00U;
+                        attr.fg = 0x000000U;
+                    } else {
+                        attr.bg = 0x555500U;
+                        attr.fg = 0xFFFFFFU;
+                    }
+                    g.put({col, p.row}, cell.cp, attr);
                 }
-                const render::Cell cell = grid.at({col, p.row});
-                render::ColorAttr attr = cell.attr;
-                if (is_current) {
-                    attr.bg = 0xFFCC00U;  // amber — current match
-                    attr.fg = 0x000000U;
-                } else {
-                    attr.bg = 0x555500U;  // dark yellow — other matches
-                    attr.fg = 0xFFFFFFU;
-                }
-                grid.put({col, p.row}, cell.cp, attr);
             }
         }
+
+        if (debug_overlay_) {
+            render::apply_debug_overlay(g, page_.box);
+        }
+
+        self->overlay_dirty_ = false;
+        self->cached_focused_ = focused_;
+        self->cached_hits_ = search_hits_;
+        self->cached_hit_idx_ = search_hit_idx_;
     }
-    if (debug_overlay_) {
-        render::apply_debug_overlay(grid, page_.box);
-    }
-    return grid;
 }
 
 void BrowserView::draw() {
@@ -355,8 +376,9 @@ void BrowserView::draw() {
         return;
     }
 
+    ensure_display_grid();
     TDrawBuffer buf;
-    const render::CharGrid grid = render_grid();
+    const render::CharGrid& grid = *display_grid_;
     const int available = grid.rows() - scroll_row_;
     const int rows = std::min(size.y, available > 0 ? available : 0);
     for (int row = 0; row < rows; ++row) {
@@ -409,6 +431,8 @@ void BrowserView::scroll_to(int row) {
 }
 
 void BrowserView::relayout() {
+    base_dirty_ = true;
+    overlay_dirty_ = true;
     page_.box = layout::layout(*page_.tree, {size.x, size.y});
     links_ = layout::collect_links(page_.box);
     form_controls_ = layout::collect_form_controls(page_.box);
@@ -567,6 +591,7 @@ void BrowserView::handle_form_input(unsigned keyCode) {
         } else {
             val += static_cast<char>(char_code);
         }
+        base_dirty_ = true;
         drawView();
     } else if (char_code == 0x20U) {
         // Space toggles checkbox / selects radio.
@@ -576,9 +601,11 @@ void BrowserView::handle_form_input(unsigned keyCode) {
                                  ? it->second
                                  : (fc->node->attr("checked").data() != nullptr);
             form_values_.checked[fc->node] = !was;
+            base_dirty_ = true;
             drawView();
         } else if (fc->kind == layout::FormControlKind::Radio) {
             form_values_.checked[fc->node] = true;
+            base_dirty_ = true;
             drawView();
         }
     }
@@ -612,6 +639,7 @@ void BrowserView::cycle_select_option(int direction) {
     }
     const int n = static_cast<int>(vals.size());
     form_values_.text[node] = std::string(vals[static_cast<size_t>((idx + direction + n) % n)]);
+    base_dirty_ = true;
     drawView();
 }
 
@@ -888,6 +916,7 @@ void BrowserView::handleEvent(TEvent& event) {
         break;
     case 0x0004:  // Ctrl-D
         debug_overlay_ = !debug_overlay_;
+        overlay_dirty_ = true;
         drawView();
         clearEvent(event);
         break;
@@ -970,10 +999,17 @@ void BrowserView::find_matches_in_page(std::string_view term) {
         return;
     }
     search_len_ = static_cast<int>(needle.size());
-    const render::RenderOpts opts{page_.url, &visited_set()};
-    auto [grid, kept] = render::collapse_blank_rows(
-        render::render(page_.box, form_values_, opts));
-    kept_rows_ = kept;
+    // Ensure base_grid_ is up to date (rebuilds if dirty, no-op otherwise).
+    if (base_dirty_) {
+        const render::RenderOpts opts{page_.url, &visited_set()};
+        auto [g, kept] = render::collapse_blank_rows(
+            render::render(page_.box, form_values_, opts));
+        base_grid_ = std::move(g);
+        kept_rows_ = std::move(kept);
+        base_dirty_ = false;
+        overlay_dirty_ = true;
+    }
+    const render::CharGrid& grid = *base_grid_;
     const int len = static_cast<int>(needle.size());
     for (int row = 0; row < grid.rows(); ++row) {
         for (int col = 0; col + len <= grid.cols(); ++col) {
