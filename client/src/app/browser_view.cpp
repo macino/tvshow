@@ -244,14 +244,60 @@ const layout::FormFocus* BrowserView::focused_fc() const {
     return nullptr;
 }
 
+// Translate a point from collapsed (visual) row space to original (layout) row space.
+// kept_rows[collapsed_row] = original_row.
+static Point uncollapse_pt(Point pt, const std::vector<int>& kept_rows) {
+    const int r = pt.row;
+    if (!kept_rows.empty() && r >= 0 && r < static_cast<int>(kept_rows.size())) {
+        return {pt.col, kept_rows[static_cast<size_t>(r)]};
+    }
+    return pt;
+}
+
+// Map a span's rows from original (layout) space to collapsed (visual) space.
+// Rows that were collapsed away are dropped; rows that survive get their
+// row coordinate remapped.  Column coordinates are unchanged.
+static std::vector<layout::CellRect> map_spans(const std::vector<layout::CellRect>& spans,
+                                               const std::vector<int>& kept_rows) {
+    // Build inverse: original_row → collapsed_row (-1 if removed).
+    int max_orig = 0;
+    for (int k : kept_rows) max_orig = std::max(max_orig, k);
+    std::vector<int> orig_to_col(static_cast<size_t>(max_orig + 1), -1);
+    for (int i = 0; i < static_cast<int>(kept_rows.size()); ++i) {
+        orig_to_col[static_cast<size_t>(kept_rows[static_cast<size_t>(i)])] = i;
+    }
+
+    std::vector<layout::CellRect> out;
+    out.reserve(spans.size());
+    for (const auto& s : spans) {
+        const int r0 = s.origin.row;
+        const int r1 = r0 + s.size.rows - 1;
+        if (r0 < 0 || r0 > max_orig || r1 > max_orig) continue;
+        const int c0 = orig_to_col[static_cast<size_t>(r0)];
+        if (c0 < 0) continue;
+        // Find the last kept row within the span.
+        int c1 = c0;
+        for (int r = r1; r >= r0; --r) {
+            if (r <= max_orig && orig_to_col[static_cast<size_t>(r)] >= 0) {
+                c1 = orig_to_col[static_cast<size_t>(r)];
+                break;
+            }
+        }
+        out.push_back({{s.origin.col, c0}, {s.size.cols, c1 - c0 + 1}});
+    }
+    return out;
+}
+
 render::CharGrid BrowserView::render_grid() const {
     const render::RenderOpts opts{page_.url, &visited_set()};
-    render::CharGrid grid = render::collapse_blank_rows(
+    auto [grid, kept] = render::collapse_blank_rows(
         render::render(page_.box, form_values_, opts));
+    // Cache the row mapping for hit-test coordinate translation.
+    const_cast<BrowserView*>(this)->kept_rows_ = kept;
     if (is_link_focused()) {
-        render::apply_focus(grid, links_[static_cast<size_t>(focused_)].spans);
+        render::apply_focus(grid, map_spans(links_[static_cast<size_t>(focused_)].spans, kept));
     } else if (const layout::FormFocus* fc = focused_fc()) {
-        render::apply_focus(grid, {fc->span});
+        render::apply_focus(grid, map_spans({fc->span}, kept));
     }
     if (!search_hits_.empty() && search_len_ > 0) {
         for (int i = 0; i < static_cast<int>(search_hits_.size()); ++i) {
@@ -666,6 +712,7 @@ void BrowserView::submit_form() {
 }
 
 bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
+    pt = uncollapse_pt(pt, kept_rows_);
     for (const auto& link : links_) {
         for (const auto& span : link.spans) {
             if (span.contains(pt)) {
@@ -921,8 +968,9 @@ void BrowserView::find_matches_in_page(std::string_view term) {
     }
     search_len_ = static_cast<int>(needle.size());
     const render::RenderOpts opts{page_.url, &visited_set()};
-    const render::CharGrid grid = render::collapse_blank_rows(
+    auto [grid, kept] = render::collapse_blank_rows(
         render::render(page_.box, form_values_, opts));
+    kept_rows_ = kept;
     const int len = static_cast<int>(needle.size());
     for (int row = 0; row < grid.rows(); ++row) {
         for (int col = 0; col + len <= grid.cols(); ++col) {
@@ -1088,6 +1136,7 @@ void BrowserView::show_bookmarks_dialog() {
 }
 
 void BrowserView::update_hover(Point content_pt) {
+    content_pt = uncollapse_pt(content_pt, kept_rows_);
     const layout::Box* box = layout::hit_test(page_.box, content_pt);
     const dom::Node* node = (box != nullptr && box->node != nullptr) ? box->node->node : nullptr;
     if (node == hovered_node_) {

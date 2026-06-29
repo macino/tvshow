@@ -566,7 +566,7 @@ void apply_debug_overlay(CharGrid& grid, const layout::Box& root) {
     draw_box_outline(grid, root);
 }
 
-CharGrid collapse_blank_rows(const CharGrid& src, int max_consecutive) {
+CollapseResult collapse_blank_rows(const CharGrid& src, int max_consecutive) {
     const int cols = src.cols();
     const int rows = src.rows();
 
@@ -601,7 +601,7 @@ CharGrid collapse_blank_rows(const CharGrid& src, int max_consecutive) {
             }
         }
     }
-    return out;
+    return {std::move(out), std::move(keep)};
 }
 
 }  // namespace tvshow::render

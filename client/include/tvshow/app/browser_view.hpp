@@ -90,6 +90,10 @@ private:
     int focused_ = -1;    // index into links_ + form_controls_ (0..n-1), or -1
     int scroll_row_ = 0;  // current vertical scroll offset in rows
 
+    // kept_rows_[collapsed_row] = original_row; built by render_grid() from
+    // collapse_blank_rows. Used to translate between layout and visual coordinates.
+    std::vector<int> kept_rows_;
+
     TScrollBar* vscroll_{nullptr};  // non-owning; managed by BrowserWindow
 
     std::vector<std::string> history_;               // per-window, for back/forward only
