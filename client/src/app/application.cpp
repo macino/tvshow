@@ -14,6 +14,7 @@
 #include "tvshow/app/browser_window.hpp"
 #include "tvshow/app/commands.hpp"
 #include "tvshow/app/page.hpp"
+#include "tvshow/app/settings_dialog.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/util/url.hpp"
 
@@ -361,6 +362,8 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
                *new TMenuItem("Style: ~t~vision", cmStyleTvision, kbNoKey, hcNoContext) +
                *new TMenuItem("Style: ~L~ight",   cmStyleLight,   kbNoKey, hcNoContext) +
                *new TMenuItem("Style: ~D~ark",    cmStyleDark,    kbNoKey, hcNoContext) +
+               newLine() +
+               *new TMenuItem("~S~ettings...", cmSettings, kbNoKey, hcNoContext) +
                *new TSubMenu("~W~indow", kbAltW) +
                *new TMenuItem("~W~indow List...", cmWindowList, kbNoKey, hcNoContext));
 }
@@ -487,6 +490,11 @@ void Application::handleEvent(TEvent& event) {
         clearEvent(event);
         show_window_list();
         return;
+    case cmSettings:
+        clearEvent(event);
+        show_settings_dialog(shared_browsing_state_);
+        set_forced_style(shared_browsing_state_.forced_style);
+        return;
     case cmStyleAuto:
     case cmStyleTvision:
     case cmStyleLight:
@@ -497,13 +505,7 @@ void Application::handleEvent(TEvent& event) {
                              : (cmd == cmStyleLight)   ? ForcedStyle::Light
                              : (cmd == cmStyleDark)    ? ForcedStyle::Dark
                                                        : ForcedStyle::Auto;
-        shared_browsing_state_.forced_style = fs;
-        // Apply to all open windows.
-        deskTop->forEach([](TView* v, void*) {
-            if (auto* bw = dynamic_cast<BrowserWindow*>(v)) {
-                bw->apply_forced_style();
-            }
-        }, nullptr);
+        set_forced_style(fs);
         return;
     }
     default:
@@ -550,6 +552,18 @@ void Application::open_url(std::string_view url) {
     auto* win = new BrowserWindow(bounds, mode_, std::move(*blank), &shared_browsing_state_);
     deskTop->insert(win);
     win->navigate(url);
+}
+
+void Application::set_forced_style(ForcedStyle fs) {
+    shared_browsing_state_.forced_style = fs;
+    if (deskTop == nullptr) {
+        return;
+    }
+    deskTop->forEach([](TView* v, void*) {
+        if (auto* bw = dynamic_cast<BrowserWindow*>(v)) {
+            bw->apply_forced_style();
+        }
+    }, nullptr);
 }
 
 }  // namespace tvshow::app

@@ -128,6 +128,7 @@ add_executable(tvshow
     src/app/browser_view.cpp
     src/app/browser_window.cpp
     src/app/builtin_themes.cpp
+    src/app/settings_dialog.cpp
 )
 
 target_include_directories(tvshow

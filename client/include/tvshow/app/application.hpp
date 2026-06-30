@@ -28,6 +28,13 @@ public:
     // bad local path or unparseable HTML logs to stderr and is a no-op.
     void open_url(std::string_view url);
 
+    // Set forced style globally (called from main() after config load, and from
+    // the settings dialog after the user changes the style preference).
+    void set_forced_style(ForcedStyle fs);
+
+    // Expose shared state for the settings dialog.
+    SharedBrowsingState& browsing_state() { return shared_browsing_state_; }
+
 private:
     AddressBarMode mode_;
     SharedBrowsingState shared_browsing_state_;  // shared across all tabs

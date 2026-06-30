@@ -49,9 +49,10 @@ Config parse_config(std::string_view toml) {
             val = std::string(bare);
         }
 
-        if (key == "log-level")   { cfg.log_level   = std::move(val); }
-        else if (key == "address-bar") { cfg.address_bar = std::move(val); }
-        else if (key == "start-url")   { cfg.start_url   = std::move(val); }
+        if (key == "log-level")        { cfg.log_level     = std::move(val); }
+        else if (key == "address-bar") { cfg.address_bar   = std::move(val); }
+        else if (key == "start-url")   { cfg.start_url     = std::move(val); }
+        else if (key == "default-style") { cfg.default_style = std::move(val); }
         // Unknown keys are silently ignored.
     }
     return cfg;

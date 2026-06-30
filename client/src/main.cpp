@@ -1,4 +1,5 @@
 #include "tvshow/app/application.hpp"
+#include "tvshow/app/browser_view.hpp"
 #include "tvshow/app/browser_window.hpp"
 #include "tvshow/util/config.hpp"
 #include "tvshow/util/log.hpp"
@@ -23,6 +24,14 @@ auto main(int argc, char** argv) -> int {
     tvshow::util::log::Level log_level = tvshow::util::log::parse_level(cfg.log_level);
     std::string initial_url = cfg.start_url;
 
+    auto parse_style = [](std::string_view s) -> tvshow::app::ForcedStyle {
+        if (s == "tvision") return tvshow::app::ForcedStyle::Tvision;
+        if (s == "light")   return tvshow::app::ForcedStyle::Light;
+        if (s == "dark")    return tvshow::app::ForcedStyle::Dark;
+        return tvshow::app::ForcedStyle::Auto;
+    };
+    tvshow::app::ForcedStyle default_style = parse_style(cfg.default_style);
+
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg(argv[i]);
         if (arg == "--address-bar=persistent") {
@@ -31,6 +40,8 @@ auto main(int argc, char** argv) -> int {
             mode = tvshow::app::AddressBarMode::Modal;
         } else if (arg.starts_with("--log-level=")) {
             log_level = tvshow::util::log::parse_level(arg.substr(12));
+        } else if (arg.starts_with("--style=")) {
+            default_style = parse_style(arg.substr(8));
         } else if (arg.starts_with("--config=")) {
             // already handled above
         } else if (!arg.starts_with("--")) {
@@ -41,6 +52,7 @@ auto main(int argc, char** argv) -> int {
     tvshow::util::log::init(log_level);
 
     tvshow::app::Application app(mode);
+    app.set_forced_style(default_style);
     try {
         if (!initial_url.empty()) {
             app.open_url(initial_url);
