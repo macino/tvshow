@@ -532,6 +532,16 @@ void BrowserView::apply_loaded_page() {
     form_values_ = {};
     focused_ = -1;
     scroll_row_ = 0;
+    // If a forced style is active, re-resolve immediately so the new page
+    // renders with the override rather than its own author CSS.
+    if (shared_ != nullptr && shared_->forced_style != ForcedStyle::Auto) {
+        forced_sheets_css_ = nullptr;  // invalidate cache for new page URL context
+        forced_sheets_.clear();
+        if (auto new_tree = style::resolve(page_.doc, effective_sheets())) {
+            page_.tree = std::make_unique<style::StyledNode>(std::move(*new_tree));
+            page_.sheets = {};
+        }
+    }
     relayout();
 
     if (!result.fragment.empty()) {
