@@ -389,7 +389,11 @@ void BrowserView::draw() {
 
 void BrowserView::changeBounds(const TRect& bounds) {
     TView::changeBounds(bounds);
-    relayout();
+    resize_pending_ = true;
+    last_resize_ = std::chrono::steady_clock::now();
+    // Defer the expensive relayout until resizing settles (see tick_if_loading).
+    // Draw the old cached grid in the meantime — it may be clipped but avoids
+    // layout thrash on every drag step.
     drawView();
 }
 
@@ -566,6 +570,15 @@ void BrowserView::tick_if_loading() {
         apply_loaded_page();
     } else if (loading_.load(std::memory_order_acquire)) {
         drawView();
+    }
+    if (resize_pending_) {
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - last_resize_).count();
+        if (ms >= kResizeDebounceMs) {
+            resize_pending_ = false;
+            relayout();
+            drawView();
+        }
     }
 }
 

@@ -111,6 +111,12 @@ private:
 
     SharedBrowsingState* shared_{nullptr};  // non-owning; null in standalone mode
 
+    // Resize debounce: changeBounds records the time; tick_if_loading() fires
+    // relayout after kResizeDebounceMs of no further resize events.
+    static constexpr int kResizeDebounceMs = 150;
+    bool resize_pending_ = false;
+    std::chrono::steady_clock::time_point last_resize_;
+
     // Async loading state.
     struct PendingLoad {
         std::optional<Page> page;
