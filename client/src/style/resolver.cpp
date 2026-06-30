@@ -696,6 +696,10 @@ bool apply_other_props(ComputedStyle& style, std::string_view prop, std::string_
             style.position = Position::Relative;
         } else if (val == "absolute") {
             style.position = Position::Absolute;
+        } else if (val == "fixed") {
+            style.position = Position::Fixed;
+        } else if (val == "sticky") {
+            style.position = Position::Sticky;
         } else {
             style.position = Position::Static;
         }

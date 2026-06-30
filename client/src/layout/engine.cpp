@@ -300,6 +300,13 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
         if (disp == style::Display::None) {
             continue;
         }
+        // Fixed/sticky elements are overlaid in real browsers (z-index layers).
+        // tvshow has no layer model — skip them from flow to avoid nav bars and
+        // cookie banners appearing before the main content.
+        if (child.style.position == style::Position::Fixed ||
+            child.style.position == style::Position::Sticky) {
+            continue;
+        }
         if (disp == style::Display::Block || disp == style::Display::Flex ||
             disp == style::Display::InlineBlock) {
             const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
@@ -371,6 +378,10 @@ std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_ro
             continue;
         }
         if (child.style.display == style::Display::None) {
+            continue;
+        }
+        if (child.style.position == style::Position::Fixed ||
+            child.style.position == style::Position::Sticky) {
             continue;
         }
         const FormControlKind fck = form_control_kind(*child.node);

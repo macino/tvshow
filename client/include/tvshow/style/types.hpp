@@ -84,7 +84,9 @@ enum class AlignItems : uint8_t { FlexStart, FlexEnd, Center, Stretch, Baseline 
 enum class Visibility : uint8_t { Visible, Hidden };
 enum class Overflow : uint8_t { Visible, Hidden, Scroll, Auto };
 enum class ListMarker : uint8_t { None, Disc, Decimal };
-enum class Position : uint8_t { Static, Relative, Absolute };
+// Fixed and Sticky are out-of-flow in real browsers (overlaid via z-index).
+// tvshow has no layer model, so we remove them from the document flow entirely.
+enum class Position : uint8_t { Static, Relative, Absolute, Fixed, Sticky };
 
 // ── Border ───────────────────────────────────────────────────────────────────
 
