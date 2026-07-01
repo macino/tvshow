@@ -124,7 +124,8 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
 std::optional<Page> post_page(std::string_view action_url, std::string_view body,
                               layout::Viewport vp, net::CookieJar* jar) {
     Fetched fetched;
-    const auto parsed = util::Url::parse(action_url);
+    std::string final_url = std::string(action_url);
+    auto parsed = util::Url::parse(action_url);
     if (!parsed) {
         fetched = {error_page_html("Invalid URL",
                                    "Invalid form action: " + std::string(action_url)),
@@ -136,7 +137,10 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
             const std::string cookie_val = jar->cookie_header(parsed->host(), parsed->path().empty() ? "/" : parsed->path());
             if (!cookie_val.empty()) { req_headers["Cookie"] = cookie_val; }
         }
-        const net::Result result = client.post(*parsed, body, req_headers);
+        // max_redirects=0: we handle the redirect ourselves so that Set-Cookie
+        // from the POST response is stored before the redirect GET is issued.
+        // (Following the redirect inside the HTTP client loses the auth cookie.)
+        const net::Result result = client.post(*parsed, body, req_headers, 0);
         if (const auto* err = std::get_if<net::NetworkError>(&result)) {
             fetched = {error_page_html("Network Error", err->message), true};
         } else {
@@ -144,7 +148,18 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
             if (jar != nullptr && !resp.set_cookies.empty()) {
                 jar->store(parsed->host(), resp.set_cookies);
             }
-            if (resp.status >= 400) {
+            if (resp.status >= 300 && resp.status < 400) {
+                // Redirect: store cookies first (above), then GET the target
+                // with the freshly-updated jar so auth cookies are included.
+                const auto loc_it = resp.headers.find("location");
+                if (loc_it != resp.headers.end()) {
+                    if (const auto redirect_url = parsed->resolve(loc_it->second)) {
+                        fetched = fetch_http(*redirect_url, jar);
+                        final_url = redirect_url->to_string();
+                        parsed = redirect_url;
+                    }
+                }
+            } else if (resp.status >= 400) {
                 fetched = {
                     error_page_html("HTTP " + std::to_string(resp.status),
                                     "The server returned an error for " + std::string(action_url)),
@@ -162,7 +177,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
     }
     std::vector<css::Stylesheet> sheets;
     if (!fetched.is_error) {
-        sheets = fetch_external_sheets(action_url, *doc);
+        sheets = fetch_external_sheets(final_url, *doc);
     }
     for (const auto& css_text : doc->inline_styles) {
         if (auto sheet = css::parse(css_text)) {
@@ -175,7 +190,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
         return std::nullopt;
     }
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
-    Page page{std::string(action_url), std::move(*doc), std::move(sheets), std::move(styled_tree), {}};
+    Page page{final_url, std::move(*doc), std::move(sheets), std::move(styled_tree), {}};
     page.box = layout::layout(*page.tree, vp);
     return page;
 }

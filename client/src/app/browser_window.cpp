@@ -4,6 +4,7 @@
 #include "tvshow/app/page.hpp"
 
 #define Uses_TEvent
+#define Uses_TFrame
 #define Uses_TKeys
 #define Uses_TScrollBar
 #include "tvshow/util/url.hpp"
@@ -202,6 +203,19 @@ void BrowserWindow::reload() {
 
 void BrowserWindow::tick_if_loading() {
     view_->tick_if_loading();
+    // Sync title and address bar to the URL of the page that just landed.
+    const std::string_view cur = current_url();
+    if (title == nullptr || std::string_view(title) != cur) {
+        delete[] title;  // NOLINT
+        title = newStr(cur);
+        frame->drawView();
+        if (mode_ == AddressBarMode::Persistent && bar_ != nullptr) {
+            std::array<char, kUrlMaxLen + 1> buf{};
+            std::strncpy(buf.data(), std::string(cur).c_str(), kUrlMaxLen);
+            bar_->setData(buf.data());
+            bar_->drawView();
+        }
+    }
 }
 
 }  // namespace tvshow::app
