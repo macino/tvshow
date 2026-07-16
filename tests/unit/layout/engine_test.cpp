@@ -240,3 +240,41 @@ TEST_CASE("layout: position:absolute places box relative to parent content origi
     CHECK(p->border_box.origin.col == div->content_box.origin.col + 1);  // left: 8px = 1ch
     CHECK(p->border_box.origin.row == div->content_box.origin.row + 1);  // top: 16px = 1row
 }
+
+TEST_CASE("layout: position:absolute skips a static intermediate to find the positioned ancestor") {
+    auto [doc, tree] = make_tree(
+        "<body><div style='position: relative; padding: 16px;'>"
+        "<section><p>x</p></section></div></body>",
+        "p { position: absolute; left: 8px; top: 16px; }");
+    const Box root = layout(tree, {80, 24});
+    const auto* div = find_box(root, "div");
+    const auto* p = find_box(root, "p");
+    REQUIRE(div != nullptr);
+    REQUIRE(p != nullptr);
+    // section is position:static (default) -- p must anchor to div, not section.
+    CHECK(p->border_box.origin.col == div->content_box.origin.col + 1);
+    CHECK(p->border_box.origin.row == div->content_box.origin.row + 1);
+}
+
+TEST_CASE("layout: position:absolute falls back to the viewport when no ancestor is positioned") {
+    auto [doc, tree] = make_tree("<body><p>x</p></body>",
+                                 "p { position: absolute; left: 8px; top: 16px; }");
+    const Box root = layout(tree, {80, 24});
+    const auto* p = find_box(root, "p");
+    REQUIRE(p != nullptr);
+    CHECK(p->border_box.origin.col == 1);  // 8px / 8 = 1 col from viewport origin
+    CHECK(p->border_box.origin.row == 1);  // 16px / 16 = 1 row from viewport origin
+}
+
+TEST_CASE("layout: position:absolute is removed from flow and doesn't push down siblings") {
+    auto [doc, tree] = make_tree(
+        "<body><div style='height: 32px; position: absolute;'></div>"
+        "<p>after</p></body>",
+        "");
+    const Box root = layout(tree, {80, 24});
+    const auto* p = find_box(root, "p");
+    REQUIRE(p != nullptr);
+    // Had the absolute div reserved its 32px (2 rows) of flow space, p would
+    // start at row 2 instead of row 0.
+    CHECK(p->border_box.origin.row == 0);
+}

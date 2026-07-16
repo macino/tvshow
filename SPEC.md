@@ -2,7 +2,7 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: **M0 complete**. M1 in progress — nav history, hover, debug overlay, table columns, scroll indicator all resolved. Remaining: CSS `position` (Q-25), image renderer wiring (Q-23, blocked on vendoring `stb_image.h`).
+> Status: **M0 complete**. M1 nearly done — nav history, hover, debug overlay, table columns, scroll indicator, CSS `position` all resolved. Remaining: image renderer wiring (Q-23, blocked on vendoring `stb_image.h`).
 
 ---
 
@@ -208,7 +208,7 @@ Limitations: no `colspan`, no `rowspan`, no CSS `border-collapse`.
 3. `<style>` blocks.
 4. Inline `style="..."`.
 
-Cascade order, specificity, and `!important` follow CSS spec. Katana provides selector ASTs; our matcher implements descendant, child, class, id, tag, attribute existence, `:hover` (M1 — mouse-over hit-test, style recalc on change), `:focus`.
+Cascade order, specificity, and `!important` follow CSS spec. Katana provides selector ASTs; our matcher implements descendant, child, class, id, tag, attribute existence, `:hover` (mouse-over hit-test, style recalc on change — see Q-10), `:focus`.
 
 ### 7.2 Honored Properties
 | Group | Properties |
@@ -450,7 +450,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-22 | Debug overlay enrichment | **Resolved**: Ctrl-D overlay draws box `WxH` dims top-right of each outlined box (`draw_box_outline`), and a focus-order index (`0,1,2,...`) at the origin of each link/form-control span, in `total_focusables()` order (`apply_focus_order_labels`). |
 | Q-23 | `<img>` ASCII-art renderer | **M1**: add `BrailleRenderer` (or similar) behind `ImageRenderer` interface. Fetch image bytes, quantize to braille dots. Config chooses renderer (`alt` default, `braille` opt-in). |
 | Q-24 | Table column alignment | **Resolved**: `compute_table_col_widths()` measures max cell content-width per column index across all rows (handles `thead`/`tbody`/`tfoot` wrappers), stashed thread-locally (`g_table_col_widths`) and consulted by `layout_flex()` per `<tr>` in place of per-row flex-basis. |
-| Q-25 | CSS `position: relative/absolute` | **M1**: add `position` property to §7.2. `relative` offsets from normal-flow position. `absolute` positions relative to nearest positioned ancestor. `top`, `left`, `right`, `bottom` in px/ch/%. |
+| Q-25 | CSS `position: relative/absolute` | **Resolved**: `position` in §7.2 (`Position` enum, `top`/`left_offset`/`right_offset`/`bottom` on `ComputedStyle`). `relative` offsets from normal-flow position without affecting siblings. `absolute` is removed from flow (no space reserved) and offsets against the nearest ancestor with `position != static` (`apply_position_offsets` tracks a containing-block box separately from the immediate parent), falling back to the viewport when none exists. `fixed`/`sticky` are dropped from flow entirely (no layer model). |
 | Q-26 | Scroll position indicator | **Resolved**: window title shows `[pct%]` scroll position when content exceeds viewport height (`BrowserView::sync_vscroll()`). |
 
 ### 20.1 Milestone 1 (M1) Scope
@@ -458,9 +458,8 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
 | M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` classes + tests exist but are dead code — no fetch/decode/config wiring. Blocked: needs `stb_image.h` vendored (ADR-004), which needs a one-time approved network fetch. | Q-23 |
-| M1-css-position | CSS `position: relative/absolute` | New layout pass for positioned elements; `top/left/right/bottom` | Q-25 |
 
-~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~, ~~M1-debug-overlay~~, ~~M1-table-cols~~ resolved — see Q-21, Q-26, Q-10, Q-22, Q-24 above.
+~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~, ~~M1-debug-overlay~~, ~~M1-table-cols~~, ~~M1-css-position~~ resolved — see Q-21, Q-26, Q-10, Q-22, Q-24, Q-25 above. M1-img-renderer is the sole remaining M1 item, blocked as noted.
 
 ---
 

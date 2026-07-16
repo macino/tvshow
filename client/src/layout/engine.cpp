@@ -311,7 +311,14 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
             disp == style::Display::InlineBlock) {
             const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
             Box child_box = layout_node(child, {content_origin.col, y}, content_w, avail_h);
-            y += cmar.top + child_box.border_box.size.rows + cmar.bottom;
+            // position:absolute is removed from normal flow (SPEC Q-25): it still
+            // gets an intrinsic size and a static fallback position (used when
+            // top/left/right/bottom are all auto), but doesn't reserve flow space
+            // for following siblings. apply_position_offsets() re-anchors it to
+            // its nearest positioned ancestor afterwards.
+            if (child.style.position != style::Position::Absolute) {
+                y += cmar.top + child_box.border_box.size.rows + cmar.bottom;
+            }
             children.push_back(std::move(child_box));
         }
     }
@@ -647,9 +654,12 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
 }  // namespace
 
 // Apply position offsets to a laid-out box (SPEC §20 Q-25).
-// relative: offset from normal-flow position.
-// absolute: offset from parent content origin (simplified — no containing block search).
-void apply_position_offsets(Box& box, CellPos parent_content_origin, int parent_w, int parent_h) {
+// relative: offset from normal-flow position (relative to the immediate parent).
+// absolute: offset from the nearest ancestor with position != static (`anc_*`),
+// or the viewport when no ancestor is positioned. Any position != static
+// establishes a new containing block for absolutely-positioned descendants.
+void apply_position_offsets(Box& box, int parent_w, int parent_h, CellPos anc_origin, int anc_w,
+                            int anc_h) {
     if (box.node == nullptr) { return; }
     const auto& st = box.node->style;
     if (st.position == style::Position::Relative) {
@@ -671,39 +681,43 @@ void apply_position_offsets(Box& box, CellPos parent_content_origin, int parent_
         box.content_box.origin.row += dy;
     } else if (st.position == style::Position::Absolute) {
         if (!st.left_offset.is_auto) {
-            const int x = parent_content_origin.col + resolve_h(st.left_offset, parent_w);
+            const int x = anc_origin.col + resolve_h(st.left_offset, anc_w);
             const int dx = x - box.border_box.origin.col;
             box.border_box.origin.col += dx;
             box.content_box.origin.col += dx;
         } else if (!st.right_offset.is_auto) {
-            const int x = parent_content_origin.col + parent_w -
-                          resolve_h(st.right_offset, parent_w) - box.border_box.size.cols;
+            const int x = anc_origin.col + anc_w - resolve_h(st.right_offset, anc_w) -
+                          box.border_box.size.cols;
             const int dx = x - box.border_box.origin.col;
             box.border_box.origin.col += dx;
             box.content_box.origin.col += dx;
         }
         if (!st.top.is_auto) {
-            const int y = parent_content_origin.row + resolve_v(st.top, parent_h);
+            const int y = anc_origin.row + resolve_v(st.top, anc_h);
             const int dy = y - box.border_box.origin.row;
             box.border_box.origin.row += dy;
             box.content_box.origin.row += dy;
         } else if (!st.bottom.is_auto) {
-            const int y = parent_content_origin.row + parent_h -
-                          resolve_v(st.bottom, parent_h) - box.border_box.size.rows;
+            const int y = anc_origin.row + anc_h - resolve_v(st.bottom, anc_h) -
+                          box.border_box.size.rows;
             const int dy = y - box.border_box.origin.row;
             box.border_box.origin.row += dy;
             box.content_box.origin.row += dy;
         }
     }
+    const bool establishes_cb = st.position != style::Position::Static;
+    const CellPos next_anc_origin = establishes_cb ? box.content_box.origin : anc_origin;
+    const int next_anc_w = establishes_cb ? box.content_box.size.cols : anc_w;
+    const int next_anc_h = establishes_cb ? box.content_box.size.rows : anc_h;
     for (auto& child : box.children) {
-        apply_position_offsets(child, box.content_box.origin, box.content_box.size.cols,
-                               box.content_box.size.rows);
+        apply_position_offsets(child, box.content_box.size.cols, box.content_box.size.rows,
+                               next_anc_origin, next_anc_w, next_anc_h);
     }
 }
 
 Box layout(const style::StyledNode& root, Viewport vp) {
     Box root_box = layout_block(root, {0, 0}, vp.cols, vp.rows);
-    apply_position_offsets(root_box, {0, 0}, vp.cols, vp.rows);
+    apply_position_offsets(root_box, vp.cols, vp.rows, {0, 0}, vp.cols, vp.rows);
     root_box.border_box.size.rows = std::max(root_box.border_box.size.rows, vp.rows);
     return root_box;
 }
