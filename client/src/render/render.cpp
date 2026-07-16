@@ -566,6 +566,23 @@ void apply_debug_overlay(CharGrid& grid, const layout::Box& root) {
     draw_box_outline(grid, root);
 }
 
+void apply_focus_order_labels(CharGrid& grid, const std::vector<layout::CellRect>& anchors) {
+    constexpr ColorAttr k_label{0x000000U, 0xFFFF00U};  // black on yellow
+    for (size_t i = 0; i < anchors.size(); ++i) {
+        const layout::CellRect& span = anchors[i];
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%u", static_cast<unsigned>(std::min(i, size_t{999})));
+        int c = span.origin.col;
+        const int row = span.origin.row;
+        for (const char* p = buf; *p != '\0'; ++p) {
+            if (c >= 0 && c < grid.cols() && row >= 0 && row < grid.rows()) {
+                grid.put({c, row}, static_cast<char32_t>(*p), k_label);
+            }
+            ++c;
+        }
+    }
+}
+
 CollapseResult collapse_blank_rows(const CharGrid& src, int max_consecutive) {
     const int cols = src.cols();
     const int rows = src.rows();

@@ -342,6 +342,27 @@ void BrowserView::ensure_display_grid() const {
 
         if (debug_overlay_) {
             render::apply_debug_overlay(g, page_.box);
+
+            // Focus-order labels: links first, then form controls, matching
+            // total_focusables()/is_link_focused()/focused_fc() ordering.
+            // map_spans() drops spans whose row got collapsed away, so each
+            // anchor is mapped individually to keep list index == focus index
+            // (a dropped span becomes an off-grid sentinel, silently skipped
+            // by apply_focus_order_labels' bounds check).
+            auto map_one = [this](const layout::CellRect& span) {
+                const auto mapped = map_spans({span}, kept_rows_);
+                return mapped.empty() ? layout::CellRect{{-1, -1}, {0, 0}} : mapped.front();
+            };
+            std::vector<layout::CellRect> anchors;
+            anchors.reserve(links_.size() + form_controls_.size());
+            for (const auto& link : links_) {
+                anchors.push_back(link.spans.empty() ? layout::CellRect{{-1, -1}, {0, 0}}
+                                                      : map_one(link.spans.front()));
+            }
+            for (const auto& fc : form_controls_) {
+                anchors.push_back(map_one(fc.span));
+            }
+            render::apply_focus_order_labels(g, anchors);
         }
 
         self->overlay_dirty_ = false;

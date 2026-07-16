@@ -48,6 +48,11 @@ void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans);
 // Corners: ┌┐└┘  edges: ─ │
 void apply_debug_overlay(CharGrid& grid, const layout::Box& root);
 
+// Paints a focus-order index (0, 1, 2, ...) at the start of each anchor span,
+// in the order given (links then form controls, as BrowserView tracks focus).
+// Part of the Ctrl-D debug overlay.
+void apply_focus_order_labels(CharGrid& grid, const std::vector<layout::CellRect>& anchors);
+
 // Result of collapse_blank_rows: collapsed grid + row mapping.
 // kept_rows[collapsed_row] = original_row in the source grid.
 struct CollapseResult {

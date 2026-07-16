@@ -268,6 +268,26 @@ TEST_CASE("apply_focus: clips spans that extend past the grid bounds") {
     CHECK(grid.at({9, 4}).attr.fg != 0xFFFFFFU);
 }
 
+TEST_CASE("apply_focus_order_labels: paints index digits at each anchor's origin") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>");
+    const Box box = layout(tree, {10, 5});
+    CharGrid grid = tvshow::render::render(box);
+    tvshow::render::apply_focus_order_labels(grid, {{{0, 0}, {1, 1}}, {{3, 1}, {1, 1}}});
+    CHECK(grid.at({0, 0}).cp == U'0');
+    CHECK(grid.at({3, 1}).cp == U'1');
+}
+
+TEST_CASE("apply_focus_order_labels: skips off-grid anchors without throwing") {
+    auto [doc, tree] = make_tree("<body><p>hi</p></body>");
+    const Box box = layout(tree, {10, 5});
+    CharGrid grid = tvshow::render::render(box);
+    const auto before = grid.at({0, 0}).cp;
+    tvshow::render::apply_focus_order_labels(grid, {{{-1, -1}, {0, 0}}, {{0, 0}, {1, 1}}});
+    // Index 0 is the off-grid sentinel (skipped); index 1 lands at {0,0}.
+    CHECK(grid.at({0, 0}).cp == U'1');
+    CHECK(before != U'1');
+}
+
 // ── form controls ─────────────────────────────────────────────────────────────
 
 TEST_CASE("render: text input draws brackets and initial value") {

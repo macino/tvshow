@@ -445,7 +445,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-19 | Config file location and format | **Resolved**: `~/.config/tvshow/config.toml` (TOML subset); CLI flags override. XDG_CONFIG_HOME respected. |
 | Q-20 | Form `enctype: multipart/form-data` | Deferred (tied to file upload, needs file dialog). |
 | Q-21 | Navigation history UX | **Resolved**: back/forward stack (`navigate_back`/`navigate_forward`), exposed via Alt-Left/Alt-Right (status line + menu). Window title shows `(pos/total)` history position, appended alongside scroll `[pct%]`. |
-| Q-22 | Debug overlay enrichment | **M1**: extend Ctrl-D overlay with box dimensions (WxH in cells) and focus-order index labels. Deferred from Q-12. |
+| Q-22 | Debug overlay enrichment | **Resolved**: Ctrl-D overlay draws box `WxH` dims top-right of each outlined box (`draw_box_outline`), and a focus-order index (`0,1,2,...`) at the origin of each link/form-control span, in `total_focusables()` order (`apply_focus_order_labels`). |
 | Q-23 | `<img>` ASCII-art renderer | **M1**: add `BrailleRenderer` (or similar) behind `ImageRenderer` interface. Fetch image bytes, quantize to braille dots. Config chooses renderer (`alt` default, `braille` opt-in). |
 | Q-24 | Table column alignment | **M1**: compute max column widths across all rows; distribute evenly or proportionally. Replace current flex-reuse sizing which misaligns on unequal cell counts. |
 | Q-25 | CSS `position: relative/absolute` | **M1**: add `position` property to §7.2. `relative` offsets from normal-flow position. `absolute` positions relative to nearest positioned ancestor. `top`, `left`, `right`, `bottom` in px/ch/%. |
@@ -455,12 +455,11 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
-| M1-debug-overlay | Debug overlay enrichment | Box dimensions + focus-order labels in Ctrl-D overlay | Q-22 |
 | M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` impl behind `ImageRenderer` interface | Q-23 |
 | M1-table-cols | Table column alignment | Cross-row max-width column sizing | Q-24 |
 | M1-css-position | CSS `position: relative/absolute` | New layout pass for positioned elements; `top/left/right/bottom` | Q-25 |
 
-~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~ resolved — see Q-21, Q-26, Q-10 above.
+~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~, ~~M1-debug-overlay~~ resolved — see Q-21, Q-26, Q-10, Q-22 above.
 
 ---
 
