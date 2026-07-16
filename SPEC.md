@@ -433,7 +433,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-7 | HTTPS via cpp-httplib + OpenSSL | **Resolved**: already implemented — CPPHTTPLIB_OPENSSL_SUPPORT enabled in cmake/HttpLib.cmake, OpenSSL linked; Url::parse accepts https:// and maps port to 443; httplib::Client auto-selects SSLClient. |
 | Q-8 | Charset support beyond UTF-8 | **Resolved**: POSIX iconv from glibc/libc (no new dep); Content-Type header > meta prescan > assume UTF-8. See ADR 003. |
 | Q-9 | Cookies / sessions | **Resolved**: in-memory session CookieJar (RFC 6265 §5 simplified); no persistence, no Secure/SameSite enforcement; per-SharedBrowsingState (shared across tabs). |
-| Q-10 | `:hover` semantics in terminal | **M1**: equate to mouse-over (TV mouse tracking already active). Apply `:hover` styles when mouse enters a box's hit-test area; remove on leave. No keyboard equivalent. |
+| Q-10 | `:hover` semantics in terminal | **Resolved**: mouse-over hit-test (`BrowserView::update_hover`) rebuilds a single-node hovered set, re-resolves style, relayouts, repaints (`restyle_for_hover`). No ancestor chain (only the directly hovered node matches `:hover`, not ancestors) — covers the common `a:hover`/`.btn:hover` case. No keyboard equivalent. |
 | Q-11 | Anchor navigation animation policy | **Resolved**: instant — `#fragment` jumps directly to the anchor row with no animation. |
 | Q-12 | Debug overlay (Ctrl-D) detail | **Resolved**: box outlines in magenta (Ctrl-D toggle); focus-order labels and box-dim display deferred. |
 | Q-13 | `<table>` support | **Resolved**: flex-reuse layout in UA stylesheet (ADR 002); no colspan/rowspan. |
@@ -455,13 +455,12 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
-| M1-hover | `:hover` pseudo-class | Mouse-over hit-test → style recalc → repaint | Q-10 |
 | M1-debug-overlay | Debug overlay enrichment | Box dimensions + focus-order labels in Ctrl-D overlay | Q-22 |
 | M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` impl behind `ImageRenderer` interface | Q-23 |
 | M1-table-cols | Table column alignment | Cross-row max-width column sizing | Q-24 |
 | M1-css-position | CSS `position: relative/absolute` | New layout pass for positioned elements; `top/left/right/bottom` | Q-25 |
 
-~~M1-nav-history~~ and ~~M1-scroll-indicator~~ resolved — see Q-21, Q-26 above.
+~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~ resolved — see Q-21, Q-26, Q-10 above.
 
 ---
 
