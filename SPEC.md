@@ -2,7 +2,7 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: **M0 complete**. M1 in progress — navigation UX, hover, debug overlay, image rendering, table columns, CSS position, scroll indicator.
+> Status: **M0 complete**. M1 in progress — nav history, hover, debug overlay, table columns, scroll indicator all resolved. Remaining: CSS `position` (Q-25), image renderer wiring (Q-23, blocked on vendoring `stb_image.h`).
 
 ---
 
@@ -190,8 +190,10 @@ Layout is implemented via the existing flex engine (ADR 002):
 | `caption` | block; font-weight: bold |
 | `colgroup` / `col` | none |
 
-Limitations: no `colspan`, no `rowspan`, no CSS `border-collapse`. Rows with unequal cell counts
-produce misaligned columns.
+Column widths align across rows: `compute_table_col_widths()` takes the max cell content-width
+per column index across all rows and applies it uniformly (see Q-24).
+
+Limitations: no `colspan`, no `rowspan`, no CSS `border-collapse`.
 
 ### 6.7 Out of subset
 `script`, `iframe`, `video`, `audio`, `canvas`, `svg` — parsed and skipped (children rendered as if their parent were `div`).
@@ -447,7 +449,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-21 | Navigation history UX | **Resolved**: back/forward stack (`navigate_back`/`navigate_forward`), exposed via Alt-Left/Alt-Right (status line + menu). Window title shows `(pos/total)` history position, appended alongside scroll `[pct%]`. |
 | Q-22 | Debug overlay enrichment | **Resolved**: Ctrl-D overlay draws box `WxH` dims top-right of each outlined box (`draw_box_outline`), and a focus-order index (`0,1,2,...`) at the origin of each link/form-control span, in `total_focusables()` order (`apply_focus_order_labels`). |
 | Q-23 | `<img>` ASCII-art renderer | **M1**: add `BrailleRenderer` (or similar) behind `ImageRenderer` interface. Fetch image bytes, quantize to braille dots. Config chooses renderer (`alt` default, `braille` opt-in). |
-| Q-24 | Table column alignment | **M1**: compute max column widths across all rows; distribute evenly or proportionally. Replace current flex-reuse sizing which misaligns on unequal cell counts. |
+| Q-24 | Table column alignment | **Resolved**: `compute_table_col_widths()` measures max cell content-width per column index across all rows (handles `thead`/`tbody`/`tfoot` wrappers), stashed thread-locally (`g_table_col_widths`) and consulted by `layout_flex()` per `<tr>` in place of per-row flex-basis. |
 | Q-25 | CSS `position: relative/absolute` | **M1**: add `position` property to §7.2. `relative` offsets from normal-flow position. `absolute` positions relative to nearest positioned ancestor. `top`, `left`, `right`, `bottom` in px/ch/%. |
 | Q-26 | Scroll position indicator | **Resolved**: window title shows `[pct%]` scroll position when content exceeds viewport height (`BrowserView::sync_vscroll()`). |
 
@@ -455,11 +457,10 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
-| M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` impl behind `ImageRenderer` interface | Q-23 |
-| M1-table-cols | Table column alignment | Cross-row max-width column sizing | Q-24 |
+| M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` classes + tests exist but are dead code — no fetch/decode/config wiring. Blocked: needs `stb_image.h` vendored (ADR-004), which needs a one-time approved network fetch. | Q-23 |
 | M1-css-position | CSS `position: relative/absolute` | New layout pass for positioned elements; `top/left/right/bottom` | Q-25 |
 
-~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~, ~~M1-debug-overlay~~ resolved — see Q-21, Q-26, Q-10, Q-22 above.
+~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~, ~~M1-debug-overlay~~, ~~M1-table-cols~~ resolved — see Q-21, Q-26, Q-10, Q-22, Q-24 above.
 
 ---
 
