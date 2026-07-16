@@ -477,14 +477,15 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
     const std::string fetch_url = base_url.empty() ? url : base_url;
     const Size vp{size.x, size.y};
 
-    loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp]() {
+    const bool skip_css = (shared_ != nullptr && shared_->forced_style != ForcedStyle::Auto);
+    loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp, skip_css]() {
         // Inner thread does the blocking HTTP fetch.
         std::atomic<bool> inner_done{false};
         std::optional<Page> loaded;
         std::thread inner([&]() {
             try {
                 net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
-                loaded = load_page(fetch_url, vp, jar);
+                loaded = load_page(fetch_url, vp, jar, skip_css);
             } catch (...) {
                 // loaded stays nullopt; apply_loaded_page handles it
             }
@@ -595,28 +596,47 @@ void BrowserView::focus_next(int direction) {
     drawView();
 }
 
-void BrowserView::handle_form_input(unsigned keyCode) {
+void BrowserView::focus_first() {
+    if (total_focusables() == 0) { return; }
+    focused_ = 0;
+    drawView();
+}
+
+void BrowserView::handle_form_input(unsigned keyCode, std::string_view text) {
     const layout::FormFocus* fc = focused_fc();
     if (fc == nullptr) {
         return;
     }
+    // On Linux terminals, printable chars arrive with keyCode==0 and the
+    // actual UTF-8 bytes in `text`.  Special keys (Backspace, Enter) use
+    // keyCode only.
     const unsigned char_code = keyCode & 0xFFU;
+    const bool is_backspace = (char_code == 0x08U);
+    const bool is_newline   = (char_code == 0x0DU);
+
     if (fc->kind == layout::FormControlKind::Text ||
         fc->kind == layout::FormControlKind::Password ||
         fc->kind == layout::FormControlKind::Textarea) {
         auto& val = form_values_.text[fc->node];
-        if (char_code == 0x08U) {
+        if (is_backspace) {
+            // Pop the last UTF-8 character (one or more bytes).
             if (!val.empty()) {
-                val.pop_back();
+                // Walk backwards to the start of the last code point.
+                auto it = val.end();
+                --it;
+                while (it != val.begin() && (static_cast<unsigned char>(*it) & 0xC0U) == 0x80U) {
+                    --it;
+                }
+                val.erase(it, val.end());
             }
-        } else if (fc->kind == layout::FormControlKind::Textarea && char_code == 0x0DU) {
+        } else if (fc->kind == layout::FormControlKind::Textarea && is_newline) {
             val += '\n';
-        } else {
-            val += static_cast<char>(char_code);
+        } else if (!text.empty()) {
+            val += text;
         }
         base_dirty_ = true;
         drawView();
-    } else if (char_code == 0x20U) {
+    } else if (text == " " || char_code == 0x20U) {
         // Space toggles checkbox / selects radio.
         if (fc->kind == layout::FormControlKind::Checkbox) {
             auto it = form_values_.checked.find(fc->node);
@@ -956,16 +976,20 @@ void BrowserView::handleEvent(TEvent& event) {
     default: {
         const unsigned char_code = keyCode & 0xFFU;
         const bool is_backspace = char_code == 0x08U;
+        // On Linux terminals keyCode==0 for printable chars; use textLength.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        const std::string_view ktext(event.keyDown.text, event.keyDown.textLength);
         const bool is_printable = char_code >= 0x20U && char_code < 0x7FU;
-        if (focused_fc() != nullptr && (is_backspace || is_printable)) {
-            handle_form_input(keyCode);
+        const bool has_text = !ktext.empty();
+        if (focused_fc() != nullptr && (is_backspace || is_printable || has_text)) {
+            handle_form_input(keyCode, ktext);
             clearEvent(event);
         } else if (!search_hits_.empty() && focused_fc() == nullptr) {
-            if (char_code == 'n') {
+            if (char_code == 'n' || ktext == "n") {
                 navigate_to_hit(1);
                 drawView();
                 clearEvent(event);
-            } else if (char_code == 'N') {
+            } else if (char_code == 'N' || ktext == "N") {
                 navigate_to_hit(-1);
                 drawView();
                 clearEvent(event);

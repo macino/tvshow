@@ -90,6 +90,10 @@ public:
     // Called when shared_->forced_style changes.
     void apply_forced_style();
 
+    // Focus the first link or form control in the page (used when Tab is
+    // pressed from the persistent address bar to move focus into the content).
+    void focus_first();
+
 private:
     Page page_;
     std::vector<layout::Link> links_;
@@ -153,7 +157,7 @@ private:
     // event on hit. Returns true if the event was consumed.
     bool handle_mouse_hit(Point pt, TEvent& event);
     void focus_next(int direction);
-    void handle_form_input(unsigned keyCode);
+    void handle_form_input(unsigned keyCode, std::string_view text = {});
     // Move the focused <select>'s selected option by direction (+1 = down, -1 = up).
     void cycle_select_option(int direction);
     // Show a modal option-picker dialog for the given select control.

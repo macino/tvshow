@@ -36,8 +36,11 @@ struct Page {
 // Reads, parses, resolves, and lays out `url` at `vp`.
 // Returns nullopt on read/parse/resolve failure; logs the reason.
 // jar may be null (cookies disabled).
+// When skip_external_css is true, external <link> stylesheets are not fetched
+// (useful when a forced theme will override author CSS anyway).
 [[nodiscard]] std::optional<Page> load_page(std::string_view url, layout::Viewport vp,
-                                            net::CookieJar* jar = nullptr);
+                                            net::CookieJar* jar = nullptr,
+                                            bool skip_external_css = false);
 
 // Builds a Page containing an error HTML document (for exception fallbacks).
 // Does not return nullopt; any internal failure falls back to a minimal grid.

@@ -86,6 +86,17 @@ bool is_navigable(const std::string& url) {
     return util::Url::parse(url).has_value() || url.starts_with("file://");
 }
 
+// If `url` has no http/https scheme, prepend "https://".
+// E.g. "redmine.previo.info/login" -> "https://redmine.previo.info/login".
+std::string normalize_url(const std::string& url) {
+    if (url.empty()) return url;
+    if (url.starts_with("http://") || url.starts_with("https://") ||
+        url.starts_with("file://")) {
+        return url;
+    }
+    return "https://" + url;
+}
+
 // Lightweight TListViewer for the window-list dialog.
 // Holds a pointer to an externally owned vector of strings (lives for the
 // duration of the modal dialog execution).
@@ -435,10 +446,15 @@ void Application::handleEvent(TEvent& event) {
     switch (event.message.command) {
     case cmNewTab: {
         clearEvent(event);
-        const std::string url =
-            show_url_picker(deskTop, "New Tab", "", shared_browsing_state_.history);
+        const std::string url = normalize_url(
+            show_url_picker(deskTop, "New Tab", "", shared_browsing_state_.history));
         if (is_navigable(url)) {
-            open_url(url);
+            deferred_open_url_ = url;
+            TEvent ev{};
+            ev.what = evCommand;
+            ev.message.command = cmDeferredOpen;
+            ev.message.infoPtr = nullptr;
+            putEvent(ev);
         }
         return;
     }
@@ -450,14 +466,30 @@ void Application::handleEvent(TEvent& event) {
             prefill_buf = std::string(win->current_url());
             prefill = prefill_buf;
         }
-        const std::string url =
-            show_url_picker(deskTop, "Open URL", prefill, shared_browsing_state_.history);
+        const std::string url = normalize_url(
+            show_url_picker(deskTop, "Open URL", prefill, shared_browsing_state_.history));
         if (!is_navigable(url)) {
             return;
         }
         if (BrowserWindow* win = active_browser_window()) {
             win->navigate(url);
         } else {
+            // Post cmDeferredOpen so open_url runs in the next main-loop iteration,
+            // after the modal dialog has fully unwound from the tvision event stack.
+            deferred_open_url_ = url;
+            TEvent ev{};
+            ev.what = evCommand;
+            ev.message.command = cmDeferredOpen;
+            ev.message.infoPtr = nullptr;
+            putEvent(ev);
+        }
+        return;
+    }
+    case cmDeferredOpen: {
+        clearEvent(event);
+        if (!deferred_open_url_.empty()) {
+            std::string url = std::move(deferred_open_url_);
+            deferred_open_url_.clear();
             open_url(url);
         }
         return;

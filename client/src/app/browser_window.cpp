@@ -30,6 +30,15 @@ constexpr int kUrlMaxLen = 511;
 bool is_navigable(const std::string& url) {
     return util::Url::parse(url).has_value() || url.starts_with("file://");
 }
+
+std::string normalize_url(const std::string& url) {
+    if (url.empty()) return url;
+    if (url.starts_with("http://") || url.starts_with("https://") ||
+        url.starts_with("file://")) {
+        return url;
+    }
+    return "https://" + url;
+}
 }  // namespace
 
 BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page,
@@ -92,7 +101,7 @@ void BrowserWindow::focus_address_bar() {
 }
 
 void BrowserWindow::navigate(std::string_view url) {
-    const std::string s(url);
+    const std::string s = normalize_url(std::string(url));
     if (!is_navigable(s)) {
         return;
     }
@@ -154,25 +163,34 @@ void BrowserWindow::handleEvent(TEvent& event) {
         clearEvent(event);
         return;
     }
-    // Persistent bar key handling (Tab completion + Enter navigation).
+    // Persistent bar key handling (Down/Up completion + Enter navigation).
     if (mode_ == AddressBarMode::Persistent && bar_ != nullptr && event.what == evKeyDown &&
         current == bar_) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
         const uint16_t key = event.keyDown.keyCode;
-        if (key == kbTab) {
+        if (key == kbDown) {
             handle_url_completion(false);
             clearEvent(event);
             return;
         }
-        if (key == kbShiftTab) {
+        if (key == kbUp) {
             handle_url_completion(true);
+            clearEvent(event);
+            return;
+        }
+        // Tab from bar moves focus to page content so the user can reach form
+        // fields and links without a mouse.  Shift+Tab cycles back to the bar.
+        if (key == kbTab) {
+            view_->select();
+            view_->focus_first();
+            completion_valid_ = false;
             clearEvent(event);
             return;
         }
         if (key == kbEnter) {
             std::array<char, kUrlMaxLen + 1> buf{};
             bar_->getData(buf.data());
-            const std::string url(buf.data());
+            const std::string url = normalize_url(std::string(buf.data()));
             completion_valid_ = false;
             clearEvent(event);
             if (is_navigable(url)) {

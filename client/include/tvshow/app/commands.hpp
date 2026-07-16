@@ -17,5 +17,7 @@ constexpr unsigned short cmStyleTvision = 110;
 constexpr unsigned short cmStyleLight   = 111;
 constexpr unsigned short cmStyleDark    = 112;
 constexpr unsigned short cmSettings     = 113;
+// Internal: fires in the next event loop iteration to open deferred_open_url_.
+constexpr unsigned short cmDeferredOpen = 114;
 
 }  // namespace tvshow::app

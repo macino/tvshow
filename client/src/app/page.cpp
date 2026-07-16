@@ -195,7 +195,8 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
     return page;
 }
 
-std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::CookieJar* jar) {
+std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::CookieJar* jar,
+                              bool skip_external_css) {
     constexpr std::string_view k_file_prefix = "file://";
 
     Fetched fetched;
@@ -222,7 +223,7 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
     }
 
     std::vector<css::Stylesheet> sheets;
-    if (!fetched.is_error) {
+    if (!fetched.is_error && !skip_external_css) {
         sheets = fetch_external_sheets(url, *doc);
     }
     for (const auto& css_text : doc->inline_styles) {

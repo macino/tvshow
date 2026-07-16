@@ -8,6 +8,7 @@
 
 #include <tvision/tv.h>
 
+#include <string>
 #include <string_view>
 
 namespace tvshow::app {
@@ -39,6 +40,9 @@ private:
     AddressBarMode mode_;
     SharedBrowsingState shared_browsing_state_;  // shared across all tabs
     int cascade_step_ = 0;  // incremented on each open_url() for window staggering
+    // URL queued by cmOpenUrl/cmNewTab to be opened on the next idle() tick, after
+    // the modal URL picker dialog has fully unwound from the tvision event stack.
+    std::string deferred_open_url_;
 
     // Returns the next cascaded window bounds (2 cols, 1 row offset per step).
     TRect next_window_bounds();
