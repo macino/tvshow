@@ -444,24 +444,24 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-18 | Image renderer plug interface | Resolved: `ImageRenderer::render(int cols, int rows, std::string_view alt, std::string_view src) → vector<string>`. v1 impl: `AltTextRenderer` (writes `[alt]` in row 0). |
 | Q-19 | Config file location and format | **Resolved**: `~/.config/tvshow/config.toml` (TOML subset); CLI flags override. XDG_CONFIG_HOME respected. |
 | Q-20 | Form `enctype: multipart/form-data` | Deferred (tied to file upload, needs file dialog). |
-| Q-21 | Navigation history UX | **M1**: back/forward stack exists (`navigate_back`/`navigate_forward`). Expose via Alt-Left / Alt-Right keybindings. Show current position in status bar or title. |
+| Q-21 | Navigation history UX | **Resolved**: back/forward stack (`navigate_back`/`navigate_forward`), exposed via Alt-Left/Alt-Right (status line + menu). Window title shows `(pos/total)` history position, appended alongside scroll `[pct%]`. |
 | Q-22 | Debug overlay enrichment | **M1**: extend Ctrl-D overlay with box dimensions (WxH in cells) and focus-order index labels. Deferred from Q-12. |
 | Q-23 | `<img>` ASCII-art renderer | **M1**: add `BrailleRenderer` (or similar) behind `ImageRenderer` interface. Fetch image bytes, quantize to braille dots. Config chooses renderer (`alt` default, `braille` opt-in). |
 | Q-24 | Table column alignment | **M1**: compute max column widths across all rows; distribute evenly or proportionally. Replace current flex-reuse sizing which misaligns on unequal cell counts. |
 | Q-25 | CSS `position: relative/absolute` | **M1**: add `position` property to §7.2. `relative` offsets from normal-flow position. `absolute` positions relative to nearest positioned ancestor. `top`, `left`, `right`, `bottom` in px/ch/%. |
-| Q-26 | Scroll position indicator | **M1**: vertical scroll indicator in right gutter or status bar showing current viewport position (e.g. `[42%]` or `[12/87]`). |
+| Q-26 | Scroll position indicator | **Resolved**: window title shows `[pct%]` scroll position when content exceeds viewport height (`BrowserView::sync_vscroll()`). |
 
 ### 20.1 Milestone 1 (M1) Scope
 
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
-| M1-nav-history | Navigation back/forward UX | Keybindings (Alt-Left/Right), status bar position indicator | Q-21 |
 | M1-hover | `:hover` pseudo-class | Mouse-over hit-test → style recalc → repaint | Q-10 |
 | M1-debug-overlay | Debug overlay enrichment | Box dimensions + focus-order labels in Ctrl-D overlay | Q-22 |
 | M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` impl behind `ImageRenderer` interface | Q-23 |
 | M1-table-cols | Table column alignment | Cross-row max-width column sizing | Q-24 |
 | M1-css-position | CSS `position: relative/absolute` | New layout pass for positioned elements; `top/left/right/bottom` | Q-25 |
-| M1-scroll-indicator | Scroll position indicator | Viewport position in gutter or status bar | Q-26 |
+
+~~M1-nav-history~~ and ~~M1-scroll-indicator~~ resolved — see Q-21, Q-26 above.
 
 ---
 

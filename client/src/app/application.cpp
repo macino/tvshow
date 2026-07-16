@@ -348,6 +348,7 @@ auto Application::initStatusLine(TRect r) -> TStatusLine* {
     return new TStatusLine(r, *new TStatusDef(0, 0xFFFF) +
                                   *new TStatusItem("~Alt-X~ Exit", kbAltX, cmQuit) +
                                   *new TStatusItem("~Alt-\x11~ Back", kbAltLeft, cmBack) +
+                                  *new TStatusItem("~Alt-\x10~ Fwd", kbAltRight, cmForward) +
                                   *new TStatusItem("~Ctrl-R~ Reload", kbCtrlR, cmReload) +
                                   *new TStatusItem("~Ctrl-L~ URL", kbCtrlL, cmOpenUrl) +
                                   *new TStatusItem(nullptr, kbF10, cmMenu));
@@ -362,8 +363,8 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
                *new TMenuItem("~C~lose Tab", cmCloseTab, kbCtrlW, hcNoContext, "Ctrl-W") +
                newLine() + *new TMenuItem("E~x~it", cmQuit, kbAltX, hcNoContext, "Alt-X") +
                *new TSubMenu("~N~avigate", kbAltN) +
-               *new TMenuItem("~B~ack", cmBack, kbNoKey, hcNoContext, "Alt-\x11") +
-               *new TMenuItem("~F~orward", cmForward, kbNoKey, hcNoContext, "Alt-\x10") +
+               *new TMenuItem("~B~ack", cmBack, kbAltLeft, hcNoContext, "Alt-\x11") +
+               *new TMenuItem("~F~orward", cmForward, kbAltRight, hcNoContext, "Alt-\x10") +
                *new TMenuItem("~R~eload", cmReload, kbCtrlR, hcNoContext, "Ctrl-R") +
                *new TSubMenu("~V~iew", kbAltV) +
                *new TMenuItem("~C~ascade", cmCascade, kbNoKey, hcNoContext) +

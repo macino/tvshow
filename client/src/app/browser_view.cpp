@@ -409,14 +409,24 @@ void BrowserView::sync_vscroll() {
     const int pg = std::max(1, size.y - 1);
     vscroll_->setParams(scroll_row_, 0, limit, pg, 1);
 
-    // Update window title with scroll position indicator.
+    // Update window title with scroll position and history position indicators.
     if (owner != nullptr) {
         const int total = page_.box.border_box.size.rows;
-        if (total > size.y) {
-            const int pct = (total > 0) ? (scroll_row_ * 100 / total) : 0;
+        const bool show_scroll = total > size.y;
+        const bool show_history = history_.size() > 1;
+        if (show_scroll || show_history) {
             char title_buf[512];
-            std::snprintf(title_buf, sizeof(title_buf), "%s [%d%%]",
-                          page_.url.c_str(), pct);
+            int len = std::snprintf(title_buf, sizeof(title_buf), "%s", page_.url.c_str());
+            len = std::clamp(len, 0, static_cast<int>(sizeof(title_buf)) - 1);
+            if (show_scroll) {
+                const int pct = (total > 0) ? (scroll_row_ * 100 / total) : 0;
+                len += std::snprintf(title_buf + len, sizeof(title_buf) - len, " [%d%%]", pct);
+                len = std::clamp(len, 0, static_cast<int>(sizeof(title_buf)) - 1);
+            }
+            if (show_history) {
+                std::snprintf(title_buf + len, sizeof(title_buf) - len, " (%zu/%zu)",
+                              history_pos_ + 1, history_.size());
+            }
             auto* win = dynamic_cast<TWindow*>(owner);
             if (win != nullptr) {
                 // Frees old title and allocates new one.
