@@ -4,6 +4,7 @@
 #include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/page.hpp"
 #include "tvshow/css/types.hpp"
+#include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
 #include "tvshow/net/cookie_jar.hpp"
@@ -38,6 +39,7 @@ struct SharedBrowsingState {
     net::CookieJar cookie_jar;               // session-scoped cookie store
     BookmarkStore bookmarks;                 // loaded once at startup, persisted on change
     ForcedStyle forced_style = ForcedStyle::Auto;
+    bool use_braille_images = false;  // SPEC Q-23: alt text (default) vs. braille-dot images
 };
 
 // Hosts one loaded Page: renders it, tracks the focused link or form control
@@ -96,6 +98,14 @@ public:
 
 private:
     Page page_;
+    // BrailleRenderer holds &page_.images, captured once here. Safe for the
+    // lifetime of this BrowserView: page_ is never relocated (only its
+    // contents are replaced via move-assignment in apply_loaded_page), so
+    // the address of page_.images never changes.
+    images::AltTextRenderer alt_img_renderer_;
+    images::BrailleRenderer braille_img_renderer_{&page_.images};
+    // Selects alt_img_renderer_ vs. braille_img_renderer_ per shared_->use_braille_images.
+    [[nodiscard]] const images::ImageRenderer& effective_img_renderer() const;
     std::vector<layout::Link> links_;
     std::vector<layout::FormFocus> form_controls_;
     render::FormValues form_values_;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/render/chargrid.hpp"
@@ -32,8 +33,13 @@ struct RenderOpts {
 // Paint a Box tree into a CharGrid. Pure function: no I/O, no tvision.
 // The grid is sized to root.border_box (the viewport rect produced by layout).
 // fv overrides DOM attr initial values for form controls.
+// img_renderer selects how <img> elements are painted; null (default) uses
+// AltTextRenderer. Pass a BrailleRenderer to render decoded image pixels
+// (still pure: BrailleRenderer only reads an already-populated ImageCache,
+// no I/O happens during render()).
 [[nodiscard]] CharGrid render(const layout::Box& root, const FormValues& fv = {},
-                              const RenderOpts& opts = {});
+                              const RenderOpts& opts = {},
+                              const images::ImageRenderer* img_renderer = nullptr);
 
 // Inverts fg/bg for every cell in `spans` (SPEC §12.1 focus highlight for the
 // currently-focused link). Cells outside the grid bounds are skipped, so

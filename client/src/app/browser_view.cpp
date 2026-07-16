@@ -16,6 +16,7 @@
 #define Uses_TStaticText
 #include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/page.hpp"
+#include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/form.hpp"
@@ -291,13 +292,20 @@ static std::vector<layout::CellRect> map_spans(const std::vector<layout::CellRec
     return out;
 }
 
+const images::ImageRenderer& BrowserView::effective_img_renderer() const {
+    if (shared_ != nullptr && shared_->use_braille_images) {
+        return braille_img_renderer_;
+    }
+    return alt_img_renderer_;
+}
+
 void BrowserView::ensure_display_grid() const {
     auto* self = const_cast<BrowserView*>(this);
 
     if (base_dirty_) {
         const render::RenderOpts opts{page_.url, &visited_set()};
         auto [grid, kept] = render::collapse_blank_rows(
-            render::render(page_.box, form_values_, opts));
+            render::render(page_.box, form_values_, opts, &effective_img_renderer()));
         self->base_grid_ = std::move(grid);
         self->kept_rows_ = std::move(kept);
         self->base_dirty_ = false;
@@ -509,14 +517,16 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
     const Size vp{size.x, size.y};
 
     const bool skip_css = (shared_ != nullptr && shared_->forced_style != ForcedStyle::Auto);
-    loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp, skip_css]() {
+    const bool fetch_images = (shared_ != nullptr && shared_->use_braille_images);
+    loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp, skip_css,
+                                  fetch_images]() {
         // Inner thread does the blocking HTTP fetch.
         std::atomic<bool> inner_done{false};
         std::optional<Page> loaded;
         std::thread inner([&]() {
             try {
                 net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
-                loaded = load_page(fetch_url, vp, jar, skip_css);
+                loaded = load_page(fetch_url, vp, jar, skip_css, fetch_images);
             } catch (...) {
                 // loaded stays nullopt; apply_loaded_page handles it
             }
@@ -1081,7 +1091,7 @@ void BrowserView::find_matches_in_page(std::string_view term) {
     if (base_dirty_) {
         const render::RenderOpts opts{page_.url, &visited_set()};
         auto [g, kept] = render::collapse_blank_rows(
-            render::render(page_.box, form_values_, opts));
+            render::render(page_.box, form_values_, opts, &effective_img_renderer()));
         base_grid_ = std::move(g);
         kept_rows_ = std::move(kept);
         base_dirty_ = false;

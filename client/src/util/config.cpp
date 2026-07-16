@@ -53,6 +53,7 @@ Config parse_config(std::string_view toml) {
         else if (key == "address-bar") { cfg.address_bar   = std::move(val); }
         else if (key == "start-url")   { cfg.start_url     = std::move(val); }
         else if (key == "default-style") { cfg.default_style = std::move(val); }
+        else if (key == "image-renderer") { cfg.image_renderer = std::move(val); }
         // Unknown keys are silently ignored.
     }
     return cfg;

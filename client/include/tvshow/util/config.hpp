@@ -11,6 +11,7 @@ struct Config {
     std::string address_bar   = "modal";  // modal | persistent
     std::string start_url;                // empty = no initial navigation
     std::string default_style = "auto";   // auto | tvision | light | dark
+    std::string image_renderer = "alt";   // alt | braille
 };
 
 // Parse TOML content (pure — no I/O). Only supports the subset:

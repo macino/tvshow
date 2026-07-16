@@ -5,6 +5,7 @@
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/types.hpp"
+#include "tvshow/images/renderer.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
 #include "tvshow/style/resolver.hpp"
@@ -12,6 +13,7 @@
 
 #include <doctest/doctest.h>
 
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -266,6 +268,48 @@ TEST_CASE("apply_focus: clips spans that extend past the grid bounds") {
     // still flip the in-bounds portion.
     tvshow::render::apply_focus(grid, {{{8, 4}, {20, 20}}});
     CHECK(grid.at({9, 4}).attr.fg != 0xFFFFFFU);
+}
+
+// ── img_renderer plug-in ────────────────────────────────────────────────────
+
+namespace {
+// Records the args it was called with and paints a fixed marker, so tests
+// can prove render() actually delegates to the injected renderer instead of
+// always using the default AltTextRenderer.
+class MarkerImageRenderer : public tvshow::images::ImageRenderer {
+public:
+    [[nodiscard]] std::vector<std::string> render(int cols, int rows, std::string_view alt,
+                                                  std::string_view src) const override {
+        last_cols = cols;
+        last_rows = rows;
+        last_alt = std::string(alt);
+        last_src = std::string(src);
+        std::vector<std::string> out(static_cast<size_t>(rows), std::string(static_cast<size_t>(cols), 'X'));
+        return out;
+    }
+
+    mutable int last_cols = 0;
+    mutable int last_rows = 0;
+    mutable std::string last_alt;
+    mutable std::string last_src;
+};
+}  // namespace
+
+TEST_CASE("render: img_renderer=nullptr (default) uses AltTextRenderer") {
+    auto [doc, tree] = make_tree(R"(<body><img src="a.png" alt="hi" width="40" height="16"></body>)");
+    const Box box = layout(tree, {20, 5});
+    const CharGrid grid = tvshow::render::render(box);
+    CHECK(grid.at({0, 0}).cp == U'[');
+}
+
+TEST_CASE("render: a custom img_renderer is used in place of AltTextRenderer") {
+    auto [doc, tree] = make_tree(R"(<body><img src="a.png" alt="hi" width="40" height="16"></body>)");
+    const Box box = layout(tree, {20, 5});
+    MarkerImageRenderer marker;
+    const CharGrid grid = tvshow::render::render(box, {}, {}, &marker);
+    CHECK(grid.at({0, 0}).cp == U'X');
+    CHECK(marker.last_alt == "hi");
+    CHECK(marker.last_src == "a.png");
 }
 
 TEST_CASE("apply_focus_order_labels: paints index digits at each anchor's origin") {

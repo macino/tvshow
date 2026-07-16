@@ -5,6 +5,8 @@
 #include "tvshow/css/types.hpp"
 #include "tvshow/dom/node.hpp"
 #include "tvshow/dom/parser.hpp"
+#include "tvshow/images/decode.hpp"
+#include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/net/cpp_http_client.hpp"
@@ -23,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -118,6 +121,62 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
     return sheets;
 }
 
+// Collects distinct <img src> attribute values verbatim (NOT resolved), in
+// document order. Kept as-authored because paint_img() (render.cpp) passes
+// node.attr("src") straight through to ImageRenderer::render() unresolved --
+// the ImageCache must be keyed the same way or BrailleRenderer's cache
+// lookup always misses.
+// NOLINTNEXTLINE(misc-no-recursion)
+void collect_img_srcs(const dom::Node& node, std::vector<std::string>& out,
+                      std::unordered_set<std::string>& seen) {
+    if (node.kind == dom::NodeKind::Element && node.tag == "img") {
+        const auto src = node.attr("src");
+        if (!src.empty() && seen.insert(std::string(src)).second) {
+            out.emplace_back(src);
+        }
+    }
+    for (const auto& child : node.children) {
+        collect_img_srcs(*child, out, seen);
+    }
+}
+
+// Fetches and decodes every <img> source referenced by doc (ADR-004) into an
+// ImageCache keyed by the raw src attribute text (see collect_img_srcs).
+// file:// pages and any fetch/decode failure are silently skipped:
+// BrailleRenderer falls back to alt text for cache misses, matching the
+// existing degrade-gracefully pattern used throughout this file for
+// network errors.
+images::ImageCache fetch_images_for(std::string_view url, const dom::Document& doc) {
+    images::ImageCache cache;
+    if (url.starts_with("file://") || doc.root == nullptr) {
+        return cache;
+    }
+    const auto base = util::Url::parse(url);
+    if (!base) {
+        return cache;
+    }
+    std::vector<std::string> srcs;
+    std::unordered_set<std::string> seen;
+    collect_img_srcs(*doc.root, srcs, seen);
+
+    net::CppHttpClient client;
+    for (const auto& src : srcs) {
+        const auto src_url = base->resolve(src);
+        if (!src_url) {
+            continue;
+        }
+        const net::Result result = client.get(*src_url);
+        const auto* resp = std::get_if<net::Response>(&result);
+        if (resp == nullptr || resp->status >= 400) {
+            continue;
+        }
+        if (auto decoded = images::decode_image(resp->body)) {
+            cache.emplace(src, std::move(*decoded));
+        }
+    }
+    return cache;
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -190,13 +249,13 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
         return std::nullopt;
     }
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
-    Page page{final_url, std::move(*doc), std::move(sheets), std::move(styled_tree), {}};
+    Page page{final_url, std::move(*doc), std::move(sheets), std::move(styled_tree), {}, false, {}};
     page.box = layout::layout(*page.tree, vp);
     return page;
 }
 
 std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::CookieJar* jar,
-                              bool skip_external_css) {
+                              bool skip_external_css, bool fetch_images) {
     constexpr std::string_view k_file_prefix = "file://";
 
     Fetched fetched;
@@ -239,7 +298,7 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
     }
 
     auto styled_tree = std::make_unique<style::StyledNode>(std::move(*tree));
-    Page page{std::string(url), std::move(*doc), std::move(sheets), std::move(styled_tree), {}};
+    Page page{std::string(url), std::move(*doc), std::move(sheets), std::move(styled_tree), {}, false, {}};
     page.box = layout::layout(*page.tree, vp);
 
     if (!fetched.is_error && render::is_mostly_blank(render::render(page.box))) {
@@ -267,6 +326,10 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
         }
     }
 
+    if (fetch_images && !fetched.is_error) {
+        page.images = fetch_images_for(url, page.doc);
+    }
+
     return page;
 }
 
@@ -278,7 +341,7 @@ std::optional<Page> load_page_from_error(std::string_view title, std::string_vie
     auto tree = style::resolve(*doc, {});
     if (!tree) return std::nullopt;
     auto styled = std::make_unique<style::StyledNode>(std::move(*tree));
-    Page page{"", std::move(*doc), {}, std::move(styled), {}};
+    Page page{"", std::move(*doc), {}, std::move(styled), {}, false, {}};
     page.box = layout::layout(*page.tree, vp);
     return page;
 }

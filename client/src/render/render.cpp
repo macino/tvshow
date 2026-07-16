@@ -455,10 +455,11 @@ void paint_box(CharGrid& grid, const layout::Box& box, const FormValues& fv,
 
 }  // namespace
 
-CharGrid render(const layout::Box& root, const FormValues& fv, const RenderOpts& opts) {
+CharGrid render(const layout::Box& root, const FormValues& fv, const RenderOpts& opts,
+                const images::ImageRenderer* img_renderer) {
     CharGrid grid(std::max(root.border_box.size.cols, 1), std::max(root.border_box.size.rows, 1));
-    const images::AltTextRenderer img_renderer;
-    paint_box(grid, root, fv, img_renderer, opts);
+    const images::AltTextRenderer default_renderer;
+    paint_box(grid, root, fv, img_renderer != nullptr ? *img_renderer : default_renderer, opts);
     return grid;
 }
 

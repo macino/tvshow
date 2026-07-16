@@ -9,6 +9,12 @@ TEST_CASE("parse_config: defaults when empty") {
     CHECK(cfg.log_level == "warn");
     CHECK(cfg.address_bar == "modal");
     CHECK(cfg.start_url.empty());
+    CHECK(cfg.image_renderer == "alt");
+}
+
+TEST_CASE("parse_config: image-renderer key") {
+    const auto cfg = parse_config("image-renderer = \"braille\"\n");
+    CHECK(cfg.image_renderer == "braille");
 }
 
 TEST_CASE("parse_config: quoted string values") {

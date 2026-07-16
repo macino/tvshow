@@ -2,7 +2,7 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: **M0 complete**. M1 nearly done — nav history, hover, debug overlay, table columns, scroll indicator, CSS `position` all resolved. Remaining: image renderer wiring (Q-23, blocked on vendoring `stb_image.h`).
+> Status: **M0 and M1 complete**. See §20.1 for the M1 feature list.
 
 ---
 
@@ -173,7 +173,9 @@ Test discipline: tests are written **before** the implementation for any pure mo
 `form` (action, method GET/POST, enctype `application/x-www-form-urlencoded`), `input` (type=text|password|checkbox|radio|submit|hidden), `textarea`, `select` + `option`, `button`, `label`.
 
 ### 6.5 Images
-`<img src alt width height>` — v1 renders `[alt]`, reserves `width × height` (mapped through px→cell ratio) so layout matches future ASCII-art renderer.
+`<img src alt width height>` — reserves `width × height` (mapped through px→cell ratio). Rendering
+is pluggable (see Q-23): `AltTextRenderer` (default) renders `[alt]`; `BrailleRenderer`
+(`image-renderer = "braille"`) decodes the fetched bytes and quantizes to braille glyphs.
 
 ### 6.6 Tables (v1.1)
 
@@ -448,7 +450,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-20 | Form `enctype: multipart/form-data` | Deferred (tied to file upload, needs file dialog). |
 | Q-21 | Navigation history UX | **Resolved**: back/forward stack (`navigate_back`/`navigate_forward`), exposed via Alt-Left/Alt-Right (status line + menu). Window title shows `(pos/total)` history position, appended alongside scroll `[pct%]`. |
 | Q-22 | Debug overlay enrichment | **Resolved**: Ctrl-D overlay draws box `WxH` dims top-right of each outlined box (`draw_box_outline`), and a focus-order index (`0,1,2,...`) at the origin of each link/form-control span, in `total_focusables()` order (`apply_focus_order_labels`). |
-| Q-23 | `<img>` ASCII-art renderer | **M1**: add `BrailleRenderer` (or similar) behind `ImageRenderer` interface. Fetch image bytes, quantize to braille dots. Config chooses renderer (`alt` default, `braille` opt-in). |
+| Q-23 | `<img>` ASCII-art renderer | **Resolved**: `stb_image.h` vendored (ADR-004) decodes fetched `<img src>` bytes into `Page::images` (`load_page(..., fetch_images=true)`); `BrailleRenderer` quantizes to 2x4-dot braille glyphs, falling back to `AltTextRenderer` on any cache miss/decode failure. Renderer choice: `image-renderer = "alt" | "braille"` in `config.toml`, or `--image-renderer=alt|braille` CLI flag (default `alt` -- image fetch/decode only runs when braille is selected, avoiding the cost otherwise). |
 | Q-24 | Table column alignment | **Resolved**: `compute_table_col_widths()` measures max cell content-width per column index across all rows (handles `thead`/`tbody`/`tfoot` wrappers), stashed thread-locally (`g_table_col_widths`) and consulted by `layout_flex()` per `<tr>` in place of per-row flex-basis. |
 | Q-25 | CSS `position: relative/absolute` | **Resolved**: `position` in §7.2 (`Position` enum, `top`/`left_offset`/`right_offset`/`bottom` on `ComputedStyle`). `relative` offsets from normal-flow position without affecting siblings. `absolute` is removed from flow (no space reserved) and offsets against the nearest ancestor with `position != static` (`apply_position_offsets` tracks a containing-block box separately from the immediate parent), falling back to the viewport when none exists. `fixed`/`sticky` are dropped from flow entirely (no layer model). |
 | Q-26 | Scroll position indicator | **Resolved**: window title shows `[pct%]` scroll position when content exceeds viewport height (`BrowserView::sync_vscroll()`). |
@@ -457,9 +459,9 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
-| M1-img-renderer | ASCII-art image renderer | `BrailleRenderer` classes + tests exist but are dead code — no fetch/decode/config wiring. Blocked: needs `stb_image.h` vendored (ADR-004), which needs a one-time approved network fetch. | Q-23 |
-
-~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~, ~~M1-debug-overlay~~, ~~M1-table-cols~~, ~~M1-css-position~~ resolved — see Q-21, Q-26, Q-10, Q-22, Q-24, Q-25 above. M1-img-renderer is the sole remaining M1 item, blocked as noted.
+All seven M1 items are resolved: ~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~,
+~~M1-debug-overlay~~, ~~M1-table-cols~~, ~~M1-css-position~~, ~~M1-img-renderer~~ — see Q-21,
+Q-26, Q-10, Q-22, Q-24, Q-25, Q-23 above. **M1 complete.**
 
 ---
 

@@ -18,6 +18,7 @@ add_executable(tvshow-tests
     layout/form_data_test.cpp
     layout/flex_test.cpp
     layout/image_test.cpp
+    images/decode_test.cpp
     render/render_test.cpp
     render/golden_test.cpp
     paint/paint_test.cpp

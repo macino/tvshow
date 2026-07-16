@@ -37,6 +37,7 @@ bool save_config(const Config& cfg, std::string_view path) {
     out << "log-level = \"" << cfg.log_level << "\"\n";
     out << "address-bar = \"" << cfg.address_bar << "\"\n";
     out << "default-style = \"" << cfg.default_style << "\"\n";
+    out << "image-renderer = \"" << cfg.image_renderer << "\"\n";
     if (!cfg.start_url.empty()) {
         out << "start-url = \"" << cfg.start_url << "\"\n";
     }

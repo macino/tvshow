@@ -21,6 +21,8 @@ add_library(tvshow_core STATIC
     src/render/render.cpp
     src/images/alt_text_renderer.cpp
     src/images/braille_renderer.cpp
+    src/images/decode.cpp
+    src/images/stb_image_impl.cpp
 )
 
 target_include_directories(tvshow_core
@@ -28,6 +30,13 @@ target_include_directories(tvshow_core
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# SYSTEM: stb_image.h is vendored third-party code (ADR-004) that isn't
+# warning-clean under our -Werror flags; treating it as a system header
+# suppresses warnings originating there without loosening our own code.
+target_include_directories(tvshow_core SYSTEM PRIVATE
+    ${CMAKE_SOURCE_DIR}/third_party/stb
 )
 
 find_library(ICONV_LIB iconv)
