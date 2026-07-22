@@ -310,6 +310,16 @@ void BrowserView::ensure_display_grid() const {
         self->kept_rows_ = std::move(kept);
         self->base_dirty_ = false;
         self->overlay_dirty_ = true;
+
+        // SPEC Q-29: pre-render each fixed/sticky element's own content once
+        // here (not collapsed -- these are small standalone grids, not the
+        // full document). draw() blits them onto the viewport every frame.
+        self->fixed_overlay_grids_.clear();
+        self->fixed_overlay_grids_.reserve(page_.box.overlays.size());
+        for (const auto& ov : page_.box.overlays) {
+            self->fixed_overlay_grids_.push_back(
+                render::render(ov.box, form_values_, opts, &effective_img_renderer()));
+        }
     }
 
     const bool focus_changed = (focused_ != cached_focused_);
@@ -410,8 +420,45 @@ void BrowserView::draw() {
     const render::CharGrid& grid = *display_grid_;
     const int available = grid.rows() - scroll_row_;
     const int rows = std::min(size.y, available > 0 ? available : 0);
+
+    if (page_.box.overlays.empty()) {
+        for (int row = 0; row < rows; ++row) {
+            paint::draw_row(grid, scroll_row_ + row, buf);
+            writeLine(0, static_cast<short>(row), static_cast<short>(size.x), 1, buf);
+        }
+        return;
+    }
+
+    // SPEC Q-29: position:fixed/sticky overlays are pinned to the viewport,
+    // independent of scroll -- composite them onto a viewport-sized frame
+    // (copied from the scrolled slice) fresh every draw() call, since
+    // scroll_row_ changes don't invalidate the cached display_grid_/
+    // fixed_overlay_grids_ (see scroll_to()).
+    render::CharGrid frame(std::max(size.x, 1), std::max(size.y, 1));
     for (int row = 0; row < rows; ++row) {
-        paint::draw_row(grid, scroll_row_ + row, buf);
+        for (int col = 0; col < size.x && col < grid.cols(); ++col) {
+            const auto& cell = grid.at({col, scroll_row_ + row});
+            frame.put({col, row}, cell.cp, cell.attr);
+        }
+    }
+    for (size_t i = 0; i < page_.box.overlays.size(); ++i) {
+        const auto& ov = page_.box.overlays[i];
+        bool pinned = ov.kind == layout::OverlayKind::Fixed;
+        if (!pinned) {
+            // Sticky: static_doc_row is in raw (uncollapsed) layout row
+            // space; translate through kept_rows_ to compare against
+            // scroll_row_, which indexes the collapsed display grid.
+            const auto mapped =
+                map_spans({{{0, ov.static_doc_row}, {1, 1}}}, kept_rows_);
+            const int visual_row = mapped.empty() ? ov.static_doc_row : mapped.front().origin.row;
+            pinned = scroll_row_ >= visual_row - ov.pinned_origin.row;
+        }
+        if (pinned) {
+            frame.blit(fixed_overlay_grids_[i], ov.pinned_origin);
+        }
+    }
+    for (int row = 0; row < size.y; ++row) {
+        paint::draw_row(frame, row, buf);
         writeLine(0, static_cast<short>(row), static_cast<short>(size.x), 1, buf);
     }
 }

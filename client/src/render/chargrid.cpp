@@ -235,6 +235,19 @@ const Cell& CharGrid::at(Point pos) const {
     return cells_.at(index(pos));
 }
 
+void CharGrid::blit(const CharGrid& src, Point dst_origin) {
+    for (int r = 0; r < src.rows_; ++r) {
+        const int dst_row = dst_origin.row + r;
+        if (dst_row < 0 || dst_row >= rows_) continue;
+        for (int c = 0; c < src.cols_; ++c) {
+            const int dst_col = dst_origin.col + c;
+            if (dst_col < 0 || dst_col >= cols_) continue;
+            const Cell& cell = src.cells_.at(src.index({dst_col - dst_origin.col, r}));
+            cells_.at(index({dst_col, dst_row})) = cell;
+        }
+    }
+}
+
 std::string CharGrid::to_string() const {
     std::string s;
     s.reserve(static_cast<size_t>(cols_ * rows_) * 20U);

@@ -203,6 +203,9 @@ private:
     mutable bool base_dirty_ = true;
     mutable std::optional<render::CharGrid> display_grid_;
     mutable bool overlay_dirty_ = true;
+    // Rendered content for each entry in page_.box.overlays (SPEC Q-29,
+    // position:fixed/sticky), parallel array. Rebuilt alongside base_grid_.
+    mutable std::vector<render::CharGrid> fixed_overlay_grids_;
     mutable int cached_focused_ = -2;
     mutable std::vector<Point> cached_hits_;
     mutable int cached_hit_idx_ = -2;

@@ -358,3 +358,51 @@ TEST_CASE("layout: position:absolute is removed from flow and doesn't push down 
     // start at row 2 instead of row 0.
     CHECK(p->border_box.origin.row == 0);
 }
+
+// ── position: fixed / sticky (overlays) ─────────────────────────────────────
+
+TEST_CASE("layout: position:fixed produces an overlay pinned to the viewport") {
+    auto [doc, tree] = make_tree("<body><div>Nav</div></body>",
+                                 "div { position: fixed; top: 0px; left: 0px; }");
+    const Box root = layout(tree, {80, 24});
+    REQUIRE(root.overlays.size() == 1);
+    CHECK(root.overlays[0].kind == tvshow::layout::OverlayKind::Fixed);
+    CHECK(root.overlays[0].pinned_origin.col == 0);
+    CHECK(root.overlays[0].pinned_origin.row == 0);
+}
+
+TEST_CASE("layout: position:fixed is not part of the normal box tree") {
+    auto [doc, tree] = make_tree("<body><div>Nav</div><p>Body</p></body>",
+                                 "div { position: fixed; top: 0px; }");
+    const Box root = layout(tree, {80, 24});
+    // The fixed div should not appear as a normal child anywhere.
+    CHECK(find_box(root, "div") == nullptr);
+    const auto* p = find_box(root, "p");
+    REQUIRE(p != nullptr);
+    CHECK(p->border_box.origin.row == 0);  // fixed div reserved no flow space
+}
+
+TEST_CASE("layout: position:fixed with bottom/right offsets pins to the opposite edge") {
+    auto [doc, tree] = make_tree("<body><div>X</div></body>",
+                                 "div { position: fixed; bottom: 0px; right: 0px; width: 80px; }");
+    const Box root = layout(tree, {80, 24});
+    REQUIRE(root.overlays.size() == 1);
+    const auto& ov = root.overlays[0];
+    CHECK(ov.pinned_origin.col == 80 - ov.box.border_box.size.cols);
+    CHECK(ov.pinned_origin.row == 24 - ov.box.border_box.size.rows);
+}
+
+TEST_CASE("layout: position:sticky stays in normal flow and also produces an overlay") {
+    auto [doc, tree] = make_tree(
+        "<body><p>Before</p><div>Header</div></body>",
+        "div { position: sticky; top: 0px; }");
+    const Box root = layout(tree, {80, 24});
+    // Still in the normal tree (unlike fixed).
+    const auto* div = find_box(root, "div");
+    REQUIRE(div != nullptr);
+    REQUIRE(root.overlays.size() == 1);
+    CHECK(root.overlays[0].kind == tvshow::layout::OverlayKind::Sticky);
+    // static_doc_row should match where it actually landed in flow.
+    CHECK(root.overlays[0].static_doc_row == div->border_box.origin.row);
+    CHECK(root.overlays[0].pinned_origin.row == 0);
+}

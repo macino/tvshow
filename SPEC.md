@@ -3,7 +3,8 @@
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
 > Status: **M0 and M1 complete**. M2 scoped, not started — see §20.2: table colspan/rowspan,
-> multipart file upload, `position:fixed/sticky` layer, expanded out-of-subset elements.
+> multipart file upload, expanded out-of-subset elements. Table spans and the
+> `position:fixed/sticky` overlay layer are done.
 
 ---
 
@@ -455,11 +456,11 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-22 | Debug overlay enrichment | **Resolved**: Ctrl-D overlay draws box `WxH` dims top-right of each outlined box (`draw_box_outline`), and a focus-order index (`0,1,2,...`) at the origin of each link/form-control span, in `total_focusables()` order (`apply_focus_order_labels`). |
 | Q-23 | `<img>` ASCII-art renderer | **Resolved**: `stb_image.h` vendored (ADR-004) decodes fetched `<img src>` bytes into `Page::images` (`load_page(..., fetch_images=true)`); `BrailleRenderer` quantizes to 2x4-dot braille glyphs, falling back to `AltTextRenderer` on any cache miss/decode failure. Renderer choice: `image-renderer = "alt" | "braille"` in `config.toml`, or `--image-renderer=alt|braille` CLI flag (default `alt` -- image fetch/decode only runs when braille is selected, avoiding the cost otherwise). |
 | Q-24 | Table column alignment | **Resolved**: `compute_table_col_widths()` measures max cell content-width per column index across all rows (handles `thead`/`tbody`/`tfoot` wrappers), stashed thread-locally (`g_table_col_widths`) and consulted by `layout_flex()` per `<tr>` in place of per-row flex-basis. |
-| Q-25 | CSS `position: relative/absolute` | **Resolved**: `position` in §7.2 (`Position` enum, `top`/`left_offset`/`right_offset`/`bottom` on `ComputedStyle`). `relative` offsets from normal-flow position without affecting siblings. `absolute` is removed from flow (no space reserved) and offsets against the nearest ancestor with `position != static` (`apply_position_offsets` tracks a containing-block box separately from the immediate parent), falling back to the viewport when none exists. `fixed`/`sticky` are dropped from flow entirely (no layer model). |
+| Q-25 | CSS `position: relative/absolute` | **Resolved**: `position` in §7.2 (`Position` enum, `top`/`left_offset`/`right_offset`/`bottom` on `ComputedStyle`). `relative` offsets from normal-flow position without affecting siblings. `absolute` is removed from flow (no space reserved) and offsets against the nearest ancestor with `position != static` (`apply_position_offsets` tracks a containing-block box separately from the immediate parent), falling back to the viewport when none exists. `fixed`/`sticky` are rendered as viewport-pinned overlays, not part of normal flow positioning — see Q-29. |
 | Q-26 | Scroll position indicator | **Resolved**: window title shows `[pct%]` scroll position when content exceeds viewport height (`BrowserView::sync_vscroll()`). |
 | Q-27 | Table `colspan`/`rowspan` | **Resolved**: `compute_table_grid()` (renamed from `compute_table_col_widths()`) runs the classic HTML column-assignment algorithm — cells are placed left-to-right, skipping grid columns still occupied by an earlier row's rowspan, tracked via a `rows_occupied_after` vector. Colspanning cells sum the widths of every column they cover (+ inter-column gaps); rowspanning cells get their box height extended post-layout (`apply_table_rowspans()`) once every row's actual height is known. Tables with any span disable `td`'s per-row `flex-grow` stretch (`TableGrid::has_span`) — otherwise rows with fewer items than real columns (because a span ate a slot) would grow disproportionately and drift out of alignment; unspanned tables keep the original stretch-to-fill behavior. `border-collapse` stays out of scope. |
 | Q-28 | Form `enctype: multipart/form-data` | **M2** (was Deferred): needs (a) a file-picker dialog (`TFileDialog`, tvision-provided) wired to `<input type="file">`, and (b) `multipart/form-data` body encoding in the form-submit path (currently only `application/x-www-form-urlencoded`, see §13). |
-| Q-29 | `position: fixed`/`sticky` layer model | **M2**: currently dropped from flow entirely (§20 Q-25) — real content behind a fixed nav bar or cookie banner never gets pushed down, but the fixed/sticky element itself is invisible. Add a minimal overlay layer: fixed elements paint at a screen-relative rect after the main render pass; sticky is treated as fixed once scrolled past its normal-flow position, static before. |
+| Q-29 | `position: fixed`/`sticky` layer model | **Resolved**: `layout::Box::overlays` (populated only on the root `Box`) holds one `OverlayBox` per fixed/sticky element -- laid out standalone at local origin (0,0) so `render::render(overlay.box)` yields just its own content, plus a `pinned_origin` resolved from `top`/`left`/`right`/`bottom` against the viewport. `Fixed` elements are fully out of flow (dropped from the main tree, matching the old drop behavior but now visible); `Sticky` elements stay in flow (their row is reserved normally) *and* get an overlay entry. `BrowserView::draw()` composites pinned overlays onto a fresh viewport-sized frame every call (`CharGrid::blit`), independent of `scroll_row_` for fixed; sticky is pinned once `scroll_row_` has scrolled its normal-flow row (`static_doc_row`, translated through `kept_rows_` into collapsed/visual row space) above `pinned_origin.row`, static before that. Scoped to **block-level children only** — a fixed/sticky element that's a direct child of a flex container is still dropped (unchanged from before), since flex item sizing doesn't have a natural place to carry overlay boxes and this is a rare pattern in practice (nav bars/headers are block-level). |
 | Q-30 | Expand out-of-subset elements | **M2**: `iframe`, `video`, `audio` are currently parsed-and-skipped (§6.7). Minimal handling: `iframe[src]` renders as a clickable link-out (`[Embedded: <src>]`, Enter navigates); `video`/`audio` render their `poster`/first `<source>` alt-equivalent, or a `[Media: <src>]` placeholder link. `canvas`/`svg` stay out of scope (no static src to point at). |
 
 ### 20.1 Milestone 1 (M1) Scope
@@ -473,10 +474,9 @@ Q-26, Q-10, Q-22, Q-24, Q-25, Q-23 above. **M1 complete.**
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
 | M2-file-upload | Multipart form upload | `TFileDialog` wiring for `<input type="file">` + multipart body encoding | Q-28 |
-| M2-fixed-sticky | `position: fixed`/`sticky` overlay layer | Screen-relative paint pass for fixed/sticky elements instead of dropping them | Q-29 |
 | M2-out-of-subset | Expand out-of-subset elements | `iframe`/`video`/`audio` as clickable link-out placeholders | Q-30 |
 
-~~M2-table-span~~ resolved — see Q-27 above.
+~~M2-table-span~~, ~~M2-fixed-sticky~~ resolved — see Q-27, Q-29 above.
 
 ---
 

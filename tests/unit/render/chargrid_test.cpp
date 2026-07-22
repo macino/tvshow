@@ -139,3 +139,50 @@ TEST_CASE("CharGrid: all style flags serialized correctly") {
     CHECK(attr.underline);
     CHECK(attr.strike);
 }
+
+TEST_CASE("CharGrid::blit copies every src cell to dst at the given origin") {
+    CharGrid src(2, 2);
+    src.put({0, 0}, U'A', {});
+    src.put({1, 0}, U'B', {});
+    src.put({0, 1}, U'C', {});
+    src.put({1, 1}, U'D', {});
+
+    CharGrid dst(5, 5);
+    dst.blit(src, {2, 1});
+
+    CHECK(dst.at({2, 1}).cp == U'A');
+    CHECK(dst.at({3, 1}).cp == U'B');
+    CHECK(dst.at({2, 2}).cp == U'C');
+    CHECK(dst.at({3, 2}).cp == U'D');
+}
+
+TEST_CASE("CharGrid::blit leaves cells outside src's footprint untouched") {
+    CharGrid src(1, 1);
+    src.put({0, 0}, U'X', {});
+    CharGrid dst(3, 3);
+    const auto before = dst.at({0, 0});
+    dst.blit(src, {1, 1});
+    CHECK(dst.at({0, 0}).cp == before.cp);
+    CHECK(dst.at({1, 1}).cp == U'X');
+}
+
+TEST_CASE("CharGrid::blit clips a src that extends past dst's bounds without throwing") {
+    CharGrid src(3, 3);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) { src.put({c, r}, U'#', {}); }
+    }
+    CharGrid dst(4, 4);
+    dst.blit(src, {2, 2});  // extends to (4,4), one past dst's (0..3, 0..3)
+    CHECK(dst.at({2, 2}).cp == U'#');
+    CHECK(dst.at({3, 3}).cp == U'#');
+}
+
+TEST_CASE("CharGrid::blit clips a negative origin without throwing") {
+    CharGrid src(3, 3);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) { src.put({c, r}, U'#', {}); }
+    }
+    CharGrid dst(4, 4);
+    dst.blit(src, {-1, -1});
+    CHECK(dst.at({0, 0}).cp == U'#');  // src's (1,1) lands at dst's (0,0)
+}

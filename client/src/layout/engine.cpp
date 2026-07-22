@@ -331,6 +331,55 @@ void apply_table_rowspans(std::vector<Box>& table_children) {
     }
 }
 
+// ── position:fixed / position:sticky overlays (SPEC Q-29) ─────────────────────
+
+// Viewport size for the current top-level layout() call and the overlay
+// accumulator it's collecting into. Set once per layout() call (unlike
+// g_table_grid, there's no nesting to save/restore -- only one viewport
+// exists per layout pass).
+thread_local Viewport g_overlay_vp{0, 0};
+thread_local std::vector<OverlayBox>* g_overlays = nullptr;
+
+// Resolves an out-of-flow element's viewport-relative pinned origin from its
+// own size and top/left/right/bottom offsets. An axis with both offsets
+// auto defaults to the start edge (0) -- fixed/sticky elements almost
+// always specify at least one offset in practice (e.g. `top: 0`).
+CellPos resolve_overlay_origin(const style::ComputedStyle& st, Size box_size, int vp_cols,
+                               int vp_rows) {
+    int x = 0;
+    if (!st.left_offset.is_auto) {
+        x = resolve_h(st.left_offset, vp_cols);
+    } else if (!st.right_offset.is_auto) {
+        x = vp_cols - resolve_h(st.right_offset, vp_cols) - box_size.cols;
+    }
+    int y = 0;
+    if (!st.top.is_auto) {
+        y = resolve_v(st.top, vp_rows);
+    } else if (!st.bottom.is_auto) {
+        y = vp_rows - resolve_v(st.bottom, vp_rows) - box_size.rows;
+    }
+    return {x, y};
+}
+
+// Builds the OverlayBox for a fixed/sticky child: laid out at local origin
+// (0,0) so render::render(overlay.box) yields exactly its own content,
+// ready to be blitted onto the viewport elsewhere by the view layer.
+// static_doc_row is meaningless for Fixed (pass 0); for Sticky it's the row
+// the element occupies in normal flow, needed by the view to decide whether
+// the in-flow copy is already visible or the overlay should paint instead.
+OverlayBox make_overlay_box(const style::StyledNode& child, int content_w, int avail_h,
+                            int static_doc_row) {
+    Box local_box = layout_node(child, {0, 0}, content_w, avail_h);
+    OverlayBox ov;
+    ov.pinned_origin = resolve_overlay_origin(child.style, local_box.border_box.size,
+                                              g_overlay_vp.cols, g_overlay_vp.rows);
+    ov.kind = (child.style.position == style::Position::Fixed) ? OverlayKind::Fixed
+                                                                : OverlayKind::Sticky;
+    ov.static_doc_row = static_doc_row;
+    ov.box = std::move(local_box);
+    return ov;
+}
+
 // ── Block layout ──────────────────────────────────────────────────────────────
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -408,11 +457,30 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
         if (disp == style::Display::None) {
             continue;
         }
-        // Fixed/sticky elements are overlaid in real browsers (z-index layers).
-        // tvshow has no layer model — skip them from flow to avoid nav bars and
-        // cookie banners appearing before the main content.
-        if (child.style.position == style::Position::Fixed ||
-            child.style.position == style::Position::Sticky) {
+        // Fixed: never in flow, pinned to the viewport (SPEC Q-29). Only
+        // handled here (block-level children) -- a fixed/sticky item
+        // directly inside a flex container is still dropped, as before;
+        // that's a rare pattern (nav bars/headers are block-level) and
+        // keeping this scoped avoids reworking layout_flex's item-sizing
+        // pass to also carry overlay boxes.
+        if (child.style.position == style::Position::Fixed) {
+            if (g_overlays != nullptr) {
+                g_overlays->push_back(make_overlay_box(child, content_w, avail_h, 0));
+            }
+            continue;
+        }
+        // Sticky: stays in flow (its own row is reserved like any block),
+        // but also gets an overlay entry so the view can pin it once
+        // scroll_row_ carries its normal-flow row above pinned_origin.row.
+        if (child.style.position == style::Position::Sticky) {
+            const EdgePx cmar = compute_margin(child.style.margin, content_w, avail_h);
+            Box child_box = layout_node(child, {content_origin.col, y}, content_w, avail_h);
+            const int static_row = child_box.border_box.origin.row;
+            y += cmar.top + child_box.border_box.size.rows + cmar.bottom;
+            children.push_back(std::move(child_box));
+            if (g_overlays != nullptr) {
+                g_overlays->push_back(make_overlay_box(child, content_w, avail_h, static_row));
+            }
             continue;
         }
         if (disp == style::Display::Block || disp == style::Display::Flex ||
@@ -865,9 +933,16 @@ void apply_position_offsets(Box& box, int parent_w, int parent_h, CellPos anc_or
 }
 
 Box layout(const style::StyledNode& root, Viewport vp) {
+    std::vector<OverlayBox> overlays;
+    g_overlay_vp = vp;
+    g_overlays = &overlays;
+
     Box root_box = layout_block(root, {0, 0}, vp.cols, vp.rows);
     apply_position_offsets(root_box, vp.cols, vp.rows, {0, 0}, vp.cols, vp.rows);
     root_box.border_box.size.rows = std::max(root_box.border_box.size.rows, vp.rows);
+
+    g_overlays = nullptr;
+    root_box.overlays = std::move(overlays);
     return root_box;
 }
 

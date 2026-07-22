@@ -44,6 +44,13 @@ public:
     // Read one cell. Throws std::out_of_range if pos is outside the grid.
     [[nodiscard]] const Cell& at(Point pos) const;
 
+    // Copies every cell of src onto this grid at dst_origin. Silently clips
+    // to this grid's bounds (including a fully or partially negative
+    // dst_origin) -- unlike put()/at(), out-of-range never throws here,
+    // since a fixed/sticky overlay near a viewport edge is an expected case,
+    // not a bug.
+    void blit(const CharGrid& src, Point dst_origin);
+
     // Serialize to the golden-snapshot format (UTF-8 text).
     [[nodiscard]] std::string to_string() const;
 
