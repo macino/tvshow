@@ -201,6 +201,86 @@ TEST_CASE("layout: table cells align to max column width across rows") {
     CHECK(rows[0]->children[1].border_box.size.cols == rows[1]->children[1].border_box.size.cols);
 }
 
+TEST_CASE("layout: colspan cell width spans multiple columns") {
+    auto [doc, tree] = make_tree(
+        "<body><table>"
+        "<tr><td colspan=\"2\">Wide</td></tr>"
+        "<tr><td>Aaaaaaaaaa</td><td>Bbbbbbbbbb</td></tr>"
+        "</table></body>");
+    const Box root = layout(tree, {80, 24});
+    const auto rows = find_all_boxes(root, "tr");
+    REQUIRE(rows.size() >= 2);
+    REQUIRE(!rows[0]->children.empty());
+    REQUIRE(rows[1]->children.size() >= 2);
+
+    // The colspan=2 cell should be as wide as both row-2 columns combined.
+    const int spanned_w = rows[0]->children[0].border_box.size.cols;
+    const int col0_w = rows[1]->children[0].border_box.size.cols;
+    const int col1_w = rows[1]->children[1].border_box.size.cols;
+    CHECK(spanned_w == col0_w + col1_w);
+}
+
+TEST_CASE("layout: colspan cell doesn't misalign the next row's columns") {
+    // Without span-aware column indexing, row 2's second <td> would be
+    // measured as if it were column index 1 instead of 2 (the colspan=2
+    // cell in row 1 only "used up" one item, not two columns).
+    auto [doc, tree] = make_tree(
+        "<body><table>"
+        "<tr><td colspan=\"2\">Wide</td><td>C</td></tr>"
+        "<tr><td>A</td><td>B</td><td>Cccccccccc</td></tr>"
+        "</table></body>");
+    const Box root = layout(tree, {80, 24});
+    const auto rows = find_all_boxes(root, "tr");
+    REQUIRE(rows.size() >= 2);
+    REQUIRE(rows[0]->children.size() >= 2);
+    REQUIRE(rows[1]->children.size() >= 3);
+
+    // Row 1's third cell ("C") should align under row 2's third column,
+    // not its second -- i.e. it starts after the colspan=2 cell's full width.
+    const int wide_w = rows[0]->children[0].border_box.size.cols;
+    const int wide_start = rows[0]->children[0].border_box.origin.col;
+    const int c_start = rows[0]->children[1].border_box.origin.col;
+    CHECK(c_start == wide_start + wide_w);
+}
+
+TEST_CASE("layout: rowspan cell extends its box height across the spanned rows") {
+    auto [doc, tree] = make_tree(
+        "<body><table>"
+        "<tr><td rowspan=\"2\">Tall</td><td>A</td></tr>"
+        "<tr><td>B</td></tr>"
+        "</table></body>");
+    const Box root = layout(tree, {80, 24});
+    const auto rows = find_all_boxes(root, "tr");
+    REQUIRE(rows.size() >= 2);
+    REQUIRE(!rows[0]->children.empty());
+
+    const int tall_h = rows[0]->children[0].border_box.size.rows;
+    const int row0_h = rows[0]->border_box.size.rows;
+    const int row1_h = rows[1]->border_box.size.rows;
+    // Spans its own row's height plus the next row's.
+    CHECK(tall_h == row0_h + row1_h);
+}
+
+TEST_CASE("layout: rowspan cell doesn't misalign the following row's columns") {
+    auto [doc, tree] = make_tree(
+        "<body><table>"
+        "<tr><td rowspan=\"2\">Tall</td><td>Aaaaaaaaaa</td></tr>"
+        "<tr><td>Bbbbbbbbbb</td></tr>"
+        "</table></body>");
+    const Box root = layout(tree, {80, 24});
+    const auto rows = find_all_boxes(root, "tr");
+    REQUIRE(rows.size() >= 2);
+    REQUIRE(!rows[0]->children.empty());
+    REQUIRE(rows[1]->children.size() >= 1);
+
+    // Row 2's single cell ("B") occupies the second grid column (skipping
+    // the column still held by row 1's rowspan cell), so it should start
+    // where row 1's second cell ("A") starts, not at column 0.
+    const int row1_second_col_start = rows[0]->children[1].border_box.origin.col;
+    const int row2_cell_start = rows[1]->children[0].border_box.origin.col;
+    CHECK(row2_cell_start == row1_second_col_start);
+}
+
 // ── position: relative ──────────────────────────────────────────────────────
 
 TEST_CASE("layout: position:relative offsets box from normal-flow position") {

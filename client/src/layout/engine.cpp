@@ -16,6 +16,7 @@
 #include <numeric>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -165,12 +166,45 @@ int measure_text_width(const style::StyledNode& sn, int avail_w) {
     return max_w;
 }
 
-// Compute max content width per column across all rows in a table.
-std::vector<int> compute_table_col_widths(const style::StyledNode& table_sn, int content_w) {
+// Reads an HTML attribute (colspan/rowspan) as a span count: absent, zero,
+// negative, or unparseable all mean "1" (no span) per HTML5 rules.
+int cell_span_attr(const dom::Node& node, std::string_view attr_name) noexcept {
+    const int v = parse_attr_int(node.attr(attr_name));
+    return v > 1 ? v : 1;
+}
+
+// Per-table column layout (SPEC Q-27): column widths, and for each <tr>
+// StyledNode, the starting grid-column index of each of its td/th cells
+// (in document order) so multi-column-spanning cells and rowspan-occupied
+// slots from earlier rows don't throw off later cells' alignment.
+struct TableGrid {
     std::vector<int> col_widths;
+    std::unordered_map<const style::StyledNode*, std::vector<int>> cell_cols;
+    // True if any cell has colspan>1 or rowspan>1. td/th have flex-grow:1 in
+    // the UA stylesheet, which independently stretches each row's items to
+    // fill that row's free space -- harmless when every row has the same
+    // item count, but once spans make item counts diverge between rows,
+    // per-row growth diverges too and columns drift out of alignment beyond
+    // what the base col_widths (and lead_gap, in collect_flex_items) fix.
+    // layout_flex uses this to skip further growth for spanned tables,
+    // keeping every column at its exact computed width instead.
+    bool has_span = false;
+};
+
+// Computes column widths and the row->cell-start-column map for a <table>.
+// Walks thead/tbody/tfoot wrappers or direct <tr> children. Cells are placed
+// into grid columns left-to-right, skipping columns still occupied by a
+// rowspan from an earlier row (classic HTML table column-assignment
+// algorithm); a colspanning cell's content width is divided evenly across
+// the columns it spans (there's no way to know how much belongs to which).
+TableGrid compute_table_grid(const style::StyledNode& table_sn, int content_w) {
+    TableGrid grid;
+    // rows_occupied_after[col] = how many rows AFTER the row currently being
+    // processed are still covered by an earlier row's rowspan.
+    std::vector<int> rows_occupied_after;
+
     for (const auto& section_or_row : table_sn.children) {
         if (section_or_row.node == nullptr) { continue; }
-        // Handle thead/tbody/tfoot wrappers or direct tr children.
         const auto& rows = (section_or_row.node->tag == "tr")
                                ? std::vector<const style::StyledNode*>{&section_or_row}
                                : [&]() {
@@ -183,30 +217,59 @@ std::vector<int> compute_table_col_widths(const style::StyledNode& table_sn, int
                                      return out;
                                  }();
         for (const auto* row : rows) {
+            std::vector<int>& cell_cols = grid.cell_cols[row];
+            std::vector<bool> touched;
             int col_idx = 0;
             for (const auto& cell : row->children) {
                 if (cell.node == nullptr || cell.node->kind != dom::NodeKind::Element) {
                     continue;
                 }
                 if (cell.node->tag != "td" && cell.node->tag != "th") { continue; }
+
+                while (col_idx < static_cast<int>(rows_occupied_after.size()) &&
+                      rows_occupied_after[static_cast<size_t>(col_idx)] > 0) {
+                    ++col_idx;
+                }
+                cell_cols.push_back(col_idx);
+
+                const int colspan = cell_span_attr(*cell.node, "colspan");
+                const int rowspan = cell_span_attr(*cell.node, "rowspan");
+                if (colspan > 1 || rowspan > 1) { grid.has_span = true; }
                 const EdgePx cpad = compute_padding(cell.style.padding, content_w, 0);
                 const int text_w = measure_text_width(cell, content_w);
                 const int cell_w = cpad.left + text_w + cpad.right;
-                if (static_cast<int>(col_widths.size()) <= col_idx) {
-                    col_widths.resize(static_cast<size_t>(col_idx + 1), 0);
+                const int per_col_w = (cell_w + colspan - 1) / colspan;  // ceil-divide
+
+                const auto need = static_cast<size_t>(col_idx + colspan);
+                if (grid.col_widths.size() < need) { grid.col_widths.resize(need, 0); }
+                if (rows_occupied_after.size() < need) { rows_occupied_after.resize(need, 0); }
+                if (touched.size() < need) { touched.resize(need, false); }
+
+                for (int c = col_idx; c < col_idx + colspan; ++c) {
+                    grid.col_widths[static_cast<size_t>(c)] =
+                        std::max(grid.col_widths[static_cast<size_t>(c)], per_col_w);
+                    rows_occupied_after[static_cast<size_t>(c)] =
+                        std::max(rows_occupied_after[static_cast<size_t>(c)], rowspan - 1);
+                    touched[static_cast<size_t>(c)] = true;
                 }
-                col_widths[static_cast<size_t>(col_idx)] =
-                    std::max(col_widths[static_cast<size_t>(col_idx)], cell_w);
-                ++col_idx;
+                col_idx += colspan;
+            }
+            // A row boundary has passed: columns occupied by an earlier
+            // row's rowspan (not touched by this row's own cells) have one
+            // fewer row of occupancy remaining.
+            for (size_t c = 0; c < rows_occupied_after.size(); ++c) {
+                if ((c >= touched.size() || !touched[c]) && rows_occupied_after[c] > 0) {
+                    --rows_occupied_after[c];
+                }
             }
         }
     }
-    return col_widths;
+    return grid;
 }
 
-// Thread-local table column widths context for layout_flex to use.
+// Thread-local table grid context for layout_flex to use.
 // Set by layout_block when processing <table>, cleared after.
-thread_local const std::vector<int>* g_table_col_widths = nullptr;
+thread_local const TableGrid* g_table_grid = nullptr;
 
 // ── Forward declarations (mutual recursion) ───────────────────────────────────
 
@@ -221,6 +284,51 @@ Box layout_node(const style::StyledNode& sn, CellPos origin, int avail_w, int av
         return layout_flex(sn, origin, avail_w, avail_h);
     }
     return layout_block(sn, origin, avail_w, avail_h);
+}
+
+// Flattens a <table>'s already-laid-out children into a list of <tr> row
+// boxes, in document order, descending one level into thead/tbody/tfoot
+// section boxes (rows are direct table children only when no section wraps
+// them).
+void collect_row_boxes(std::vector<Box>& table_children, std::vector<Box*>& out) {
+    for (auto& b : table_children) {
+        if (b.node != nullptr && b.node->node != nullptr && b.node->node->tag == "tr") {
+            out.push_back(&b);
+        } else {
+            for (auto& rb : b.children) {
+                if (rb.node != nullptr && rb.node->node != nullptr && rb.node->node->tag == "tr") {
+                    out.push_back(&rb);
+                }
+            }
+        }
+    }
+}
+
+// Extends each rowspan>1 cell's box height to cover the rows it spans (SPEC
+// Q-27). Cells were laid out with their own row's intrinsic height (row
+// heights aren't known ahead of time in this row-by-row layout); this
+// widens the box downward now that every row's actual height is known.
+// The spanned column in later rows is already left empty by the col_idx
+// occupancy skip in compute_table_grid, so the extended box doesn't overlap
+// any sibling cell.
+void apply_table_rowspans(std::vector<Box>& table_children) {
+    std::vector<Box*> rows;
+    collect_row_boxes(table_children, rows);
+    for (size_t ri = 0; ri < rows.size(); ++ri) {
+        for (auto& cell : rows[ri]->children) {
+            if (cell.node == nullptr || cell.node->node == nullptr) { continue; }
+            const int rowspan = cell_span_attr(*cell.node->node, "rowspan");
+            if (rowspan <= 1) { continue; }
+            const int extra_rows =
+                std::min(rowspan - 1, static_cast<int>(rows.size() - ri - 1));
+            int extra_h = 0;
+            for (int k = 1; k <= extra_rows; ++k) {
+                extra_h += rows[ri + static_cast<size_t>(k)]->border_box.size.rows;
+            }
+            cell.border_box.size.rows += extra_h;
+            cell.content_box.size.rows += extra_h;
+        }
+    }
 }
 
 // ── Block layout ──────────────────────────────────────────────────────────────
@@ -243,16 +351,16 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     const CellPos content_origin{border_origin.col + brd.left + pad.left,
                                  border_origin.row + brd.top + pad.top};
 
-    // Table column alignment: compute column widths for <table> elements.
-    std::vector<int> table_cols;
+    // Table column alignment: compute the column grid for <table> elements.
+    TableGrid table_grid;
     const bool is_table = sn.node != nullptr && sn.node->tag == "table";
-    const std::vector<int>* prev_col_widths = g_table_col_widths;
+    const TableGrid* prev_grid = g_table_grid;
     if (is_table) {
-        table_cols = compute_table_col_widths(sn, content_w);
-        // table_cols outlives all recursive layout calls below; restored before return.
+        table_grid = compute_table_grid(sn, content_w);
+        // table_grid outlives all recursive layout calls below; restored before return.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
-        g_table_col_widths = &table_cols;
+        g_table_grid = &table_grid;
 #pragma GCC diagnostic pop
     }
 
@@ -349,7 +457,8 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     const int content_h = std::max(0, y - content_origin.row);
 
     if (is_table) {
-        g_table_col_widths = prev_col_widths;
+        apply_table_rowspans(children);
+        g_table_grid = prev_grid;
     }
 
     Box box;
@@ -369,17 +478,28 @@ struct FlexItem {
     int main_base;  // hypothetical main-axis size in cells
     float grow;
     float shrink;
+    // Table rows only: blank space to insert before this item for grid
+    // columns skipped because an earlier row's rowspan still occupies them.
+    int lead_gap = 0;
 };
 
 // Collect flex items from a container's children, skipping display:none and
 // hidden form controls. Returns items in source order.
+// gap_main only matters for table rows: it's added between the columns a
+// colspanning cell covers.
 std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_row, int content_main,
-                                         int avail_cross) {
-    // Table row: use pre-computed column widths if available.
-    const bool is_tr = sn.node != nullptr && sn.node->tag == "tr" && g_table_col_widths != nullptr;
+                                         int avail_cross, int gap_main) {
+    // Table row: use the pre-computed column grid if available.
+    const bool is_tr = sn.node != nullptr && sn.node->tag == "tr" && g_table_grid != nullptr;
+    const std::vector<int>* row_cols = nullptr;
+    if (is_tr) {
+        const auto it = g_table_grid->cell_cols.find(&sn);
+        if (it != g_table_grid->cell_cols.end()) { row_cols = &it->second; }
+    }
 
     std::vector<FlexItem> items;
-    int col_idx = 0;
+    int cell_i = 0;    // index into row_cols: the nth td/th cell in this row
+    int next_col = 0;  // grid column the next item is expected to start at
     for (const auto& child : sn.children) {
         if (child.node == nullptr || child.node->kind != dom::NodeKind::Element) {
             continue;
@@ -399,13 +519,34 @@ std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_ro
             const auto [icols, irows] = img_cell_size(*child.node);
             const int base = is_row ? icols : irows;
             items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink});
-            ++col_idx;
             continue;
         }
 
         int base = 0;
-        if (is_tr && is_row && col_idx < static_cast<int>(g_table_col_widths->size())) {
-            base = (*g_table_col_widths)[static_cast<size_t>(col_idx)];
+        int lead_gap = 0;
+        if (row_cols != nullptr && is_row && cell_i < static_cast<int>(row_cols->size())) {
+            // Sum the widths of every column this cell's colspan covers,
+            // plus the gaps between them.
+            const int start_col = (*row_cols)[static_cast<size_t>(cell_i)];
+            const int colspan = cell_span_attr(*child.node, "colspan");
+            const int end_col = std::min(start_col + colspan,
+                                         static_cast<int>(g_table_grid->col_widths.size()));
+            for (int c = start_col; c < end_col; ++c) {
+                base += g_table_grid->col_widths[static_cast<size_t>(c)];
+            }
+            base += gap_main * std::max(0, end_col - start_col - 1);
+            // Columns between next_col and start_col are occupied by an
+            // earlier row's rowspan -- no item sits there, so insert blank
+            // space instead, otherwise this item would render flush against
+            // the previous one instead of under its real grid column.
+            if (start_col > next_col) {
+                for (int c = next_col; c < start_col; ++c) {
+                    lead_gap += g_table_grid->col_widths[static_cast<size_t>(c)];
+                }
+                lead_gap += gap_main * (start_col - next_col);
+            }
+            next_col = end_col;
+            ++cell_i;
         } else {
             const auto& fb = child.style.flex_basis;
             if (!fb.is_auto) {
@@ -416,8 +557,7 @@ std::vector<FlexItem> collect_flex_items(const style::StyledNode& sn, bool is_ro
                 base = resolve_v(child.style.height, avail_cross);
             }
         }
-        items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink});
-        ++col_idx;
+        items.push_back({&child, base, child.style.flex_grow, child.style.flex_shrink, lead_gap});
     }
     return items;
 }
@@ -548,7 +688,7 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
     const int gap_main = is_row ? resolve_h(st.gap, content_main) : resolve_v(st.gap, avail_h);
 
     const std::vector<FlexItem> items =
-        collect_flex_items(sn, is_row, content_main, is_row ? avail_h : content_w);
+        collect_flex_items(sn, is_row, content_main, is_row ? avail_h : content_w, gap_main);
     const int n = static_cast<int>(items.size());
 
     // ── Main-axis sizing ──────────────────────────────────────────────────────
@@ -563,7 +703,15 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
     // Row: distribute horizontal space. Column: use avail_h (vertical space available).
     const int main_available =
         is_row ? content_main : (st.height.is_auto ? avail_h : resolve_v(st.height, avail_h));
-    distribute_flex_space(main_sizes, items, main_available - total_base - total_gaps);
+    // Spanned tables keep every column at its exact grid width (see
+    // TableGrid::has_span) -- growing items further would drift columns out
+    // of alignment whenever a row's item count differs from the table's
+    // real column count.
+    const bool is_spanned_table_row =
+        sn.node != nullptr && sn.node->tag == "tr" && g_table_grid != nullptr && g_table_grid->has_span;
+    if (!is_spanned_table_row) {
+        distribute_flex_space(main_sizes, items, main_available - total_base - total_gaps);
+    }
 
     const int used_main = std::accumulate(main_sizes.begin(), main_sizes.end(), 0) + total_gaps;
     const int free_main = main_available - used_main;
@@ -583,6 +731,7 @@ Box layout_flex(const style::StyledNode& sn, CellPos origin, int avail_w, int av
     for (int i = 0; i < n; ++i) {
         const auto& item = items[static_cast<size_t>(i)];
         const int msz = main_sizes[static_cast<size_t>(i)];
+        main_cursor += item.lead_gap;
 
         int item_w = 0;
         int item_h = 0;
