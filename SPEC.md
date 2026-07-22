@@ -3,8 +3,8 @@
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
 > Status: **M0 and M1 complete**. M2 scoped, not started — see §20.2: table colspan/rowspan,
-> multipart file upload, expanded out-of-subset elements. Table spans and the
-> `position:fixed/sticky` overlay layer are done.
+> multipart file upload (Q-28) is the only item left. Table spans,
+> `position:fixed/sticky`, and out-of-subset link-outs are done.
 
 ---
 
@@ -201,8 +201,8 @@ per column index across all rows and applies it uniformly (see Q-24).
 
 ### 6.7 Out of subset
 `script`, `canvas`, `svg` — parsed and skipped (children rendered as if their parent were `div`).
-`iframe`, `video`, `audio` are slated for minimal link-out handling in M2 (see Q-30); until then
-they're skipped the same way.
+`iframe`, `video`, `audio` render as a `[Embedded: <src>]`/`[Media: <src>]` link-out instead of
+being skipped (see Q-30).
 
 ---
 
@@ -461,7 +461,7 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-27 | Table `colspan`/`rowspan` | **Resolved**: `compute_table_grid()` (renamed from `compute_table_col_widths()`) runs the classic HTML column-assignment algorithm — cells are placed left-to-right, skipping grid columns still occupied by an earlier row's rowspan, tracked via a `rows_occupied_after` vector. Colspanning cells sum the widths of every column they cover (+ inter-column gaps); rowspanning cells get their box height extended post-layout (`apply_table_rowspans()`) once every row's actual height is known. Tables with any span disable `td`'s per-row `flex-grow` stretch (`TableGrid::has_span`) — otherwise rows with fewer items than real columns (because a span ate a slot) would grow disproportionately and drift out of alignment; unspanned tables keep the original stretch-to-fill behavior. `border-collapse` stays out of scope. |
 | Q-28 | Form `enctype: multipart/form-data` | **M2** (was Deferred): needs (a) a file-picker dialog (`TFileDialog`, tvision-provided) wired to `<input type="file">`, and (b) `multipart/form-data` body encoding in the form-submit path (currently only `application/x-www-form-urlencoded`, see §13). |
 | Q-29 | `position: fixed`/`sticky` layer model | **Resolved**: `layout::Box::overlays` (populated only on the root `Box`) holds one `OverlayBox` per fixed/sticky element -- laid out standalone at local origin (0,0) so `render::render(overlay.box)` yields just its own content, plus a `pinned_origin` resolved from `top`/`left`/`right`/`bottom` against the viewport. `Fixed` elements are fully out of flow (dropped from the main tree, matching the old drop behavior but now visible); `Sticky` elements stay in flow (their row is reserved normally) *and* get an overlay entry. `BrowserView::draw()` composites pinned overlays onto a fresh viewport-sized frame every call (`CharGrid::blit`), independent of `scroll_row_` for fixed; sticky is pinned once `scroll_row_` has scrolled its normal-flow row (`static_doc_row`, translated through `kept_rows_` into collapsed/visual row space) above `pinned_origin.row`, static before that. Scoped to **block-level children only** — a fixed/sticky element that's a direct child of a flex container is still dropped (unchanged from before), since flex item sizing doesn't have a natural place to carry overlay boxes and this is a rare pattern in practice (nav bars/headers are block-level). |
-| Q-30 | Expand out-of-subset elements | **M2**: `iframe`, `video`, `audio` are currently parsed-and-skipped (§6.7). Minimal handling: `iframe[src]` renders as a clickable link-out (`[Embedded: <src>]`, Enter navigates); `video`/`audio` render their `poster`/first `<source>` alt-equivalent, or a `[Media: <src>]` placeholder link. `canvas`/`svg` stay out of scope (no static src to point at). |
+| Q-30 | Expand out-of-subset elements | **Resolved**: `iframe`/`video`/`audio` are synthesized into a token run (`emit_media_placeholder()` in `inline_text.cpp`) carrying `src` as the token's `href` -- `[Embedded: <src>]` for `iframe`, `[Media: <src>]` for `video`/`audio` (falling back to the first `<source src>` child if the element has no `src` of its own). This makes it a real, focusable, Enter-navigable link for free: `collect_links()` and the browser's Tab/Enter handling are already generic over any token with a non-empty `href`, no `<a>`-specific code touched. An element with no resolvable `src` at all contributes nothing (same as before). `canvas`/`svg` stay out of scope (no static src to point at). |
 
 ### 20.1 Milestone 1 (M1) Scope
 
@@ -474,9 +474,9 @@ Q-26, Q-10, Q-22, Q-24, Q-25, Q-23 above. **M1 complete.**
 | ID | Feature | Scope | Depends on |
 |----|---------|-------|------------|
 | M2-file-upload | Multipart form upload | `TFileDialog` wiring for `<input type="file">` + multipart body encoding | Q-28 |
-| M2-out-of-subset | Expand out-of-subset elements | `iframe`/`video`/`audio` as clickable link-out placeholders | Q-30 |
 
-~~M2-table-span~~, ~~M2-fixed-sticky~~ resolved — see Q-27, Q-29 above.
+~~M2-table-span~~, ~~M2-fixed-sticky~~, ~~M2-out-of-subset~~ resolved — see Q-27, Q-29, Q-30 above.
+M2-file-upload is the sole remaining M2 item.
 
 ---
 

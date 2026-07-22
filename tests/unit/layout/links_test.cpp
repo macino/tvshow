@@ -77,6 +77,39 @@ TEST_CASE("collect_links: two separate links yield two entries in reading order"
     CHECK(links[1].href == "/b");
 }
 
+// ── iframe/video/audio link-out placeholders (SPEC Q-30) ────────────────────
+
+TEST_CASE("collect_links: iframe[src] yields a focusable [Embedded: ...] link") {
+    auto [doc, tree] = make_tree(R"(<body><iframe src="https://example.com/x"></iframe></body>)");
+    const Box box = layout(tree, {80, 5});
+    const auto links = collect_links(box);
+    REQUIRE(links.size() == 1);
+    CHECK(links[0].href == "https://example.com/x");
+}
+
+TEST_CASE("collect_links: video[src] yields a focusable [Media: ...] link") {
+    auto [doc, tree] = make_tree(R"(<body><video src="movie.mp4"></video></body>)");
+    const Box box = layout(tree, {80, 5});
+    const auto links = collect_links(box);
+    REQUIRE(links.size() == 1);
+    CHECK(links[0].href == "movie.mp4");
+}
+
+TEST_CASE("collect_links: audio with no own src falls back to first <source src>") {
+    auto [doc, tree] = make_tree(
+        R"(<body><audio><source src="a.ogg"><source src="b.mp3"></audio></body>)");
+    const Box box = layout(tree, {80, 5});
+    const auto links = collect_links(box);
+    REQUIRE(links.size() == 1);
+    CHECK(links[0].href == "a.ogg");
+}
+
+TEST_CASE("collect_links: iframe with no src attribute contributes no link") {
+    auto [doc, tree] = make_tree("<body><iframe></iframe></body>");
+    const Box box = layout(tree, {80, 5});
+    CHECK(collect_links(box).empty());
+}
+
 // ── find_anchor_row ───────────────────────────────────────────────────────────
 
 TEST_CASE("find_anchor_row: returns -1 when no element has matching id") {

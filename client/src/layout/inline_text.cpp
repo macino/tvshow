@@ -87,6 +87,47 @@ void collect_text_node(std::string_view text, const style::ComputedStyle& st, st
     }
 }
 
+// SPEC §20 Q-30: `<iframe src>`/`<video>`/`<audio>` are out of the HTML
+// subset (no embedding/playback), but rather than silently dropping them,
+// synthesize a "[Embedded: <src>]" / "[Media: <src>]" token run carrying
+// `src` as its href -- this makes it a real, focusable, Enter-navigable
+// link for free (collect_links()/browser_view.cpp are generic over any
+// non-empty InlineToken::href, no `<a>`-specific code involved).
+// video/audio fall back to the first <source src> child if the element has
+// no src attribute of its own. Elements with no resolvable src at all
+// (malformed markup) contribute nothing, same as before this change.
+void emit_media_placeholder(const style::StyledNode& sn, std::vector<InlineToken>& out,
+                            PendingSpace& pending) {
+    std::string_view src = sn.node->attr("src");
+    if (src.empty() && sn.node->tag != "iframe") {
+        for (const auto& sub : sn.children) {
+            if (sub.node != nullptr && sub.node->tag == "source") {
+                const std::string_view sub_src = sub.node->attr("src");
+                if (!sub_src.empty()) {
+                    src = sub_src;
+                    break;
+                }
+            }
+        }
+    }
+    if (src.empty()) {
+        return;
+    }
+    if (pending.active) {
+        out.push_back({U' ', &sn.style, pending.href});
+        pending.active = false;
+    }
+    const std::string_view label = (sn.node->tag == "iframe") ? "Embedded: " : "Media: ";
+    out.push_back({U'[', &sn.style, src});
+    for (const char c : label) {
+        out.push_back({static_cast<char32_t>(static_cast<unsigned char>(c)), &sn.style, src});
+    }
+    for (const char c : src) {
+        out.push_back({static_cast<char32_t>(static_cast<unsigned char>(c)), &sn.style, src});
+    }
+    out.push_back({U']', &sn.style, src});
+}
+
 // SPEC §12.1: focusable links are `<a href>` elements. `href` is the target
 // inherited from the nearest enclosing `<a href>`, or empty outside one.
 // Mirrors render::paint_text / layout::has_inline_content's recursion
@@ -119,6 +160,10 @@ void collect_tokens(const style::StyledNode& sn, style::WhiteSpace ws, std::stri
                 for (int k = 1; k < wc; ++k) {
                     out.push_back({U'\0', &child.style, {}});       // continuation placeholders
                 }
+            } else if (child.node->tag == "iframe" || child.node->tag == "video" ||
+                      child.node->tag == "audio") {
+                emit_media_placeholder(child, out, pending);
+                // No recursion: <source>/<track> children aren't renderable content.
             } else {
                 std::string_view child_href = href;
                 if (child.node->tag == "a") {
