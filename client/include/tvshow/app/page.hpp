@@ -55,11 +55,13 @@ struct Page {
                                                        std::string_view detail,
                                                        layout::Viewport vp);
 
-// Issues a POST to action_url with application/x-www-form-urlencoded body,
-// then parses and lays out the response document.
-// jar may be null (cookies disabled).
-[[nodiscard]] std::optional<Page> post_page(std::string_view action_url, std::string_view body,
-                                            layout::Viewport vp,
-                                            net::CookieJar* jar = nullptr);
+// Issues a POST to action_url, then parses and lays out the response document.
+// jar may be null (cookies disabled). content_type defaults to standard HTML
+// form encoding; pass "multipart/form-data; boundary=..." for file uploads
+// (SPEC Q-28), with body already encoded to match.
+[[nodiscard]] std::optional<Page> post_page(
+    std::string_view action_url, std::string_view body, layout::Viewport vp,
+    net::CookieJar* jar = nullptr,
+    std::string_view content_type = "application/x-www-form-urlencoded");
 
 }  // namespace tvshow::app

@@ -42,8 +42,15 @@ TEST_CASE("form: input types map to correct kinds") {
           FormControlKind::Submit);
     CHECK(form_control_kind(make_element("input", {{"type", "hidden"}})) ==
           FormControlKind::Hidden);
+    CHECK(form_control_kind(make_element("input", {{"type", "file"}})) == FormControlKind::File);
     // input with no type defaults to text
     CHECK(form_control_kind(make_element("input")) == FormControlKind::Text);
+}
+
+TEST_CASE("form: file input has a fixed default size") {
+    const auto sz = form_control_size(make_element("input", {{"type", "file"}}));
+    CHECK(sz.cols > 2);  // room for "[Choose File]"
+    CHECK(sz.rows == 1);
 }
 
 TEST_CASE("form: button and textarea kinds") {

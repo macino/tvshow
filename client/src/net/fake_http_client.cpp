@@ -25,7 +25,8 @@ Result FakeHttpClient::get(const util::Url& url, const Headers& /*extra_headers*
 }
 
 Result FakeHttpClient::post(const util::Url& url, std::string_view /*body*/,
-                            const Headers& /*extra_headers*/, int max_redirects) {
+                            const Headers& /*extra_headers*/, int max_redirects,
+                            std::string_view /*content_type*/) {
     return dispatch(url, max_redirects);
 }
 

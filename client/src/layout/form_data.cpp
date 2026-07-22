@@ -69,9 +69,35 @@ void collect_control(const dom::Node& node, const TextMap& text_vals, const Chec
         }
         return;
     }
+    case FormControlKind::File:  // collected separately by collect_form_files (SPEC Q-28)
     case FormControlKind::Submit:
     case FormControlKind::None:
         return;
+    }
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+void collect_files(const dom::Node& node, const TextMap& text_vals,
+                   std::vector<FormFileRef>& out) {
+    if (node.kind != dom::NodeKind::Element) {
+        return;
+    }
+    const FormControlKind kind = form_control_kind(node);
+    if (kind == FormControlKind::File) {
+        const std::string_view name = node.attr("name");
+        const auto it = text_vals.find(&node);
+        if (!name.empty() && it != text_vals.end() && !it->second.empty()) {
+            out.push_back({std::string(name), it->second});
+        }
+        return;
+    }
+    if (kind != FormControlKind::None) {
+        return;  // don't recurse into other controls' children
+    }
+    for (const auto& child : node.children) {
+        if (child) {
+            collect_files(*child, text_vals, out);
+        }
     }
 }
 
@@ -112,6 +138,16 @@ std::vector<FormField> collect_form_fields(const dom::Node& form, const TextMap&
     return fields;
 }
 
+std::vector<FormFileRef> collect_form_files(const dom::Node& form, const TextMap& text_values) {
+    std::vector<FormFileRef> files;
+    for (const auto& child : form.children) {
+        if (child) {
+            collect_files(*child, text_values, files);
+        }
+    }
+    return files;
+}
+
 std::string url_encode(std::string_view s) {
     static constexpr std::string_view k_hex = "0123456789ABCDEF";
     std::string out;
@@ -140,6 +176,33 @@ std::string encode_fields(const std::vector<FormField>& fields) {
         out += '=';
         out += url_encode(f.value);
     }
+    return out;
+}
+
+std::string encode_multipart(const std::vector<FormField>& fields,
+                             const std::vector<FormFilePart>& files, std::string_view boundary) {
+    std::string out;
+    for (const auto& f : fields) {
+        out += "--";
+        out += boundary;
+        out += "\r\n";
+        out += "Content-Disposition: form-data; name=\"" + f.name + "\"\r\n\r\n";
+        out += f.value;
+        out += "\r\n";
+    }
+    for (const auto& file : files) {
+        out += "--";
+        out += boundary;
+        out += "\r\n";
+        out += "Content-Disposition: form-data; name=\"" + file.field_name + "\"; filename=\"" +
+               file.filename + "\"\r\n";
+        out += "Content-Type: " + file.content_type + "\r\n\r\n";
+        out += file.content;
+        out += "\r\n";
+    }
+    out += "--";
+    out += boundary;
+    out += "--\r\n";
     return out;
 }
 

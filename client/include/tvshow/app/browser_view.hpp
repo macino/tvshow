@@ -172,6 +172,10 @@ private:
     void cycle_select_option(int direction);
     // Show a modal option-picker dialog for the given select control.
     void show_select_popup(const layout::FormFocus& fc);
+    // Opens tvision's TFileDialog for an <input type="file"> control (SPEC
+    // Q-28); on OK, stores the picked full path in form_values_.text[fc.node]
+    // (reusing the generic text-value store, same as file's render/encode path).
+    void show_file_picker(const layout::FormFocus& fc);
     void submit_form();
 
     // Find-in-page state.

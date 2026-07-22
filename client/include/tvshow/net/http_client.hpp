@@ -45,10 +45,13 @@ public:
     [[nodiscard]] virtual Result get(const util::Url& url, const Headers& extra_headers = {},
                                      int max_redirects = 5) = 0;
 
-    // Perform a POST request with application/x-www-form-urlencoded body.
+    // Perform a POST request. content_type defaults to the standard HTML
+    // form encoding; pass "multipart/form-data; boundary=..." for file
+    // uploads (SPEC Q-28).
     [[nodiscard]] virtual Result post(const util::Url& url, std::string_view body,
-                                      const Headers& extra_headers = {},
-                                      int max_redirects = 5) = 0;
+                                      const Headers& extra_headers = {}, int max_redirects = 5,
+                                      std::string_view content_type =
+                                          "application/x-www-form-urlencoded") = 0;
 };
 
 }  // namespace tvshow::net

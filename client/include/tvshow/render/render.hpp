@@ -20,7 +20,7 @@ namespace tvshow::render {
 // Mutable form control state layered on top of DOM attr initial values.
 // Keyed by dom::Node* (stable for the lifetime of Page).
 struct FormValues {
-    std::unordered_map<const dom::Node*, std::string> text;  // text/password/textarea/select
+    std::unordered_map<const dom::Node*, std::string> text;  // text/password/textarea/select/file (full path)
     std::unordered_map<const dom::Node*, bool> checked;      // checkbox/radio
 };
 

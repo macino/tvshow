@@ -13,8 +13,11 @@
 using tvshow::dom::Node;
 using tvshow::dom::NodeKind;
 using tvshow::layout::collect_form_fields;
+using tvshow::layout::collect_form_files;
 using tvshow::layout::encode_fields;
+using tvshow::layout::encode_multipart;
 using tvshow::layout::FormField;
+using tvshow::layout::FormFilePart;
 using tvshow::layout::url_encode;
 
 static Node make_elem(std::string_view tag) {
@@ -139,4 +142,65 @@ TEST_CASE("collect_form_fields: unnamed controls are skipped") {
     const std::unordered_map<const tvshow::dom::Node*, bool> checked_vals;
     const auto fields = collect_form_fields(form, text_vals, checked_vals);
     CHECK(fields.empty());
+}
+
+TEST_CASE("collect_form_fields: file input not included (handled by collect_form_files)") {
+    const Node form = make_form_with_child(make_input("file", "upload"));
+    const std::unordered_map<const tvshow::dom::Node*, std::string> text_vals;
+    const std::unordered_map<const tvshow::dom::Node*, bool> checked_vals;
+    const auto fields = collect_form_fields(form, text_vals, checked_vals);
+    CHECK(fields.empty());
+}
+
+// ── collect_form_files (SPEC Q-28) ───────────────────────────────────────────
+
+TEST_CASE("collect_form_files: file input with a picked path is included") {
+    Node form = make_form_with_child(make_input("file", "upload"));
+    const tvshow::dom::Node* input_node = form.children[0].get();
+    const std::unordered_map<const tvshow::dom::Node*, std::string> text_vals = {
+        {input_node, "/tmp/photo.png"}};
+    const auto files = collect_form_files(form, text_vals);
+    REQUIRE(files.size() == 1);
+    CHECK(files[0].name == "upload");
+    CHECK(files[0].path == "/tmp/photo.png");
+}
+
+TEST_CASE("collect_form_files: file input with no picked path is excluded") {
+    const Node form = make_form_with_child(make_input("file", "upload"));
+    const std::unordered_map<const tvshow::dom::Node*, std::string> text_vals;
+    CHECK(collect_form_files(form, text_vals).empty());
+}
+
+TEST_CASE("collect_form_files: non-file inputs never appear") {
+    Node form = make_form_with_child(make_input("text", "q", "hello"));
+    const std::unordered_map<const tvshow::dom::Node*, std::string> text_vals;
+    CHECK(collect_form_files(form, text_vals).empty());
+}
+
+// ── encode_multipart (SPEC Q-28) ─────────────────────────────────────────────
+
+TEST_CASE("encode_multipart: field-only body has one part and a terminating boundary") {
+    const std::vector<FormField> fields = {{"q", "hello"}};
+    const std::string body = encode_multipart(fields, {}, "BOUNDARY");
+    CHECK(body.find("--BOUNDARY\r\n") == 0);
+    CHECK(body.find(R"(Content-Disposition: form-data; name="q")") != std::string::npos);
+    CHECK(body.find("hello") != std::string::npos);
+    CHECK(body.find("--BOUNDARY--\r\n") != std::string::npos);
+}
+
+TEST_CASE("encode_multipart: file part includes filename and content-type headers") {
+    const std::vector<FormFilePart> files = {
+        {"upload", "photo.png", "application/octet-stream", "\x89PNG..."}};
+    const std::string body = encode_multipart({}, files, "BOUNDARY");
+    CHECK(body.find(R"(name="upload"; filename="photo.png")") != std::string::npos);
+    CHECK(body.find("Content-Type: application/octet-stream") != std::string::npos);
+    CHECK(body.find("\x89PNG...") != std::string::npos);
+}
+
+TEST_CASE("encode_multipart: fields and files can coexist in one body") {
+    const std::vector<FormField> fields = {{"name", "alice"}};
+    const std::vector<FormFilePart> files = {{"upload", "a.txt", "text/plain", "hi"}};
+    const std::string body = encode_multipart(fields, files, "B");
+    CHECK(body.find(R"(name="name")") != std::string::npos);
+    CHECK(body.find(R"(name="upload"; filename="a.txt")") != std::string::npos);
 }

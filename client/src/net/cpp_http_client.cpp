@@ -97,11 +97,12 @@ Result CppHttpClient::get(const util::Url& url, const Headers& extra_headers, in
 }
 
 Result CppHttpClient::post(const util::Url& url, std::string_view body,
-                           const Headers& extra_headers, int max_redirects) {
+                           const Headers& extra_headers, int max_redirects,
+                           std::string_view content_type) {
     httplib::Client cli(client_base(url));
     Result result = to_result(
         cli.Post(request_target(url), to_httplib_headers(extra_headers),
-                 std::string(body), "application/x-www-form-urlencoded"));
+                 std::string(body), std::string(content_type)));
 
     const auto* resp = std::get_if<Response>(&result);
     if (resp == nullptr || !is_redirect_status(resp->status) || max_redirects <= 0) {

@@ -53,6 +53,9 @@ FormControlKind form_control_kind(const dom::Node& node) noexcept {
     if (type == "hidden") {
         return FormControlKind::Hidden;
     }
+    if (type == "file") {
+        return FormControlKind::File;
+    }
     // "text", "" (unset), or any unrecognised type → text input.
     return FormControlKind::Text;
 }
@@ -87,6 +90,8 @@ FormControlSize form_control_size(const dom::Node& node) noexcept {
         const int inner = parse_int_attr(node, "size", 12);
         return {inner + 5, 1};  // "[ val  ▾ ]"
     }
+    case FormControlKind::File:
+        return {13, 1};  // "[Choose File]" fixed width; render.cpp truncates a picked filename
     }
     return {0, 0};
 }

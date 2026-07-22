@@ -25,8 +25,9 @@ public:
     [[nodiscard]] Result get(const util::Url& url, const Headers& extra_headers = {},
                              int max_redirects = 5) override;
     [[nodiscard]] Result post(const util::Url& url, std::string_view body,
-                              const Headers& extra_headers = {},
-                              int max_redirects = 5) override;
+                              const Headers& extra_headers = {}, int max_redirects = 5,
+                              std::string_view content_type =
+                                  "application/x-www-form-urlencoded") override;
 
 private:
     std::unordered_map<std::string, Handler> routes_;

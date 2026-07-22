@@ -7,6 +7,7 @@
 #define Uses_TDrawBuffer
 #define Uses_TEvent
 #define Uses_TEventQueue
+#define Uses_TFileDialog
 #define Uses_TInputLine
 #define Uses_TKeys
 #define Uses_TListViewer
@@ -32,6 +33,8 @@
 
 #include <tvision/tv.h>
 
+#include <tvision/stddlg.h>
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -39,9 +42,13 @@
 #include <cstdio>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <fstream>
+#include <ios>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -835,6 +842,39 @@ void BrowserView::show_select_popup(const layout::FormFocus& fc) {
     }
 }
 
+void BrowserView::show_file_picker(const layout::FormFocus& fc) {
+    if (fc.node == nullptr || owner == nullptr || owner->owner == nullptr) {
+        return;
+    }
+    TGroup* const desk = owner->owner;
+    auto* dlg = new TFileDialog("*.*", "Choose File", "~N~ame", fdOKButton | fdHelpButton, 0);
+    const unsigned short res = desk->execView(dlg);
+    if (res == cmOK) {
+        std::array<char, MAXPATH> buf{};
+        dlg->getFileName(buf.data());
+        form_values_.text[fc.node] = std::string(buf.data());
+        base_dirty_ = true;
+        drawView();
+    }
+    TObject::destroy(dlg);
+}
+
+// SPEC Q-28: reads a file the user picked via show_file_picker() from disk.
+// Skips (returns nullopt) files that can't be opened -- consistent with the
+// rest of this file's degrade-gracefully-on-failure pattern (network
+// errors, image decode failures) rather than aborting the whole submission.
+std::optional<layout::FormFilePart> read_form_file(const layout::FormFileRef& ref) {
+    std::ifstream in(ref.path, std::ios::binary);
+    if (!in) {
+        return std::nullopt;
+    }
+    std::ostringstream buf;
+    buf << in.rdbuf();
+    const auto slash = ref.path.rfind('/');
+    const std::string filename = (slash == std::string::npos) ? ref.path : ref.path.substr(slash + 1);
+    return layout::FormFilePart{ref.name, filename, "application/octet-stream", buf.str()};
+}
+
 void BrowserView::submit_form() {
     const layout::FormFocus* fc = focused_fc();
     if (fc == nullptr || fc->form == nullptr) {
@@ -842,7 +882,7 @@ void BrowserView::submit_form() {
     }
     const auto fields =
         layout::collect_form_fields(*fc->form, form_values_.text, form_values_.checked);
-    const std::string encoded = layout::encode_fields(fields);
+    const auto file_refs = layout::collect_form_files(*fc->form, form_values_.text);
 
     const std::string_view action_attr = fc->form->attr("action");
     const std::string action_url = util::resolve_url(
@@ -851,9 +891,30 @@ void BrowserView::submit_form() {
     const std::string_view method_attr = fc->form->attr("method");
     const bool is_post = (method_attr == "post" || method_attr == "POST");
 
+    std::string body;
+    std::string content_type = "application/x-www-form-urlencoded";
+    if (!file_refs.empty() && is_post) {
+        // enctype=multipart/form-data (SPEC Q-28): a plain GET can't carry
+        // file content anyway, so the multipart path only applies to POST.
+        static std::atomic<uint64_t> s_boundary_seq{0};
+        const std::string boundary =
+            "----tvshowBoundary" + std::to_string(s_boundary_seq.fetch_add(1));
+        std::vector<layout::FormFilePart> file_parts;
+        file_parts.reserve(file_refs.size());
+        for (const auto& ref : file_refs) {
+            if (auto part = read_form_file(ref)) {
+                file_parts.push_back(std::move(*part));
+            }
+        }
+        body = layout::encode_multipart(fields, file_parts, boundary);
+        content_type = "multipart/form-data; boundary=" + boundary;
+    } else {
+        body = layout::encode_fields(fields);
+    }
+
     if (is_post) {
         net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
-        auto page = post_page(action_url, encoded, {size.x, size.y}, jar);
+        auto page = post_page(action_url, body, {size.x, size.y}, jar, content_type);
         if (!page) {
             return;
         }
@@ -868,7 +929,7 @@ void BrowserView::submit_form() {
         history_pos_ = history_.size() - 1;
         drawView();
     } else {
-        const std::string get_url = encoded.empty() ? action_url : (action_url + "?" + encoded);
+        const std::string get_url = body.empty() ? action_url : (action_url + "?" + body);
         navigate(get_url, true);
     }
 }
@@ -914,6 +975,11 @@ bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
             drawView();
             clearEvent(event);
             show_select_popup(fc);
+            return true;
+        case layout::FormControlKind::File:
+            drawView();
+            clearEvent(event);
+            show_file_picker(fc);
             return true;
         default:
             drawView();
@@ -1015,6 +1081,8 @@ void BrowserView::handleEvent(TEvent& event) {
                 handle_form_input(kbEnter);
             } else if (fc->kind == layout::FormControlKind::Select) {
                 show_select_popup(*fc);
+            } else if (fc->kind == layout::FormControlKind::File) {
+                show_file_picker(*fc);
             } else {
                 submit_form();
             }

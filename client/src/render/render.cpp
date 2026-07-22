@@ -229,6 +229,30 @@ void paint_radio(const GridPen& pen, const dom::Node& node, const FormValues& fv
     pen.put({2, 0}, U')');
 }
 
+// SPEC Q-28: <input type="file">. fv.text[node] holds the full path picked
+// via the file dialog (set by BrowserView, reusing the generic text-value
+// store); only the filename (last path component) is displayed, matching
+// how browsers show a chosen file.
+void paint_file_field(const GridPen& pen, int w, const dom::Node& node, const FormValues& fv) {
+    if (w < 2) {
+        return;
+    }
+    const std::string_view full_path = resolve_text_value(node, fv);
+    const auto slash = full_path.rfind('/');
+    const std::string_view filename =
+        (slash == std::string_view::npos) ? full_path : full_path.substr(slash + 1);
+    const std::string_view label = filename.empty() ? std::string_view("Choose File") : filename;
+    pen.put({0, 0}, U'[');
+    int col = 1;
+    for (size_t i = 0; i < label.size() && col < w - 1; ++col, ++i) {
+        pen.put({col, 0}, static_cast<char32_t>(static_cast<unsigned char>(label[i])));
+    }
+    for (; col < w - 1; ++col) {
+        pen.put({col, 0}, U' ');
+    }
+    pen.put({w - 1, 0}, U']');
+}
+
 void paint_submit(const GridPen& pen, int w, const dom::Node& node) {
     if (w < 2) {
         return;
@@ -361,6 +385,9 @@ void paint_form_control(CharGrid& grid, const layout::Box& box, const dom::Node&
         break;
     case layout::FormControlKind::Select:
         paint_select(pen, w, node, fv);
+        break;
+    case layout::FormControlKind::File:
+        paint_file_field(pen, w, node, fv);
         break;
     case layout::FormControlKind::None:
     case layout::FormControlKind::Hidden:

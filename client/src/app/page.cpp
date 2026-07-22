@@ -181,7 +181,8 @@ images::ImageCache fetch_images_for(std::string_view url, const dom::Document& d
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<Page> post_page(std::string_view action_url, std::string_view body,
-                              layout::Viewport vp, net::CookieJar* jar) {
+                              layout::Viewport vp, net::CookieJar* jar,
+                              std::string_view content_type) {
     Fetched fetched;
     std::string final_url = std::string(action_url);
     auto parsed = util::Url::parse(action_url);
@@ -199,7 +200,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
         // max_redirects=0: we handle the redirect ourselves so that Set-Cookie
         // from the POST response is stored before the redirect GET is issued.
         // (Following the redirect inside the HTTP client loses the auth cookie.)
-        const net::Result result = client.post(*parsed, body, req_headers, 0);
+        const net::Result result = client.post(*parsed, body, req_headers, 0, content_type);
         if (const auto* err = std::get_if<net::NetworkError>(&result)) {
             fetched = {error_page_html("Network Error", err->message), true};
         } else {

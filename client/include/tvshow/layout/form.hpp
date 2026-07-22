@@ -16,6 +16,7 @@ enum class FormControlKind : uint8_t {
     Hidden,    // <input type="hidden"> — display:none
     Textarea,  // <textarea>
     Select,    // <select>
+    File,      // <input type="file"> (SPEC Q-28)
 };
 
 // Returns the form control kind for a DOM element node.
