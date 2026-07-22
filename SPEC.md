@@ -2,7 +2,8 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: **M0 and M1 complete**. See §20.1 for the M1 feature list.
+> Status: **M0 and M1 complete**. M2 scoped, not started — see §20.2: table colspan/rowspan,
+> multipart file upload, `position:fixed/sticky` layer, expanded out-of-subset elements.
 
 ---
 
@@ -195,10 +196,12 @@ Layout is implemented via the existing flex engine (ADR 002):
 Column widths align across rows: `compute_table_col_widths()` takes the max cell content-width
 per column index across all rows and applies it uniformly (see Q-24).
 
-Limitations: no `colspan`, no `rowspan`, no CSS `border-collapse`.
+Limitations: no `colspan`/`rowspan` (M2, see Q-27), no CSS `border-collapse`.
 
 ### 6.7 Out of subset
-`script`, `iframe`, `video`, `audio`, `canvas`, `svg` — parsed and skipped (children rendered as if their parent were `div`).
+`script`, `canvas`, `svg` — parsed and skipped (children rendered as if their parent were `div`).
+`iframe`, `video`, `audio` are slated for minimal link-out handling in M2 (see Q-30); until then
+they're skipped the same way.
 
 ---
 
@@ -454,14 +457,25 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | Q-24 | Table column alignment | **Resolved**: `compute_table_col_widths()` measures max cell content-width per column index across all rows (handles `thead`/`tbody`/`tfoot` wrappers), stashed thread-locally (`g_table_col_widths`) and consulted by `layout_flex()` per `<tr>` in place of per-row flex-basis. |
 | Q-25 | CSS `position: relative/absolute` | **Resolved**: `position` in §7.2 (`Position` enum, `top`/`left_offset`/`right_offset`/`bottom` on `ComputedStyle`). `relative` offsets from normal-flow position without affecting siblings. `absolute` is removed from flow (no space reserved) and offsets against the nearest ancestor with `position != static` (`apply_position_offsets` tracks a containing-block box separately from the immediate parent), falling back to the viewport when none exists. `fixed`/`sticky` are dropped from flow entirely (no layer model). |
 | Q-26 | Scroll position indicator | **Resolved**: window title shows `[pct%]` scroll position when content exceeds viewport height (`BrowserView::sync_vscroll()`). |
+| Q-27 | Table `colspan`/`rowspan` | **M2**: extend `compute_table_col_widths()` and the `<tr>` flex-item pass to consume `colspan`/`rowspan` attrs — a spanning cell occupies N adjacent column slots (or contributes to N rows' worth of height) instead of exactly one. `border-collapse` stays out of scope. |
+| Q-28 | Form `enctype: multipart/form-data` | **M2** (was Deferred): needs (a) a file-picker dialog (`TFileDialog`, tvision-provided) wired to `<input type="file">`, and (b) `multipart/form-data` body encoding in the form-submit path (currently only `application/x-www-form-urlencoded`, see §13). |
+| Q-29 | `position: fixed`/`sticky` layer model | **M2**: currently dropped from flow entirely (§20 Q-25) — real content behind a fixed nav bar or cookie banner never gets pushed down, but the fixed/sticky element itself is invisible. Add a minimal overlay layer: fixed elements paint at a screen-relative rect after the main render pass; sticky is treated as fixed once scrolled past its normal-flow position, static before. |
+| Q-30 | Expand out-of-subset elements | **M2**: `iframe`, `video`, `audio` are currently parsed-and-skipped (§6.7). Minimal handling: `iframe[src]` renders as a clickable link-out (`[Embedded: <src>]`, Enter navigates); `video`/`audio` render their `poster`/first `<source>` alt-equivalent, or a `[Media: <src>]` placeholder link. `canvas`/`svg` stay out of scope (no static src to point at). |
 
 ### 20.1 Milestone 1 (M1) Scope
 
-| ID | Feature | Scope | Depends on |
-|----|---------|-------|------------|
 All seven M1 items are resolved: ~~M1-nav-history~~, ~~M1-scroll-indicator~~, ~~M1-hover~~,
 ~~M1-debug-overlay~~, ~~M1-table-cols~~, ~~M1-css-position~~, ~~M1-img-renderer~~ — see Q-21,
 Q-26, Q-10, Q-22, Q-24, Q-25, Q-23 above. **M1 complete.**
+
+### 20.2 Milestone 2 (M2) Scope
+
+| ID | Feature | Scope | Depends on |
+|----|---------|-------|------------|
+| M2-table-span | Table `colspan`/`rowspan` | Extend column-width + flex-item passes to consume span attrs | Q-27 |
+| M2-file-upload | Multipart form upload | `TFileDialog` wiring for `<input type="file">` + multipart body encoding | Q-28 |
+| M2-fixed-sticky | `position: fixed`/`sticky` overlay layer | Screen-relative paint pass for fixed/sticky elements instead of dropping them | Q-29 |
+| M2-out-of-subset | Expand out-of-subset elements | `iframe`/`video`/`audio` as clickable link-out placeholders | Q-30 |
 
 ---
 
