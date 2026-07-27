@@ -89,7 +89,9 @@ The HTML and CSS subsets are defined in SPEC §6 and §7. Don't broaden them on 
 
 ## Architecture Decisions
 
-Place ADRs in `docs/decisions/NNN-short-title.md`. Statuses: `proposed` → `accepted` → `deprecated` / `superseded by NNN`. Commit alongside implementing code. Do not delete reversed ADRs — supersede them.
+ID scheme (per ai-wkf slug-ID rule, `ai-wkf/CLAUDE.md` §Workflow Rules — Generated IDs): new ADRs use `docs/decisions/adr-<slug>.md` (slug = first significant words of title, kebab-case), no number. ADRs 001–004 predate this rule and stay numbered — frozen, never renumbered (code/tests cite them by number). Statuses: `proposed` → `accepted` → `deprecated` / `superseded by <id>`. Commit alongside implementing code. Do not delete reversed ADRs — supersede them.
+
+Same split applies to SPEC §20 Open Questions: `Q-1`..`Q-30` are frozen numeric IDs (cited in code/tests, never renumbered); `Q-31`+ use slug IDs (`q-<slug>`). See SPEC §20 header note.
 
 ## Where Things Live
 
