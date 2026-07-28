@@ -1,6 +1,6 @@
 # adr-content-blocklist — config-driven content/ad blocking
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-28
 - **Touches SPEC:** §20 q-extensions-api, §3.1 (net/style pipeline stages)
 

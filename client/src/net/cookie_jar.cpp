@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
+#include <ctime>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -68,8 +70,22 @@ std::optional<Cookie> parse_set_cookie(std::string_view header, std::string_view
             c.host_only = false;
         } else if (iequal(attr_name, "Path")) {
             c.path = attr_val.empty() ? "/" : std::string(attr_val);
+        } else if (iequal(attr_name, "Max-Age")) {
+            int seconds = 0;
+            const auto res = std::from_chars(attr_val.data(), attr_val.data() + attr_val.size(), seconds);
+            if (res.ec == std::errc{}) {
+                c.expires_at = std::time(nullptr) + seconds;
+            }
+        } else if (iequal(attr_name, "Expires") && c.expires_at == 0) {
+            // Max-Age takes precedence over Expires (RFC 6265 §5.3); only parse
+            // Expires if Max-Age hasn't already set expires_at.
+            std::tm tm{};
+            std::string date_str(attr_val);
+            if (::strptime(date_str.c_str(), "%a, %d %b %Y %H:%M:%S GMT", &tm) != nullptr) {
+                c.expires_at = ::timegm(&tm);
+            }
         }
-        // Secure, HttpOnly, SameSite, Expires, Max-Age → ignored in v1
+        // Secure, HttpOnly, SameSite → still ignored in v1
     }
 
     // Domain must not be a public suffix or empty.
@@ -83,17 +99,20 @@ void CookieJar::store(std::string_view host, const std::vector<std::string>& set
     for (const auto& header : set_cookie_headers) {
         auto cookie = parse_set_cookie(header, host);
         if (!cookie) { continue; }
+        upsert(std::move(*cookie));
+    }
+}
 
-        // Replace existing cookie with the same name+domain+path.
-        auto it = std::find_if(cookies_.begin(), cookies_.end(), [&](const Cookie& existing) {
-            return existing.name == cookie->name && existing.domain == cookie->domain &&
-                   existing.path == cookie->path;
-        });
-        if (it != cookies_.end()) {
-            *it = std::move(*cookie);
-        } else {
-            cookies_.push_back(std::move(*cookie));
-        }
+void CookieJar::upsert(Cookie cookie) {
+    // Replace existing cookie with the same name+domain+path.
+    auto it = std::find_if(cookies_.begin(), cookies_.end(), [&](const Cookie& existing) {
+        return existing.name == cookie.name && existing.domain == cookie.domain &&
+               existing.path == cookie.path;
+    });
+    if (it != cookies_.end()) {
+        *it = std::move(cookie);
+    } else {
+        cookies_.push_back(std::move(cookie));
     }
 }
 
@@ -132,6 +151,68 @@ std::string CookieJar::cookie_header(std::string_view host, std::string_view pat
         out += c.value;
     }
     return out;
+}
+
+namespace {
+
+// Tab is never legal inside a cookie name/value/domain/path (RFC 6265 token
+// rules), so a plain split on '\t' is safe — no escaping needed.
+std::string_view next_field(std::string_view& line) {
+    const auto tab = line.find('\t');
+    const auto field = line.substr(0, tab);
+    line = (tab == std::string_view::npos) ? std::string_view{} : line.substr(tab + 1);
+    return field;
+}
+
+}  // namespace
+
+std::string CookieJar::serialize_persistent() const {
+    std::string out;
+    for (const auto& c : cookies_) {
+        if (c.expires_at == 0) { continue; }  // session cookie — never persisted
+        out += c.domain;
+        out += '\t';
+        out += (c.host_only ? '1' : '0');
+        out += '\t';
+        out += c.path;
+        out += '\t';
+        out += c.name;
+        out += '\t';
+        out += c.value;
+        out += '\t';
+        out += std::to_string(static_cast<long long>(c.expires_at));
+        out += '\n';
+    }
+    return out;
+}
+
+void CookieJar::load_persistent(std::string_view text, std::time_t now) {
+    while (!text.empty()) {
+        const auto nl = text.find('\n');
+        auto line = text.substr(0, nl);
+        text = (nl == std::string_view::npos) ? std::string_view{} : text.substr(nl + 1);
+        if (line.empty()) { continue; }
+
+        Cookie c;
+        c.domain = std::string(next_field(line));
+        const auto host_only_field = next_field(line);
+        c.host_only = host_only_field == "1";
+        c.path = std::string(next_field(line));
+        c.name = std::string(next_field(line));
+        c.value = std::string(next_field(line));
+        const auto expires_field = next_field(line);
+
+        if (c.domain.empty() || c.name.empty()) { continue; }  // malformed line
+
+        long long expires = 0;
+        const auto res = std::from_chars(expires_field.data(),
+                                          expires_field.data() + expires_field.size(), expires);
+        if (res.ec != std::errc{} || expires == 0) { continue; }  // malformed / not persistent
+        if (expires <= static_cast<long long>(now)) { continue; }  // expired — drop
+
+        c.expires_at = static_cast<std::time_t>(expires);
+        upsert(std::move(c));
+    }
 }
 
 }  // namespace tvshow::net

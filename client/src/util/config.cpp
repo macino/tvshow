@@ -54,6 +54,12 @@ Config parse_config(std::string_view toml) {
         else if (key == "start-url")   { cfg.start_url     = std::move(val); }
         else if (key == "default-style") { cfg.default_style = std::move(val); }
         else if (key == "image-renderer") { cfg.image_renderer = std::move(val); }
+        else if (key == "download-dir") { cfg.download_dir = std::move(val); }
+        else if (key == "handler-video") { cfg.handler_video = std::move(val); }
+        else if (key == "handler-audio") { cfg.handler_audio = std::move(val); }
+        else if (key.starts_with("window-provider-")) {
+            cfg.window_providers.emplace_back(std::string(key.substr(16)), std::move(val));
+        }
         // Unknown keys are silently ignored.
     }
     return cfg;

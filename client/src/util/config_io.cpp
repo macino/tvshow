@@ -41,6 +41,18 @@ bool save_config(const Config& cfg, std::string_view path) {
     if (!cfg.start_url.empty()) {
         out << "start-url = \"" << cfg.start_url << "\"\n";
     }
+    if (!cfg.download_dir.empty()) {
+        out << "download-dir = \"" << cfg.download_dir << "\"\n";
+    }
+    if (!cfg.handler_video.empty()) {
+        out << "handler-video = \"" << cfg.handler_video << "\"\n";
+    }
+    if (!cfg.handler_audio.empty()) {
+        out << "handler-audio = \"" << cfg.handler_audio << "\"\n";
+    }
+    for (const auto& [name, command] : cfg.window_providers) {
+        out << "window-provider-" << name << " = \"" << command << "\"\n";
+    }
     return out.good();
 }
 

@@ -5,7 +5,9 @@
 #include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/box.hpp"
 #include "tvshow/layout/types.hpp"
+#include "tvshow/net/blocklist.hpp"
 #include "tvshow/net/cookie_jar.hpp"
+#include "tvshow/net/request_log.hpp"
 #include "tvshow/style/tree.hpp"
 
 #include <memory>
@@ -44,10 +46,14 @@ struct Page {
 // into Page::images; left false, images.empty() and BrailleRenderer falls
 // back to alt text. Off by default: avoids the extra network/decode cost
 // when the alt-text renderer is in use.
+// blocklist may be null (no content blocking) — adr-content-blocklist.
+// request_log may be null (no logging) — adr-dev-tools.
 [[nodiscard]] std::optional<Page> load_page(std::string_view url, layout::Viewport vp,
                                             net::CookieJar* jar = nullptr,
                                             bool skip_external_css = false,
-                                            bool fetch_images = false);
+                                            bool fetch_images = false,
+                                            const net::Blocklist* blocklist = nullptr,
+                                            net::RequestLog* request_log = nullptr);
 
 // Builds a Page containing an error HTML document (for exception fallbacks).
 // Does not return nullopt; any internal failure falls back to a minimal grid.
@@ -62,6 +68,7 @@ struct Page {
 [[nodiscard]] std::optional<Page> post_page(
     std::string_view action_url, std::string_view body, layout::Viewport vp,
     net::CookieJar* jar = nullptr,
-    std::string_view content_type = "application/x-www-form-urlencoded");
+    std::string_view content_type = "application/x-www-form-urlencoded",
+    const net::Blocklist* blocklist = nullptr, net::RequestLog* request_log = nullptr);
 
 }  // namespace tvshow::app

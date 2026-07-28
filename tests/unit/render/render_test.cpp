@@ -270,6 +270,64 @@ TEST_CASE("apply_focus: clips spans that extend past the grid bounds") {
     CHECK(grid.at({9, 4}).attr.fg != 0xFFFFFFU);
 }
 
+// ── text selection (adr-text-selection) ─────────────────────────────────────
+
+TEST_CASE("apply_selection: inverts fg/bg for a single-row range") {
+    CharGrid grid(5, 1);
+    for (int c = 0; c < 5; ++c) { grid.put({c, 0}, U'x', {}); }
+    const auto before = grid.at({1, 0}).attr;
+    tvshow::render::apply_selection(grid, {1, 0}, {3, 0});
+    CHECK(grid.at({1, 0}).attr.fg == before.bg);
+    CHECK(grid.at({1, 0}).attr.bg == before.fg);
+    CHECK(grid.at({3, 0}).attr.fg == before.bg);
+}
+
+TEST_CASE("apply_selection: leaves cells outside the range untouched") {
+    CharGrid grid(5, 1);
+    for (int c = 0; c < 5; ++c) { grid.put({c, 0}, U'x', {}); }
+    const auto before = grid.at({4, 0}).attr;
+    tvshow::render::apply_selection(grid, {0, 0}, {2, 0});
+    CHECK(grid.at({4, 0}).attr == before);
+}
+
+TEST_CASE("apply_selection: spans multiple rows, full rows in between") {
+    CharGrid grid(3, 3);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) { grid.put({c, r}, U'x', {}); }
+    }
+    const auto before = grid.at({1, 1}).attr;
+    tvshow::render::apply_selection(grid, {2, 0}, {0, 2});
+    // Middle row (r=1) is fully selected regardless of column.
+    CHECK(grid.at({0, 1}).attr.fg == before.bg);
+    CHECK(grid.at({2, 1}).attr.fg == before.bg);
+    // Before the start column on the first row is untouched.
+    CHECK(grid.at({0, 0}).attr == before);
+}
+
+TEST_CASE("apply_selection: endpoints given in reverse order give the same result") {
+    CharGrid grid1(5, 1);
+    CharGrid grid2(5, 1);
+    for (int c = 0; c < 5; ++c) {
+        grid1.put({c, 0}, U'x', {});
+        grid2.put({c, 0}, U'x', {});
+    }
+    tvshow::render::apply_selection(grid1, {1, 0}, {3, 0});
+    tvshow::render::apply_selection(grid2, {3, 0}, {1, 0});
+    for (int c = 0; c < 5; ++c) {
+        CHECK(grid1.at({c, 0}).attr == grid2.at({c, 0}).attr);
+    }
+}
+
+TEST_CASE("apply_selection: clamps out-of-range points without throwing") {
+    CharGrid grid(3, 3);
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) { grid.put({c, r}, U'x', {}); }
+    }
+    tvshow::render::apply_selection(grid, {-5, -5}, {99, 99});
+    const auto before_bg = 0x000000U;
+    CHECK(grid.at({0, 0}).attr.fg == before_bg);  // fully selected: whole grid inverted
+}
+
 // ── img_renderer plug-in ────────────────────────────────────────────────────
 
 namespace {

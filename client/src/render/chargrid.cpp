@@ -2,6 +2,7 @@
 
 #include "tvshow/types.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -246,6 +247,32 @@ void CharGrid::blit(const CharGrid& src, Point dst_origin) {
             cells_.at(index({dst_col, dst_row})) = cell;
         }
     }
+}
+
+std::string CharGrid::extract_text_range(Point a, Point b) const {
+    auto clamp_pt = [this](Point p) {
+        p.row = std::clamp(p.row, 0, rows_ - 1);
+        p.col = std::clamp(p.col, 0, cols_ - 1);
+        return p;
+    };
+    a = clamp_pt(a);
+    b = clamp_pt(b);
+    if (b.row < a.row || (b.row == a.row && b.col < a.col)) {
+        std::swap(a, b);
+    }
+
+    std::string out;
+    for (int r = a.row; r <= b.row; ++r) {
+        const int c_start = (r == a.row) ? a.col : 0;
+        const int c_end = (r == b.row) ? b.col : cols_ - 1;
+        for (int c = c_start; c <= c_end; ++c) {
+            utf8_encode(cells_.at(index({c, r})).cp, out);
+        }
+        if (r != b.row) {
+            out += '\n';
+        }
+    }
+    return out;
 }
 
 std::string CharGrid::to_string() const {

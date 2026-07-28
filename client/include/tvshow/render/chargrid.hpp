@@ -51,6 +51,13 @@ public:
     // not a bug.
     void blit(const CharGrid& src, Point dst_origin);
 
+    // Extracts plain UTF-8 text between `a` and `b` (inclusive), in row-major
+    // reading order regardless of which endpoint is "first" (adr-text-selection).
+    // Full rows between the endpoints are taken whole; the first/last row is
+    // clipped to a/b's column. Rows are joined with '\n'. Points are clamped
+    // to grid bounds.
+    [[nodiscard]] std::string extract_text_range(Point a, Point b) const;
+
     // Serialize to the golden-snapshot format (UTF-8 text).
     [[nodiscard]] std::string to_string() const;
 

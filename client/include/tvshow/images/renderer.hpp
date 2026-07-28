@@ -54,4 +54,19 @@ private:
     const ImageCache* cache_;
 };
 
+// Renders images as classic ASCII-art: each cell = one pixel-block average,
+// quantized to a 10-level luminance ramp (adr-ascii-art-renderer). Coarser
+// than BrailleRenderer (no 2x4 sub-cell resolution) but works on any
+// terminal/font — no Unicode braille block support required.
+class AsciiArtRenderer : public ImageRenderer {
+public:
+    explicit AsciiArtRenderer(const ImageCache* cache) : cache_(cache) {}
+
+    [[nodiscard]] std::vector<std::string> render(int cols, int rows, std::string_view alt,
+                                                  std::string_view src) const override;
+
+private:
+    const ImageCache* cache_;
+};
+
 }  // namespace tvshow::images

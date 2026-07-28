@@ -186,3 +186,41 @@ TEST_CASE("CharGrid::blit clips a negative origin without throwing") {
     dst.blit(src, {-1, -1});
     CHECK(dst.at({0, 0}).cp == U'#');  // src's (1,1) lands at dst's (0,0)
 }
+
+// ── extract_text_range (adr-text-selection) ─────────────────────────────────
+
+namespace {
+CharGrid make_text_grid() {
+    CharGrid g(5, 3);
+    const char* rows[3] = {"hello", "world", "!!!!!"};
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 5; ++c) { g.put({c, r}, static_cast<char32_t>(rows[r][c]), {}); }
+    }
+    return g;
+}
+}  // namespace
+
+TEST_CASE("extract_text_range: single row, sub-range") {
+    const auto g = make_text_grid();
+    CHECK(g.extract_text_range({1, 0}, {3, 0}) == "ell");
+}
+
+TEST_CASE("extract_text_range: spans multiple full-in-between rows") {
+    const auto g = make_text_grid();
+    CHECK(g.extract_text_range({2, 0}, {2, 2}) == "llo\nworld\n!!!");
+}
+
+TEST_CASE("extract_text_range: endpoints given in reverse order") {
+    const auto g = make_text_grid();
+    CHECK(g.extract_text_range({3, 0}, {1, 0}) == "ell");
+}
+
+TEST_CASE("extract_text_range: single cell") {
+    const auto g = make_text_grid();
+    CHECK(g.extract_text_range({0, 1}, {0, 1}) == "w");
+}
+
+TEST_CASE("extract_text_range: clamps out-of-range points") {
+    const auto g = make_text_grid();
+    CHECK(g.extract_text_range({-5, -5}, {99, 99}) == "hello\nworld\n!!!!!");
+}

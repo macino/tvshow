@@ -31,7 +31,12 @@ auto main(int argc, char** argv) -> int {
         return tvshow::app::ForcedStyle::Auto;
     };
     tvshow::app::ForcedStyle default_style = parse_style(cfg.default_style);
-    bool use_braille_images = (cfg.image_renderer == "braille");
+    auto parse_image_renderer = [](std::string_view s) -> tvshow::app::ImageRendererKind {
+        if (s == "braille") return tvshow::app::ImageRendererKind::Braille;
+        if (s == "ascii")   return tvshow::app::ImageRendererKind::Ascii;
+        return tvshow::app::ImageRendererKind::Alt;
+    };
+    tvshow::app::ImageRendererKind image_renderer = parse_image_renderer(cfg.image_renderer);
 
     for (int i = 1; i < argc; ++i) {
         const std::string_view arg(argv[i]);
@@ -43,10 +48,8 @@ auto main(int argc, char** argv) -> int {
             log_level = tvshow::util::log::parse_level(arg.substr(12));
         } else if (arg.starts_with("--style=")) {
             default_style = parse_style(arg.substr(8));
-        } else if (arg == "--image-renderer=braille") {
-            use_braille_images = true;
-        } else if (arg == "--image-renderer=alt") {
-            use_braille_images = false;
+        } else if (arg.starts_with("--image-renderer=")) {
+            image_renderer = parse_image_renderer(arg.substr(18));
         } else if (arg.starts_with("--config=")) {
             // already handled above
         } else if (!arg.starts_with("--")) {
@@ -58,7 +61,7 @@ auto main(int argc, char** argv) -> int {
 
     tvshow::app::Application app(mode);
     app.set_forced_style(default_style);
-    app.browsing_state().use_braille_images = use_braille_images;
+    app.browsing_state().image_renderer = image_renderer;
     try {
         if (!initial_url.empty()) {
             app.open_url(initial_url);

@@ -1,6 +1,6 @@
 # adr-dev-tools — network log overlay
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-28
 - **Touches SPEC:** §20 q-dev-tools, Q-12, Q-22 (existing debug overlay)
 

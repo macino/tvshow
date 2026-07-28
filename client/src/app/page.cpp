@@ -9,8 +9,10 @@
 #include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/engine.hpp"
 #include "tvshow/layout/types.hpp"
+#include "tvshow/net/blocklist.hpp"
 #include "tvshow/net/cpp_http_client.hpp"
 #include "tvshow/net/http_client.hpp"
+#include "tvshow/net/request_log.hpp"
 #include "tvshow/style/resolver.hpp"
 #include "tvshow/style/tree.hpp"
 #include "tvshow/net/cookie_jar.hpp"
@@ -18,6 +20,7 @@
 #include "tvshow/util/log.hpp"
 #include "tvshow/util/url.hpp"
 
+#include <chrono>
 #include <fstream>
 #include <ios>
 #include <memory>
@@ -60,7 +63,15 @@ std::optional<std::string> read_file(std::string_view path) {
     return contents.str();
 }
 
-Fetched fetch_http(const util::Url& url, net::CookieJar* jar) {
+Fetched fetch_http(const util::Url& url, net::CookieJar* jar,
+                   const net::Blocklist* blocklist = nullptr,
+                   net::RequestLog* request_log = nullptr) {
+    if (blocklist != nullptr && net::is_blocked(*blocklist, url.to_string())) {
+        // Matched block: rule -> synthetic empty page, no request issued
+        // (adr-content-blocklist). Not an error page: an ad slot silently
+        // rendering nothing is the expected UX, not a failure.
+        return {"<!doctype html><html><body></body></html>", false};
+    }
     net::CppHttpClient client;
     // Inject cookies from the jar if any match this URL.
     net::Headers req_headers;
@@ -70,13 +81,24 @@ Fetched fetch_http(const util::Url& url, net::CookieJar* jar) {
             req_headers["Cookie"] = cookie_val;
         }
     }
+    const auto t0 = std::chrono::steady_clock::now();
     const net::Result result = client.get(url, req_headers);
+    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - t0)
+                                .count();
     if (const auto* err = std::get_if<net::NetworkError>(&result)) {
+        if (request_log != nullptr) {
+            request_log->record({"GET", url.to_string(), 0, 0, elapsed_ms});
+        }
         return {error_page_html("Network Error", err->message), true};
     }
     const auto& resp = std::get<net::Response>(result);
+    if (request_log != nullptr) {
+        request_log->record({"GET", url.to_string(), resp.status, resp.body.size(), elapsed_ms});
+    }
     if (jar != nullptr && !resp.set_cookies.empty()) {
         jar->store(url.host(), resp.set_cookies);
+        net::save_cookie_jar(*jar);  // crash-safe: persist on every Set-Cookie write
     }
     if (resp.status >= 400) {
         return {error_page_html("HTTP " + std::to_string(resp.status),
@@ -119,6 +141,21 @@ std::vector<css::Stylesheet> fetch_external_sheets(std::string_view url, const d
         }
     }
     return sheets;
+}
+
+// Builds the synthetic lowest-author-priority stylesheet implementing
+// Blocklist::hide_selectors (adr-content-blocklist): each selector gets an
+// implicit `display: none`. nullptr/empty blocklist -> nullopt (no sheet).
+std::optional<css::Stylesheet> hide_selectors_stylesheet(const net::Blocklist* blocklist) {
+    if (blocklist == nullptr || blocklist->hide_selectors.empty()) {
+        return std::nullopt;
+    }
+    std::string css_text;
+    for (const auto& selector : blocklist->hide_selectors) {
+        css_text += selector;
+        css_text += " { display: none; }\n";
+    }
+    return css::parse(css_text);
 }
 
 // Collects distinct <img src> attribute values verbatim (NOT resolved), in
@@ -182,7 +219,8 @@ images::ImageCache fetch_images_for(std::string_view url, const dom::Document& d
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<Page> post_page(std::string_view action_url, std::string_view body,
                               layout::Viewport vp, net::CookieJar* jar,
-                              std::string_view content_type) {
+                              std::string_view content_type, const net::Blocklist* blocklist,
+                              net::RequestLog* request_log) {
     Fetched fetched;
     std::string final_url = std::string(action_url);
     auto parsed = util::Url::parse(action_url);
@@ -200,11 +238,22 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
         // max_redirects=0: we handle the redirect ourselves so that Set-Cookie
         // from the POST response is stored before the redirect GET is issued.
         // (Following the redirect inside the HTTP client loses the auth cookie.)
+        const auto t0 = std::chrono::steady_clock::now();
         const net::Result result = client.post(*parsed, body, req_headers, 0, content_type);
+        const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now() - t0)
+                                    .count();
         if (const auto* err = std::get_if<net::NetworkError>(&result)) {
+            if (request_log != nullptr) {
+                request_log->record({"POST", std::string(action_url), 0, 0, elapsed_ms});
+            }
             fetched = {error_page_html("Network Error", err->message), true};
         } else {
             const auto& resp = std::get<net::Response>(result);
+            if (request_log != nullptr) {
+                request_log->record(
+                    {"POST", std::string(action_url), resp.status, resp.body.size(), elapsed_ms});
+            }
             if (jar != nullptr && !resp.set_cookies.empty()) {
                 jar->store(parsed->host(), resp.set_cookies);
             }
@@ -214,7 +263,7 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
                 const auto loc_it = resp.headers.find("location");
                 if (loc_it != resp.headers.end()) {
                     if (const auto redirect_url = parsed->resolve(loc_it->second)) {
-                        fetched = fetch_http(*redirect_url, jar);
+                        fetched = fetch_http(*redirect_url, jar, blocklist, request_log);
                         final_url = redirect_url->to_string();
                         parsed = redirect_url;
                     }
@@ -236,8 +285,13 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
         return std::nullopt;
     }
     std::vector<css::Stylesheet> sheets;
+    if (auto hide_sheet = hide_selectors_stylesheet(blocklist)) {
+        sheets.push_back(std::move(*hide_sheet));
+    }
     if (!fetched.is_error) {
-        sheets = fetch_external_sheets(final_url, *doc);
+        auto external = fetch_external_sheets(final_url, *doc);
+        sheets.insert(sheets.end(), std::make_move_iterator(external.begin()),
+                      std::make_move_iterator(external.end()));
     }
     for (const auto& css_text : doc->inline_styles) {
         if (auto sheet = css::parse(css_text)) {
@@ -256,7 +310,8 @@ std::optional<Page> post_page(std::string_view action_url, std::string_view body
 }
 
 std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::CookieJar* jar,
-                              bool skip_external_css, bool fetch_images) {
+                              bool skip_external_css, bool fetch_images,
+                              const net::Blocklist* blocklist, net::RequestLog* request_log) {
     constexpr std::string_view k_file_prefix = "file://";
 
     Fetched fetched;
@@ -269,7 +324,7 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
             fetched = {std::move(*body), false};
         }
     } else if (auto parsed = util::Url::parse(url)) {
-        fetched = fetch_http(*parsed, jar);
+        fetched = fetch_http(*parsed, jar, blocklist, request_log);
     } else {
         fetched = {error_page_html("Invalid URL",
                                    "Unsupported or invalid URL: " + std::string(url)),
@@ -283,8 +338,13 @@ std::optional<Page> load_page(std::string_view url, layout::Viewport vp, net::Co
     }
 
     std::vector<css::Stylesheet> sheets;
+    if (auto hide_sheet = hide_selectors_stylesheet(blocklist)) {
+        sheets.push_back(std::move(*hide_sheet));
+    }
     if (!fetched.is_error && !skip_external_css) {
-        sheets = fetch_external_sheets(url, *doc);
+        auto external = fetch_external_sheets(url, *doc);
+        sheets.insert(sheets.end(), std::make_move_iterator(external.begin()),
+                      std::make_move_iterator(external.end()));
     }
     for (const auto& css_text : doc->inline_styles) {
         if (auto sheet = css::parse(css_text)) {

@@ -1,6 +1,6 @@
 # adr-download-manager — "Save Link As" download support
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-28
 - **Touches SPEC:** §20 q-download-manager, Q-28 (file upload precedent), Q-19 (config file)
 

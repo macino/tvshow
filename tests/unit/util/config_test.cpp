@@ -55,3 +55,37 @@ TEST_CASE("parse_config: whitespace around key and value is trimmed") {
     const auto cfg = parse_config("  log-level  =  \"info\"  \n");
     CHECK(cfg.log_level == "info");
 }
+
+TEST_CASE("parse_config: download-dir key (q-download-manager)") {
+    const auto cfg = parse_config("download-dir = \"/home/user/Downloads\"\n");
+    CHECK(cfg.download_dir == "/home/user/Downloads");
+}
+
+TEST_CASE("parse_config: download-dir defaults to empty") {
+    const auto cfg = parse_config("");
+    CHECK(cfg.download_dir.empty());
+}
+
+TEST_CASE("parse_config: handler-video/handler-audio keys (adr-external-handlers)") {
+    const auto cfg = parse_config(
+        "handler-video = \"mpv %s\"\n"
+        "handler-audio = \"mpv --no-video %s\"\n");
+    CHECK(cfg.handler_video == "mpv %s");
+    CHECK(cfg.handler_audio == "mpv --no-video %s");
+}
+
+TEST_CASE("parse_config: window-provider-* keys (adr-external-window-provider)") {
+    const auto cfg = parse_config(
+        "window-provider-calculator = \"bc -l\"\n"
+        "window-provider-translate = \"trans -b :cs\"\n");
+    REQUIRE(cfg.window_providers.size() == 2);
+    CHECK(cfg.window_providers[0].first == "calculator");
+    CHECK(cfg.window_providers[0].second == "bc -l");
+    CHECK(cfg.window_providers[1].first == "translate");
+    CHECK(cfg.window_providers[1].second == "trans -b :cs");
+}
+
+TEST_CASE("parse_config: no window-provider entries yields empty vector") {
+    const auto cfg = parse_config("log-level = \"info\"\n");
+    CHECK(cfg.window_providers.empty());
+}

@@ -1,6 +1,6 @@
 # adr-external-handlers — mailcap-style fire-and-forget spawn
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-28
 - **Touches SPEC:** §20 q-extensions-api, Q-30 (media link-out placeholders)
 

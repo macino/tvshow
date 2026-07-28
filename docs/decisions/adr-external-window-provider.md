@@ -1,6 +1,6 @@
 # adr-external-window-provider — embedded 3rd-party windows via subprocess pipe
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-28
 - **Touches SPEC:** §20 q-extensions-api, §11 (UI Model), §3.1 (module boundaries)
 

@@ -46,6 +46,12 @@ struct RenderOpts {
 // callers don't need to pre-clip spans.
 void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans);
 
+// Inverts fg/bg for every cell between `a` and `b` (inclusive), in row-major
+// reading order regardless of endpoint order (adr-text-selection) — same
+// linear-selection semantics as CharGrid::extract_text_range. Points are
+// clamped to grid bounds.
+void apply_selection(CharGrid& grid, Point a, Point b);
+
 // Returns true if grid has fewer than 20 visible (non-space) cells — used
 // to detect pages where author CSS hides all content (JS-dependent pages).
 [[nodiscard]] bool is_mostly_blank(const CharGrid& grid) noexcept;

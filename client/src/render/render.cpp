@@ -506,6 +506,30 @@ void apply_focus(CharGrid& grid, const std::vector<layout::CellRect>& spans) {
     }
 }
 
+void apply_selection(CharGrid& grid, Point a, Point b) {
+    auto clamp_pt = [&grid](Point p) {
+        p.row = std::clamp(p.row, 0, grid.rows() - 1);
+        p.col = std::clamp(p.col, 0, grid.cols() - 1);
+        return p;
+    };
+    a = clamp_pt(a);
+    b = clamp_pt(b);
+    if (b.row < a.row || (b.row == a.row && b.col < a.col)) {
+        std::swap(a, b);
+    }
+    for (int r = a.row; r <= b.row; ++r) {
+        const int c_start = (r == a.row) ? a.col : 0;
+        const int c_end = (r == b.row) ? b.col : grid.cols() - 1;
+        for (int c = c_start; c <= c_end; ++c) {
+            const Point pos{c, r};
+            const Cell cell = grid.at(pos);
+            ColorAttr attr = cell.attr;
+            std::swap(attr.fg, attr.bg);
+            grid.put(pos, cell.cp, attr);
+        }
+    }
+}
+
 bool is_mostly_blank(const CharGrid& grid) noexcept {
     constexpr int k_visible_threshold = 20;
     int visible = 0;

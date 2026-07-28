@@ -1,6 +1,7 @@
 #include "tvshow/app/browser_view.hpp"
 
 #include "tvshow/app/builtin_themes.hpp"
+#include "tvshow/app/external_handler.hpp"
 #include "tvshow/css/parser.hpp"
 
 #define Uses_TDialog
@@ -24,11 +25,14 @@
 #include "tvshow/layout/form_data.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
+#include "tvshow/net/cpp_http_client.hpp"
 #include "tvshow/paint/paint.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
 #include "tvshow/style/resolver.hpp"
 #include "tvshow/types.hpp"
+#include "tvshow/util/config.hpp"
+#include "tvshow/util/media_kind.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <tvision/tv.h>
@@ -300,8 +304,12 @@ static std::vector<layout::CellRect> map_spans(const std::vector<layout::CellRec
 }
 
 const images::ImageRenderer& BrowserView::effective_img_renderer() const {
-    if (shared_ != nullptr && shared_->use_braille_images) {
-        return braille_img_renderer_;
+    if (shared_ != nullptr) {
+        switch (shared_->image_renderer) {
+            case ImageRendererKind::Braille: return braille_img_renderer_;
+            case ImageRendererKind::Ascii:   return ascii_img_renderer_;
+            case ImageRendererKind::Alt:     break;
+        }
     }
     return alt_img_renderer_;
 }
@@ -363,6 +371,10 @@ void BrowserView::ensure_display_grid() const {
                     g.put({col, p.row}, cell.cp, attr);
                 }
             }
+        }
+
+        if (has_selection()) {
+            render::apply_selection(g, *sel_anchor_, *sel_end_);
         }
 
         if (debug_overlay_) {
@@ -521,8 +533,20 @@ void BrowserView::sync_vscroll() {
     }
 }
 
+void BrowserView::clear_selection() {
+    if (has_selection()) {
+        overlay_dirty_ = true;
+    }
+    sel_anchor_.reset();
+    sel_end_.reset();
+}
+
 void BrowserView::scroll_to(int row) {
-    scroll_row_ = std::clamp(row, 0, scroll_limit());
+    const int clamped = std::clamp(row, 0, scroll_limit());
+    if (clamped != scroll_row_) {
+        clear_selection();  // adr-text-selection: selection anchored to visible viewport only
+    }
+    scroll_row_ = clamped;
     sync_vscroll();
     drawView();
 }
@@ -545,6 +569,7 @@ void BrowserView::navigate_to(std::string_view url) {
 }
 
 void BrowserView::navigate(const std::string& url, bool push_history) {
+    clear_selection();
     // Cancel any in-flight load and wait for it to finish.
     load_cancelled_.store(true, std::memory_order_release);
     if (loader_thread_.joinable()) {
@@ -571,7 +596,8 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
     const Size vp{size.x, size.y};
 
     const bool skip_css = (shared_ != nullptr && shared_->forced_style != ForcedStyle::Auto);
-    const bool fetch_images = (shared_ != nullptr && shared_->use_braille_images);
+    const bool fetch_images =
+        (shared_ != nullptr && shared_->image_renderer != ImageRendererKind::Alt);
     loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp, skip_css,
                                   fetch_images]() {
         // Inner thread does the blocking HTTP fetch.
@@ -580,7 +606,9 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
         std::thread inner([&]() {
             try {
                 net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
-                loaded = load_page(fetch_url, vp, jar, skip_css, fetch_images);
+                const net::Blocklist* blocklist = (shared_ != nullptr) ? &shared_->blocklist : nullptr;
+                net::RequestLog* request_log = (shared_ != nullptr) ? &shared_->request_log : nullptr;
+                loaded = load_page(fetch_url, vp, jar, skip_css, fetch_images, blocklist, request_log);
             } catch (...) {
                 // loaded stays nullopt; apply_loaded_page handles it
             }
@@ -672,6 +700,7 @@ void BrowserView::tick_if_loading() {
                             std::chrono::steady_clock::now() - last_resize_).count();
         if (ms >= kResizeDebounceMs) {
             resize_pending_ = false;
+            clear_selection();  // adr-text-selection: cleared on resize
             relayout();
             drawView();
         }
@@ -859,6 +888,59 @@ void BrowserView::show_file_picker(const layout::FormFocus& fc) {
     TObject::destroy(dlg);
 }
 
+// adr-download-manager: fetches `url` synchronously and returns the raw
+// response body, or nullopt on any network/status failure — same
+// degrade-gracefully stance as the rest of net/ call sites in this file.
+std::optional<std::string> fetch_bytes_for_download(const util::Url& url) {
+    net::CppHttpClient client;
+    const net::Result result = client.get(url);
+    const auto* resp = std::get_if<net::Response>(&result);
+    if (resp == nullptr || resp->status >= 400) {
+        return std::nullopt;
+    }
+    return resp->body;
+}
+
+void BrowserView::save_link_as() {
+    if (!is_link_focused() || owner == nullptr || owner->owner == nullptr) {
+        return;
+    }
+    const std::string abs_url =
+        util::resolve_url(page_.url, links_[static_cast<size_t>(focused_)].href);
+    const auto parsed = util::Url::parse(abs_url);
+    if (!parsed) {
+        return;
+    }
+
+    util::Config cfg = util::load_config();
+    const std::string dir_pattern = (cfg.download_dir.empty() ? "." : cfg.download_dir) + "/*.*";
+
+    TGroup* const desk = owner->owner;
+    auto* dlg = new TFileDialog(dir_pattern.c_str(), "Save Link As", "~N~ame",
+                                fdOKButton | fdHelpButton, 0);
+    const unsigned short res = desk->execView(dlg);
+    if (res == cmOK) {
+        std::array<char, MAXPATH> buf{};
+        dlg->getFileName(buf.data());
+        const std::string save_path(buf.data());
+
+        if (auto bytes = fetch_bytes_for_download(*parsed)) {
+            std::ofstream out(save_path, std::ios::binary | std::ios::trunc);
+            if (out) {
+                out.write(bytes->data(), static_cast<std::streamsize>(bytes->size()));
+                // Remember the directory for next time (config.toml, q-download-manager).
+                const auto slash = save_path.rfind('/');
+                if (slash != std::string::npos) {
+                    util::Config fresh_cfg = util::load_config();
+                    fresh_cfg.download_dir = save_path.substr(0, slash);
+                    util::save_config(fresh_cfg);
+                }
+            }
+        }
+    }
+    TObject::destroy(dlg);
+}
+
 // SPEC Q-28: reads a file the user picked via show_file_picker() from disk.
 // Skips (returns nullopt) files that can't be opened -- consistent with the
 // rest of this file's degrade-gracefully-on-failure pattern (network
@@ -914,7 +996,10 @@ void BrowserView::submit_form() {
 
     if (is_post) {
         net::CookieJar* jar = (shared_ != nullptr) ? &shared_->cookie_jar : nullptr;
-        auto page = post_page(action_url, body, {size.x, size.y}, jar, content_type);
+        const net::Blocklist* blocklist = (shared_ != nullptr) ? &shared_->blocklist : nullptr;
+        net::RequestLog* request_log = (shared_ != nullptr) ? &shared_->request_log : nullptr;
+        auto page = post_page(action_url, body, {size.x, size.y}, jar, content_type, blocklist,
+                              request_log);
         if (!page) {
             return;
         }
@@ -934,12 +1019,34 @@ void BrowserView::submit_form() {
     }
 }
 
+void BrowserView::activate_link(std::string_view href) {
+    const std::string abs_url = util::resolve_url(page_.url, href);
+    const util::Config cfg = util::load_config();
+    switch (util::classify_media_url(abs_url)) {
+    case util::MediaKind::Video:
+        if (!cfg.handler_video.empty()) {
+            spawn_handler(cfg.handler_video, abs_url);
+            return;
+        }
+        break;
+    case util::MediaKind::Audio:
+        if (!cfg.handler_audio.empty()) {
+            spawn_handler(cfg.handler_audio, abs_url);
+            return;
+        }
+        break;
+    case util::MediaKind::None:
+        break;
+    }
+    navigate(abs_url, true);
+}
+
 bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
     pt = uncollapse_pt(pt, kept_rows_);
     for (const auto& link : links_) {
         for (const auto& span : link.spans) {
             if (span.contains(pt)) {
-                navigate(util::resolve_url(page_.url, link.href), true);
+                activate_link(link.href);
                 clearEvent(event);
                 return true;
             }
@@ -1018,9 +1125,33 @@ void BrowserView::handleEvent(TEvent& event) {
     if (event.what == evMouseDown) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
         const TPoint local = makeLocal(event.mouse.where);
-        if (handle_mouse_hit({local.x, local.y + scroll_row_}, event)) {
+        const Point content_pt{local.x, local.y + scroll_row_};
+        if (handle_mouse_hit(content_pt, event)) {
             return;
         }
+        // No link/form hit: start a text-selection drag (adr-text-selection).
+        // Classic TurboVision drag idiom: poll mouseEvent(evMouseMove) until
+        // the button is released (mouseEvent then returns false on evMouseUp).
+        clear_selection();
+        sel_anchor_ = content_pt;
+        sel_end_ = content_pt;
+        overlay_dirty_ = true;
+        drawView();
+        TEvent drag_event;
+        while (mouseEvent(drag_event, evMouseMove)) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+            const TPoint drag_local = makeLocal(drag_event.mouse.where);
+            sel_end_ = Point{drag_local.x, drag_local.y + scroll_row_};
+            overlay_dirty_ = true;
+            drawView();
+        }
+        if (sel_anchor_ == sel_end_) {
+            // Plain click, no drag: not a real selection (matches GUI-browser
+            // click-without-drag behavior — no visible highlight).
+            clear_selection();
+            drawView();
+        }
+        clearEvent(event);
         return;
     }
 
@@ -1074,8 +1205,7 @@ void BrowserView::handleEvent(TEvent& event) {
         break;
     case kbEnter:
         if (is_link_focused()) {
-            navigate(util::resolve_url(page_.url, links_[static_cast<size_t>(focused_)].href),
-                     true);
+            activate_link(links_[static_cast<size_t>(focused_)].href);
         } else if (const layout::FormFocus* fc = focused_fc(); fc != nullptr) {
             if (fc->kind == layout::FormControlKind::Textarea) {
                 handle_form_input(kbEnter);
@@ -1105,11 +1235,27 @@ void BrowserView::handleEvent(TEvent& event) {
         show_bookmarks_dialog();
         clearEvent(event);
         break;
-    case 0x0003:  // Ctrl-C — copy focused link URL via OSC 52
-        if (is_link_focused()) {
+    case 0x000E:  // Ctrl-N — network log (adr-dev-tools). NOTE: Ctrl-L is
+                  // already bound app-wide to cmOpenUrl (Application menu/
+                  // status line) -- do not reuse it here.
+        show_request_log_dialog();
+        clearEvent(event);
+        break;
+    case 0x0003:  // Ctrl-C — copy selection, else focused link URL (adr-text-selection extends Q-5)
+        if (has_selection()) {
+            ensure_display_grid();
+            osc52_copy(display_grid_->extract_text_range(*sel_anchor_, *sel_end_));
+            clearEvent(event);
+        } else if (is_link_focused()) {
             const std::string abs_url = util::resolve_url(
                 page_.url, links_[static_cast<size_t>(focused_)].href);
             osc52_copy(abs_url);
+            clearEvent(event);
+        }
+        break;
+    case 0x0013:  // Ctrl-S — Save Link As (adr-download-manager)
+        if (is_link_focused()) {
+            save_link_as();
             clearEvent(event);
         }
         break;
@@ -1270,6 +1416,38 @@ void BrowserView::navigate_forward() {
 
 void BrowserView::reload() {
     navigate(history_[history_pos_], false);
+}
+
+// adr-dev-tools: read-only list of the shared request log, newest-first,
+// formatted via format_request_log_entry(). Dismissed with Enter/Esc, same
+// as show_select_popup's OptionListViewer.
+void BrowserView::show_request_log_dialog() {
+    if (owner == nullptr || owner->owner == nullptr || shared_ == nullptr) {
+        return;
+    }
+    TGroup* const desk = owner->owner;
+
+    std::vector<std::string> labels;
+    for (const auto& entry : shared_->request_log.entries()) {
+        labels.push_back(net::format_request_log_entry(entry));
+    }
+    if (labels.empty()) {
+        labels.push_back("(no requests logged yet)");
+    }
+
+    constexpr int kDlgW = 76;
+    const int n = static_cast<int>(labels.size());
+    const int h = std::min(n + 2, 20);
+    const TRect desk_r = desk->getBounds();
+    const TRect dlg_r{(desk_r.b.x - kDlgW) / 2, (desk_r.b.y - h) / 2,
+                      (desk_r.b.x + kDlgW) / 2, (desk_r.b.y + h) / 2};
+    auto* dlg = new TDialog(dlg_r, "Network Log");
+    const TRect list_r{1, 1, kDlgW - 2, h - 1};
+    auto* viewer = new OptionListViewer(list_r, &labels);
+    dlg->insert(viewer);
+
+    desk->execView(dlg);
+    TObject::destroy(dlg);
 }
 
 void BrowserView::show_bookmarks_dialog() {

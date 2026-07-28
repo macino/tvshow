@@ -1,6 +1,6 @@
 # adr-text-selection — text range-selection + clipboard copy
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-27
 - **Touches SPEC:** §20 Q-5, q-text-selection
 

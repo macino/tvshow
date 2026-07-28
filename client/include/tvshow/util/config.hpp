@@ -2,6 +2,8 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace tvshow::util {
 
@@ -12,6 +14,16 @@ struct Config {
     std::string start_url;                // empty = no initial navigation
     std::string default_style = "auto";   // auto | tvision | light | dark
     std::string image_renderer = "alt";   // alt | braille
+    std::string download_dir;             // last-used "Save Link As" directory (q-download-manager)
+    // adr-external-handlers: fire-and-forget spawn on Enter over a matching
+    // media link. "%s" in the template is replaced with the absolute URL.
+    // Empty = no handler configured, falls back to normal link navigation.
+    std::string handler_video;  // handler-video, e.g. "mpv %s"
+    std::string handler_audio;  // handler-audio
+    // adr-external-window-provider: `window-provider-<name> = "<command>"`
+    // entries, name -> shell-word-split command (no %s substitution -- input
+    // goes over stdin once the window is open, not as an argv URL).
+    std::vector<std::pair<std::string, std::string>> window_providers;
 };
 
 // Parse TOML content (pure — no I/O). Only supports the subset:

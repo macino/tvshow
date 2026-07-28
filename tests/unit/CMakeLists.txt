@@ -5,8 +5,11 @@ add_executable(tvshow-tests
     util/url_test.cpp
     util/charset_test.cpp
     util/config_test.cpp
+    util/media_kind_test.cpp
     net/http_client_test.cpp
     net/cookie_jar_test.cpp
+    net/blocklist_test.cpp
+    net/request_log_test.cpp
     app/bookmarks_test.cpp
     dom/parser_test.cpp
     css/parser_test.cpp
@@ -19,6 +22,7 @@ add_executable(tvshow-tests
     layout/flex_test.cpp
     layout/image_test.cpp
     images/decode_test.cpp
+    images/ascii_art_renderer_test.cpp
     render/render_test.cpp
     render/golden_test.cpp
     paint/paint_test.cpp

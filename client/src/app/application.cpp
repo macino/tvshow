@@ -13,9 +13,14 @@
 #include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/browser_window.hpp"
 #include "tvshow/app/commands.hpp"
+#include "tvshow/app/extension_window.hpp"
 #include "tvshow/app/page.hpp"
 #include "tvshow/app/settings_dialog.hpp"
 #include "tvshow/layout/types.hpp"
+#include "tvshow/net/blocklist.hpp"
+#include "tvshow/net/cookie_jar.hpp"
+#include "tvshow/util/config.hpp"
+#include "tvshow/util/media_kind.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <tvision/tv.h>
@@ -313,6 +318,13 @@ static void tick_loading_window(TView* v, void* /*arg*/) {
     }
 }
 
+// adr-external-window-provider: pulls output from every open ExtensionWindow.
+static void poll_extension_window(TView* v, void* /*arg*/) {
+    if (auto* ew = dynamic_cast<ExtensionWindow*>(v)) {
+        ew->poll();
+    }
+}
+
 // ── window-list helpers ──────────────────────────────────────────────────────
 
 struct CollectWindowsCtx {
@@ -336,10 +348,13 @@ Application::Application(AddressBarMode mode)
       mode_(mode) {
     load_history(shared_browsing_state_);
     shared_browsing_state_.bookmarks = load_bookmarks();
+    net::load_cookie_jar(shared_browsing_state_.cookie_jar);
+    shared_browsing_state_.blocklist = net::load_blocklist();
 }
 
 void Application::shutDown() {
     save_history(shared_browsing_state_);
+    net::save_cookie_jar(shared_browsing_state_.cookie_jar);
     TApplication::shutDown();
 }
 
@@ -377,7 +392,9 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
                newLine() +
                *new TMenuItem("~S~ettings...", cmSettings, kbNoKey, hcNoContext) +
                *new TSubMenu("~W~indow", kbAltW) +
-               *new TMenuItem("~W~indow List...", cmWindowList, kbNoKey, hcNoContext));
+               *new TMenuItem("~W~indow List...", cmWindowList, kbNoKey, hcNoContext) +
+               newLine() +
+               *new TMenuItem("~E~xtension...", cmOpenExtension, kbCtrlX, hcNoContext, "Ctrl-X"));
 }
 
 BrowserWindow* Application::active_browser_window() {
@@ -421,10 +438,65 @@ void Application::show_window_list() {  // NOLINT(readability-convert-member-fun
     }
 }
 
+void Application::open_extension_window(const std::string& provider_name, const std::string& command) {
+    if (deskTop == nullptr) {
+        return;
+    }
+    const std::vector<std::string> argv = util::build_handler_argv(command, "");
+    if (argv.empty()) {
+        return;
+    }
+    const TRect bounds = next_window_bounds();
+    auto* win = new ExtensionWindow(bounds, provider_name.c_str(), argv);
+    deskTop->insert(win);
+}
+
+void Application::show_extension_picker() {  // NOLINT(readability-convert-member-functions-to-static)
+    if (deskTop == nullptr) {
+        return;
+    }
+    const util::Config cfg = util::load_config();
+    if (cfg.window_providers.empty()) {
+        messageBox("No window-provider-* entries configured in config.toml.\n"
+                  "Example: window-provider-calculator = \"bc -l\"",
+                  mfInformation | mfOKButton);
+        return;
+    }
+    if (cfg.window_providers.size() == 1) {
+        const auto& [provider_name, command] = cfg.window_providers.front();
+        open_extension_window(provider_name, command);
+        return;
+    }
+
+    std::vector<std::string> names;
+    names.reserve(cfg.window_providers.size());
+    for (const auto& [provider_name, command] : cfg.window_providers) { names.push_back(provider_name); }
+
+    constexpr int kDlgW = 40;
+    const int count = static_cast<int>(names.size());
+    const int h = std::min(count + 2, 14);
+    const TRect dlg_r((deskTop->size.x - kDlgW) / 2, (deskTop->size.y - h) / 2,
+                      (deskTop->size.x + kDlgW) / 2, (deskTop->size.y + h) / 2);
+    auto* dlg = new TDialog(dlg_r, "Open Extension");
+    const TRect list_r(1, 1, kDlgW - 2, h - 1);
+    auto* viewer = new WindowListViewer(list_r, &names);
+    dlg->insert(viewer);
+
+    const unsigned short res = deskTop->execView(dlg);
+    const short sel = viewer->focused;
+    TObject::destroy(dlg);
+
+    if (res == cmOK && sel >= 0 && sel < count) {
+        const auto& [provider_name, command] = cfg.window_providers[static_cast<size_t>(sel)];
+        open_extension_window(provider_name, command);
+    }
+}
+
 void Application::idle() {
     TProgram::idle();
     if (deskTop != nullptr) {
         deskTop->forEach(tick_loading_window, nullptr);
+        deskTop->forEach(poll_extension_window, nullptr);
     }
 }
 
@@ -522,6 +594,10 @@ void Application::handleEvent(TEvent& event) {
     case cmWindowList:
         clearEvent(event);
         show_window_list();
+        return;
+    case cmOpenExtension:
+        clearEvent(event);
+        show_extension_picker();
         return;
     case cmSettings:
         clearEvent(event);

@@ -19,5 +19,7 @@ constexpr unsigned short cmStyleDark    = 112;
 constexpr unsigned short cmSettings     = 113;
 // Internal: fires in the next event loop iteration to open deferred_open_url_.
 constexpr unsigned short cmDeferredOpen = 114;
+// adr-external-window-provider: opens a configured extension window.
+constexpr unsigned short cmOpenExtension = 115;
 
 }  // namespace tvshow::app

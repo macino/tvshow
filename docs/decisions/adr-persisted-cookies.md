@@ -1,6 +1,6 @@
 # adr-persisted-cookies — disk-persisted cookies
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-27
 - **Touches SPEC:** §20 Q-9, q-persisted-cookies
 

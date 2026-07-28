@@ -7,7 +7,9 @@
 #include "tvshow/images/renderer.hpp"
 #include "tvshow/layout/form_focus.hpp"
 #include "tvshow/layout/links.hpp"
+#include "tvshow/net/blocklist.hpp"
 #include "tvshow/net/cookie_jar.hpp"
+#include "tvshow/net/request_log.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
 
@@ -30,6 +32,8 @@ struct TScrollBar;
 namespace tvshow::app {
 
 enum class ForcedStyle { Auto, Tvision, Light, Dark };
+// SPEC Q-23 / q-ascii-art-renderer: image-renderer config selects among these.
+enum class ImageRendererKind { Alt, Braille, Ascii };
 
 // History and visited-URL state shared across all browser tabs in one process.
 // Owned by Application, passed by pointer to each BrowserView.
@@ -37,9 +41,11 @@ struct SharedBrowsingState {
     std::vector<std::string> history;         // all visited URLs in order (for autocomplete)
     std::unordered_set<std::string> visited;  // set form of history (for link coloring)
     net::CookieJar cookie_jar;               // session-scoped cookie store
+    net::Blocklist blocklist;                // adr-content-blocklist, loaded once at startup
+    net::RequestLog request_log;             // adr-dev-tools, shared across tabs
     BookmarkStore bookmarks;                 // loaded once at startup, persisted on change
     ForcedStyle forced_style = ForcedStyle::Auto;
-    bool use_braille_images = false;  // SPEC Q-23: alt text (default) vs. braille-dot images
+    ImageRendererKind image_renderer = ImageRendererKind::Alt;  // Q-23 / q-ascii-art-renderer
 };
 
 // Hosts one loaded Page: renders it, tracks the focused link or form control
@@ -68,6 +74,9 @@ public:
 
     // Bookmarks: show CRUD picker dialog (Ctrl-B).
     void show_bookmarks_dialog();
+
+    // Dev tools: show the shared request log (Ctrl-L) — adr-dev-tools.
+    void show_request_log_dialog();
 
     [[nodiscard]] const Page& page() const { return page_; }
     // History for URL-bar autocomplete: shared history when available, else per-window.
@@ -104,7 +113,8 @@ private:
     // the address of page_.images never changes.
     images::AltTextRenderer alt_img_renderer_;
     images::BrailleRenderer braille_img_renderer_{&page_.images};
-    // Selects alt_img_renderer_ vs. braille_img_renderer_ per shared_->use_braille_images.
+    images::AsciiArtRenderer ascii_img_renderer_{&page_.images};
+    // Selects among the three renderers above per shared_->image_renderer.
     [[nodiscard]] const images::ImageRenderer& effective_img_renderer() const;
     std::vector<layout::Link> links_;
     std::vector<layout::FormFocus> form_controls_;
@@ -163,6 +173,10 @@ private:
     // then applies focus/search overlays if overlay state changed.
     void ensure_display_grid() const;
     void navigate(const std::string& url, bool push_history);
+    // Enter/click on a link: resolves href, dispatches to an external handler
+    // if configured for the URL's media kind (adr-external-handlers), else
+    // navigates normally.
+    void activate_link(std::string_view href);
     // Hit-test pt (content coords) against links/form controls, handle and clear
     // event on hit. Returns true if the event was consumed.
     bool handle_mouse_hit(Point pt, TEvent& event);
@@ -177,6 +191,10 @@ private:
     // (reusing the generic text-value store, same as file's render/encode path).
     void show_file_picker(const layout::FormFocus& fc);
     void submit_form();
+    // Ctrl-S over a focused link: fetches the target URL and writes the raw
+    // response body to a user-picked path (adr-download-manager). Dialog is
+    // pre-filled with the last-used save directory, persisted to config.toml.
+    void save_link_as();
 
     // Find-in-page state.
     std::string search_term_;
@@ -186,6 +204,16 @@ private:
 
     void find_matches_in_page(std::string_view term);
     void navigate_to_hit(int dir);  // +1 = next, -1 = prev
+
+    // Text selection (adr-text-selection): anchor/end in display-grid cell
+    // space (same space as search_hits_). Active iff both are set. Cleared
+    // on scroll/resize/navigation.
+    std::optional<Point> sel_anchor_;
+    std::optional<Point> sel_end_;
+    [[nodiscard]] bool has_selection() const noexcept {
+        return sel_anchor_.has_value() && sel_end_.has_value();
+    }
+    void clear_selection();
 
     bool debug_overlay_ = false;  // Ctrl-D toggles box-outline overlay
 

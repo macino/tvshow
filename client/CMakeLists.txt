@@ -4,8 +4,11 @@ add_library(tvshow_core STATIC
     src/util/url.cpp
     src/util/charset.cpp
     src/util/config.cpp
+    src/util/media_kind.cpp
     src/app/bookmarks.cpp
     src/net/cookie_jar.cpp
+    src/net/blocklist.cpp
+    src/net/request_log.cpp
     src/net/http_client.cpp
     src/net/fake_http_client.cpp
     src/dom/node.cpp
@@ -21,6 +24,7 @@ add_library(tvshow_core STATIC
     src/render/render.cpp
     src/images/alt_text_renderer.cpp
     src/images/braille_renderer.cpp
+    src/images/ascii_art_renderer.cpp
     src/images/decode.cpp
     src/images/stb_image_impl.cpp
 )
@@ -89,6 +93,8 @@ add_library(tvshow_io STATIC
     src/app/page.cpp
     src/app/bookmarks_io.cpp
     src/net/cpp_http_client.cpp
+    src/net/cookie_jar_io.cpp
+    src/net/blocklist_io.cpp
     src/util/log.cpp
     src/util/config_io.cpp
 )
@@ -138,6 +144,9 @@ add_executable(tvshow
     src/app/browser_window.cpp
     src/app/builtin_themes.cpp
     src/app/settings_dialog.cpp
+    src/app/external_handler.cpp
+    src/app/extension_process.cpp
+    src/app/extension_window.cpp
 )
 
 target_include_directories(tvshow

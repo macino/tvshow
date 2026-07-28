@@ -1,6 +1,6 @@
 # adr-ascii-art-renderer — ASCII-art image renderer mode
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-27
 - **Touches SPEC:** §6.5, §20 Q-23, q-ascii-art-renderer
 

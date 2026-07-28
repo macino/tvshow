@@ -50,6 +50,10 @@ private:
     // Returns the focused BrowserWindow in the desktop, or nullptr.
     static BrowserWindow* active_browser_window();
     static void show_window_list();
+    // adr-external-window-provider: Ctrl-X. Reads window-provider-* config
+    // entries; none -> notice, one -> opens it directly, multiple -> picker.
+    void show_extension_picker();
+    void open_extension_window(const std::string& name, const std::string& command);
 };
 
 }  // namespace tvshow::app
