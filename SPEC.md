@@ -2,7 +2,7 @@
 
 A terminal "web browser" rendered with TurboVision. Server speaks real HTTP/1.1 and returns HTML+CSS; client parses, lays out into character cells, paints with `tvision` using box-drawing chars and color attributes.
 
-> Status: **M0, M1, and M2 complete**. See §20.1/§20.2 for the feature lists.
+> Status: **M0, M1, M2, and M3 complete**. See §20.1/§20.2/§20.3 for the feature lists.
 
 ---
 
@@ -483,6 +483,18 @@ Q-26, Q-10, Q-22, Q-24, Q-25, Q-23 above. **M1 complete.**
 
 All four M2 items are resolved: ~~M2-table-span~~, ~~M2-fixed-sticky~~, ~~M2-out-of-subset~~,
 ~~M2-file-upload~~ — see Q-27, Q-29, Q-30, Q-28 above. **M2 complete.**
+
+### 20.3 Milestone 3 (M3) Scope — GUI-browser gap analysis
+
+All eight M3 items are implemented: ~~M3-persisted-cookies~~, ~~M3-content-blocklist~~,
+~~M3-download-manager~~, ~~M3-dev-tools~~, ~~M3-ascii-art-renderer~~, ~~M3-text-selection~~,
+~~M3-external-handlers~~, ~~M3-external-window-provider~~ — see q-persisted-cookies,
+q-content-blocklist (folded into q-extensions-api), q-download-manager, q-dev-tools,
+q-ascii-art-renderer, q-text-selection, q-external-handlers (q-extensions-api),
+q-external-window-provider (q-extensions-api) above, and `docs/decisions/adr-*` for each.
+Two related items were resolved as **won't-implement** rather than built: q-websocket-support
+(conditioned on a future scripting layer) and q-multiprocess-sandboxing (denied — risk accepted).
+**M3 complete.**
 
 ---
 
