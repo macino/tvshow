@@ -134,7 +134,48 @@ Press **Enter** on a submit button (or an `input type="submit"`) to submit the f
 
 ## Images
 
-An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `width`/`height` attributes. A braille-dot renderer is available for rendering actual image content as Unicode braille patterns (U+2800..U+28FF) when image data is pre-fetched.
+An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `width`/`height` attributes. Two renderers can decode and show actual image content instead, selected via `image-renderer = "alt" | "braille" | "ascii"` in `config.toml` (or `--image-renderer=...`):
+
+- **braille** — Unicode braille patterns (U+2800..U+28FF), 2×4 sub-cell resolution.
+- **ascii** — classic ASCII-art, one pixel-block average per cell on a 10-level luminance ramp (` .:-=+*#%@`). Coarser than braille but works on any terminal/font.
+
+---
+
+## Text selection
+
+Click and drag with the mouse over rendered text to select it (reverse-video highlight). Release to finish. **Ctrl-C** copies the selection to the terminal clipboard (via OSC 52); with nothing selected, Ctrl-C falls back to copying the focused link's URL instead. Selection is cleared on scroll, resize, or navigating away. Keyboard-only selection (Shift+arrows) is not supported — mouse only.
+
+## Save Link As
+
+With a link or media placeholder focused, press **Ctrl-S** to fetch it and save the response to disk. A file-save dialog opens pre-filled with the last directory you saved to (remembered in `config.toml`).
+
+## Network log (dev tools)
+
+Press **Ctrl-N** to open a read-only dialog listing recent HTTP requests for the current session — method, status, byte count, elapsed time, URL — newest first, capped at the last 50. Complements the Ctrl-D box-outline overlay; there is no JS console (tvshow doesn't run JavaScript).
+
+## Content blocklist
+
+`~/.config/tvshow/blocklist` can list two kinds of rule, one per line:
+
+```
+block: http://ads.example.com/*
+hide: .ad-banner
+```
+
+`block:` lines (URL glob patterns) stop the request before it's issued — the response renders as an empty page instead. `hide:` lines are CSS selectors that get an implicit `display: none`, lower priority than the page's own CSS so authors can still override it. No file present = no blocking, same as today.
+
+## Extensions
+
+Press **Ctrl-X** ("Extension...") to open a 3rd-party extension in its own embedded window — a calculator, translator, or anything else that speaks plain text over stdin/stdout. Configure one or more in `config.toml`:
+
+```toml
+window-provider-calculator = "/path/to/calculator.py"
+window-provider-translate  = "/path/to/translator.py"
+```
+
+With one provider configured, Ctrl-X opens it directly; with several, it shows a picker first. See [`extensions/README.md`](../extensions/README.md) for working examples (calculator, calendar, DeepL translator) and the protocol extensions must follow.
+
+Related, fire-and-forget (no embedded window): `handler-video`/`handler-audio` in `config.toml` spawn an external player (e.g. `mpv %s`) when you press Enter on a video/audio link, instead of trying to navigate to it.
 
 ---
 
@@ -146,7 +187,7 @@ An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `wi
 | **File** | New Tab (Ctrl-T), Open URL (Ctrl-L), Close Tab (Ctrl-W) |
 | **Navigate** | Back (Alt-←), Forward (Alt-→), Reload (Ctrl-R), Stop (Esc), Home |
 | **View** | Toggle Address Bar, Toggle Status, Cascade, Tile |
-| **Window** | List of open tabs |
+| **Window** | List of open tabs, Extension... (Ctrl-X) |
 
 ---
 
@@ -172,7 +213,11 @@ An `<img>` tag defaults to showing `[alt text]` in the space reserved by the `wi
 | Ctrl-D | Toggle debug overlay (box outlines + dimensions) |
 | Ctrl-F | Find in page |
 | Ctrl-B | Bookmarks |
-| Ctrl-C | Copy focused link URL |
+| Ctrl-C | Copy selection, else focused link URL |
+| Ctrl-S | Save Link As (focused link/media) |
+| Ctrl-N | Network log |
+| Ctrl-X | Open extension window |
+| Mouse drag | Select text |
 | Alt-X | Quit |
 
 ---
@@ -200,7 +245,9 @@ Press **Ctrl-D** to toggle box outlines drawn in magenta over the rendered page.
 ## Known limitations
 
 - No JavaScript.
-- Session cookies only (not persisted across restarts).
-- Images default to `[alt]` text (braille renderer requires pre-fetched image data).
-- No text selection; Ctrl-C copies the focused link URL only.
+- Cookies with `Max-Age`/`Expires` persist across restarts (`~/.config/tvshow/cookies`); session cookies (no expiry) don't, matching browser behavior. No `Secure`/`SameSite` enforcement.
+- Images default to `[alt]` text (braille/ascii renderers require pre-fetched image data).
+- Text selection is mouse-only; no keyboard (Shift+arrow) range-select.
 - `:hover` applies to the directly hovered element only (not ancestors).
+- No JS console in the network log — there's nothing to console.log from.
+- Extensions (Ctrl-X) and video/audio handlers run as plain child processes: no sandboxing beyond normal OS process isolation.
