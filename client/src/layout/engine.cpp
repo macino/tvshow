@@ -407,10 +407,19 @@ Box layout_block(const style::StyledNode& sn, CellPos origin, int avail_w, int a
     if (is_table) {
         table_grid = compute_table_grid(sn, content_w);
         // table_grid outlives all recursive layout calls below; restored before return.
+        // -Wdangling-pointer is GCC-specific -- clang doesn't know the name at
+        // all, and with -Werror it fails on "unknown warning option" rather
+        // than silently ignoring the pragma, so this suppression only applies
+        // under GCC (confirmed: this broke CI, which builds with clang, while
+        // local dev builds with GCC never saw it).
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
+#endif
         g_table_grid = &table_grid;
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
     }
 
     // Lay out block-level children.

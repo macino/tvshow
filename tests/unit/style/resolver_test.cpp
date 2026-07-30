@@ -109,21 +109,21 @@ TEST_CASE("style::parse_length: px") {
     const auto l = parse_length("16px");
     CHECK_FALSE(l.is_auto);
     CHECK(l.unit == LengthUnit::Px);
-    CHECK(l.value == doctest::Approx(static_cast<double>(16.0F)));
+    CHECK(static_cast<double>(l.value) == doctest::Approx(static_cast<double>(16.0F)));
 }
 
 TEST_CASE("style::parse_length: percent") {
     const auto l = parse_length("50%");
     CHECK_FALSE(l.is_auto);
     CHECK(l.unit == LengthUnit::Pct);
-    CHECK(l.value == doctest::Approx(static_cast<double>(50.0F)));
+    CHECK(static_cast<double>(l.value) == doctest::Approx(static_cast<double>(50.0F)));
 }
 
 TEST_CASE("style::parse_length: ch") {
     const auto l = parse_length("20ch");
     CHECK_FALSE(l.is_auto);
     CHECK(l.unit == LengthUnit::Ch);
-    CHECK(l.value == doctest::Approx(static_cast<double>(20.0F)));
+    CHECK(static_cast<double>(l.value) == doctest::Approx(static_cast<double>(20.0F)));
 }
 
 TEST_CASE("style::parse_length: auto") {
@@ -134,7 +134,7 @@ TEST_CASE("style::parse_length: auto") {
 TEST_CASE("style::parse_length: zero without unit") {
     const auto l = parse_length("0");
     CHECK_FALSE(l.is_auto);
-    CHECK(l.value == doctest::Approx(static_cast<double>(0.0F)));
+    CHECK(static_cast<double>(l.value) == doctest::Approx(static_cast<double>(0.0F)));
 }
 
 // ── UA defaults ───────────────────────────────────────────────────────────────
@@ -399,7 +399,7 @@ TEST_CASE("style::resolve: td gets flex-grow 1 and block display") {
     const auto* td = find_tag(*tree, "td");
     REQUIRE(td != nullptr);
     CHECK(td->style.display == Display::Block);
-    CHECK(td->style.flex_grow == doctest::Approx(1.0));
+    CHECK(static_cast<double>(td->style.flex_grow) == doctest::Approx(1.0));
 }
 
 TEST_CASE("style::resolve: th is bold and flex-grow 1") {
@@ -409,7 +409,7 @@ TEST_CASE("style::resolve: th is bold and flex-grow 1") {
     const auto* th = find_tag(*tree, "th");
     REQUIRE(th != nullptr);
     CHECK(th->style.font_weight == FontWeight::Bold);
-    CHECK(th->style.flex_grow == doctest::Approx(1.0));
+    CHECK(static_cast<double>(th->style.flex_grow) == doctest::Approx(1.0));
 }
 
 // ── position property ────────────────────────────────────────────────────────
@@ -424,8 +424,8 @@ TEST_CASE("style::resolve: position:relative is parsed") {
     const auto* div = find_tag(*tree, "div");
     REQUIRE(div != nullptr);
     CHECK(div->style.position == style::Position::Relative);
-    CHECK(div->style.top.value == doctest::Approx(8.0));
-    CHECK(div->style.left_offset.value == doctest::Approx(16.0));
+    CHECK(static_cast<double>(div->style.top.value) == doctest::Approx(8.0));
+    CHECK(static_cast<double>(div->style.left_offset.value) == doctest::Approx(16.0));
 }
 
 TEST_CASE("style::resolve: position:absolute is parsed") {
@@ -438,8 +438,8 @@ TEST_CASE("style::resolve: position:absolute is parsed") {
     const auto* div = find_tag(*tree, "div");
     REQUIRE(div != nullptr);
     CHECK(div->style.position == style::Position::Absolute);
-    CHECK(div->style.right_offset.value == doctest::Approx(8.0));
-    CHECK(div->style.bottom.value == doctest::Approx(16.0));
+    CHECK(static_cast<double>(div->style.right_offset.value) == doctest::Approx(8.0));
+    CHECK(static_cast<double>(div->style.bottom.value) == doctest::Approx(16.0));
 }
 
 // ── :hover pseudo-class ──────────────────────────────────────────────────────

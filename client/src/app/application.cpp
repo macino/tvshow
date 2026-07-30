@@ -46,8 +46,6 @@ namespace tvshow::app {
 
 namespace {
 
-constexpr int kUrlMaxLen = 255;
-constexpr int kUrlBufSize = kUrlMaxLen + 1;
 constexpr size_t k_max_history = 500;
 
 std::string history_file_path() {
