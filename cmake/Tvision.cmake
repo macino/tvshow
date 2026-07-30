@@ -7,15 +7,29 @@ if(NOT DEFINED TVSHOW_TVISION_TAG OR TVSHOW_TVISION_TAG STREQUAL "")
       CACHE STRING "tvision commit to pin" FORCE)
 endif()
 
+# Packaging override (e.g. a Homebrew Formula's `resource` block, staged
+# ahead of time so the sandboxed build step needs no network access): point
+# this at an already-checked-out tvision tree instead of git-cloning.
+# See docs/packaging.md.
+set(TVSHOW_TVISION_SOURCE_DIR "" CACHE PATH
+    "Pre-staged tvision source dir; skips the network fetch when set")
+
 # Tvision's own build emits warnings we don't want to gate on.
 set(_tvshow_saved_werror "${TVSHOW_WARNINGS_AS_ERRORS}")
 
-FetchContent_Declare(
-  tvision
-  GIT_REPOSITORY https://github.com/magiblot/tvision.git
-  GIT_TAG        ${TVSHOW_TVISION_TAG}
-  GIT_SHALLOW    FALSE
-)
+if(TVSHOW_TVISION_SOURCE_DIR)
+  FetchContent_Declare(
+    tvision
+    SOURCE_DIR "${TVSHOW_TVISION_SOURCE_DIR}"
+  )
+else()
+  FetchContent_Declare(
+    tvision
+    GIT_REPOSITORY https://github.com/magiblot/tvision.git
+    GIT_TAG        ${TVSHOW_TVISION_TAG}
+    GIT_SHALLOW    FALSE
+  )
+endif()
 
 FetchContent_MakeAvailable(tvision)
 

@@ -1,6 +1,10 @@
 # tvshow extensions
 
-**Note:** tvshow itself now has a native Calculator, Calendar, Puzzle, ASCII Chart, and Event
+**New to extensions?** Start with [`docs/extension-guide.md`](../docs/extension-guide.md) — a
+decision guide for which of the mechanisms below to use, plus quickstarts for each. This file is
+the detailed protocol/API reference the guide links back to.
+
+**Note:** tvshow itself now has a native Calculator, Calendar, Puzzle, Char Chart, and Event
 Viewer built in (Tools menu) — see `adr-native-demo-windows.md`. The `calculator/`/`calendar/`
 scripts here are **not** what those use; they're kept as a working reference implementation of
 the structured window-provider UI protocol, for anyone writing a real 3rd-party extension in a
@@ -14,7 +18,7 @@ script for the native Translator window (`translator/`) — see
 [`adr-translator-native-window.md`](../docs/decisions/adr-translator-native-window.md), and
 [`adr-native-demo-windows.md`](../docs/decisions/adr-native-demo-windows.md).
 
-## Two extension modes
+## Four extension modes
 
 ### 1. Structured UI mode (`calculator/`, `calendar/`) — real buttons
 

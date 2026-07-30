@@ -10,13 +10,27 @@ include(FetchContent)
 set(TVSHOW_LUA_TAG "v5.4.7"
     CACHE STRING "lua/lua tag to pin")
 
-FetchContent_Declare(
-    lua
-    GIT_REPOSITORY https://github.com/lua/lua.git
-    GIT_TAG        ${TVSHOW_LUA_TAG}
-    GIT_SHALLOW    TRUE
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
+# Packaging override (e.g. a Homebrew Formula's `resource` block, staged
+# ahead of time so the sandboxed build step needs no network access): point
+# this at an already-checked-out lua/lua tree instead of git-cloning.
+# See docs/packaging.md.
+set(TVSHOW_LUA_SOURCE_DIR "" CACHE PATH
+    "Pre-staged lua/lua source dir; skips the network fetch when set")
+
+if(TVSHOW_LUA_SOURCE_DIR)
+    FetchContent_Declare(
+        lua
+        SOURCE_DIR "${TVSHOW_LUA_SOURCE_DIR}"
+    )
+else()
+    FetchContent_Declare(
+        lua
+        GIT_REPOSITORY https://github.com/lua/lua.git
+        GIT_TAG        ${TVSHOW_LUA_TAG}
+        GIT_SHALLOW    TRUE
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+endif()
 
 FetchContent_GetProperties(lua)
 if(NOT lua_POPULATED)

@@ -177,8 +177,16 @@ window-provider-calculator = "/path/to/extensions/calculator/calculator.py"
 window-provider-calendar   = "/path/to/extensions/calendar/calendar_provider.py"
 ```
 
-With one provider configured, Ctrl-X opens it directly; with several, it shows a picker first. See
-[`extensions/README.md`](../extensions/README.md) for both protocols and working examples.
+With one provider configured, Ctrl-X opens it directly; with several, it shows a picker first.
+
+A separate, additive mechanism serves extensions as ordinary HTML pages instead: an internal HTTP
+server (`extension-server-port` in `config.toml`, default `8765`, started lazily) routes
+`/extensions/<name>/` to the extension, rendered as a normal browser tab — real forms/CSS, and
+optionally a sandboxed Lua script for instant (no-reload) interactivity. **Tools → Extension:
+Calculator (HTTP)...** is the bundled example.
+
+See [`docs/extension-guide.md`](extension-guide.md) for which mechanism to reach for and how to
+write one; [`extensions/README.md`](../extensions/README.md) for exact protocol grammar.
 
 Related, fire-and-forget (no embedded window): `handler-video`/`handler-audio` in `config.toml` spawn an external player (e.g. `mpv %s`) when you press Enter on a video/audio link, instead of trying to navigate to it.
 
@@ -203,10 +211,10 @@ Five built-in native windows, reachable from **Tools**, no config needed:
 
 | Window | What it does |
 |---|---|
-| Calculator | Green keypad + display, standard `+ - * /` and parens |
-| Calendar | Month grid, today highlighted, "<"/">" to change month |
+| Calculator | Green keypad + display, standard `+ - * /` and parens; responds to number/operator keys directly, not just clicks |
+| Calendar | Month grid, today highlighted; "<"/">" buttons or Left/Right change month, Up/Down change year, plus a direct year-entry field |
 | Puzzle | 4×4 sliding-tile puzzle (letters A–O), move counter |
-| ASCII Chart | Printable-character reference table; click a char to see its decimal/hex value |
+| Char Chart | Character reference table over 8 selectable Unicode blocks (ASCII, Latin-1, Greek, Cyrillic, Box Drawing, Braille, ...); "<"/">" or Left/Right cycles blocks, click a char to see its decimal/hex value |
 | Event Viewer | Live log of mouse/keyboard events received by that window |
 
 ---
@@ -218,9 +226,9 @@ Five built-in native windows, reachable from **Tools**, no config needed:
 | **≡ tvshow** | About, Quit (Alt-X) |
 | **File** | New Tab (Ctrl-T), Open URL (Ctrl-L), Close Tab (Ctrl-W) |
 | **Navigate** | Back (Alt-←), Forward (Alt-→), Reload (Ctrl-R), Stop (Esc), Home |
-| **View** | Toggle Address Bar, Toggle Status, Cascade, Tile |
+| **View** | Toggle Address Bar, Toggle Status, Cascade, Tile, Style (Auto/tvision/Light/Dark — active window only), Settings... |
 | **Window** | List of open tabs, Extension... (Ctrl-X) |
-| **Tools** | Translate..., Calculator, Calendar, Puzzle, ASCII Chart, Event Viewer |
+| **Tools** | Translate..., Calculator, Calendar, Puzzle, Char Chart, Event Viewer, Extension: Calculator (HTTP)... |
 
 ---
 
