@@ -31,7 +31,22 @@ else()
   )
 endif()
 
-FetchContent_MakeAvailable(tvision)
+# FetchContent_Populate + add_subdirectory, not FetchContent_MakeAvailable:
+# functionally the same (MakeAvailable is exactly this pair of calls under
+# the hood), but Homebrew's build sandbox installs a dependency provider
+# that unconditionally FATAL_ERRORs on the FETCHCONTENT_MAKEAVAILABLE_SERIAL
+# method specifically (see cmake/trap_fetchcontent_provider.cmake in a
+# Homebrew CMake install) -- even when SOURCE_DIR means no network call
+# would actually happen. Populate isn't a trapped method, confirmed via a
+# real `brew install --build-from-source` run. Every other dependency here
+# (Gumbo/Katana/Lua) already used Populate for unrelated reasons (they ship
+# no CMakeLists.txt, so there's nothing for MakeAvailable's add_subdirectory
+# step to do) and were never affected.
+FetchContent_GetProperties(tvision)
+if(NOT tvision_POPULATED)
+  FetchContent_Populate(tvision)
+  add_subdirectory("${tvision_SOURCE_DIR}" "${tvision_BINARY_DIR}")
+endif()
 
 # Mark tvision headers as system includes so our -Wshadow/-Wall flags don't
 # fire on tvision's own code when our files include it.
