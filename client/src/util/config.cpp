@@ -60,6 +60,16 @@ Config parse_config(std::string_view toml) {
         else if (key.starts_with("window-provider-")) {
             cfg.window_providers.emplace_back(std::string(key.substr(16)), std::move(val));
         }
+        else if (key == "translator-script") { cfg.translator_script = std::move(val); }
+        else if (key == "extension-server-port") {
+            int parsed = 0;
+            bool valid = !val.empty();
+            for (const char c : val) {
+                if (c < '0' || c > '9') { valid = false; break; }
+                parsed = parsed * 10 + (c - '0');
+            }
+            if (valid) { cfg.extension_server_port = parsed; }
+        }
         // Unknown keys are silently ignored.
     }
     return cfg;

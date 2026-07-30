@@ -13,14 +13,19 @@
 #include "tvshow/app/bookmarks.hpp"
 #include "tvshow/app/browser_window.hpp"
 #include "tvshow/app/commands.hpp"
-#include "tvshow/app/extension_window.hpp"
+#include "tvshow/app/char_chart_window.hpp"
+#include "tvshow/app/calc_window.hpp"
+#include "tvshow/app/calendar_window.hpp"
+#include "tvshow/app/event_viewer_window.hpp"
+#include "tvshow/app/puzzle_window.hpp"
+#include "tvshow/app/translator_window.hpp"
 #include "tvshow/app/page.hpp"
 #include "tvshow/app/settings_dialog.hpp"
 #include "tvshow/layout/types.hpp"
 #include "tvshow/net/blocklist.hpp"
 #include "tvshow/net/cookie_jar.hpp"
+#include "tvshow/net/extension_server.hpp"
 #include "tvshow/util/config.hpp"
-#include "tvshow/util/media_kind.hpp"
 #include "tvshow/util/url.hpp"
 
 #include <tvision/tv.h>
@@ -318,10 +323,10 @@ static void tick_loading_window(TView* v, void* /*arg*/) {
     }
 }
 
-// adr-external-window-provider: pulls output from every open ExtensionWindow.
-static void poll_extension_window(TView* v, void* /*arg*/) {
-    if (auto* ew = dynamic_cast<ExtensionWindow*>(v)) {
-        ew->poll();
+// adr-translator-native-window: pulls the in-flight translate request's output, if any.
+static void poll_translator_window(TView* v, void* /*arg*/) {
+    if (auto* tw = dynamic_cast<TranslatorWindow*>(v)) {
+        tw->poll();
     }
 }
 
@@ -350,6 +355,22 @@ Application::Application(AddressBarMode mode)
     shared_browsing_state_.bookmarks = load_bookmarks();
     net::load_cookie_jar(shared_browsing_state_.cookie_jar);
     shared_browsing_state_.blocklist = net::load_blocklist();
+}
+
+Application::~Application() = default;
+
+int Application::ensure_extension_server() {
+    if (extension_server_ && extension_server_->running()) {
+        return extension_server_->port();
+    }
+    const util::Config cfg = util::load_config();
+    extension_server_ =
+        std::make_unique<net::ExtensionServer>(std::vector<std::string>{TVSHOW_EXTENSIONS_DIR});
+    if (!extension_server_->start(cfg.extension_server_port)) {
+        extension_server_.reset();
+        return 0;
+    }
+    return extension_server_->port();
 }
 
 void Application::shutDown() {
@@ -392,9 +413,22 @@ auto Application::initMenuBar(TRect r) -> TMenuBar* {
                newLine() +
                *new TMenuItem("~S~ettings...", cmSettings, kbNoKey, hcNoContext) +
                *new TSubMenu("~W~indow", kbAltW) +
-               *new TMenuItem("~W~indow List...", cmWindowList, kbNoKey, hcNoContext) +
+               *new TMenuItem("~C~lose", cmClose, kbAltF3, hcNoContext, "Alt-F3") +
+               *new TMenuItem("~Z~oom", cmZoom, kbAltF5, hcNoContext, "Alt-F5") +
+               *new TMenuItem("~M~ove/Resize", cmResize, kbAltF7, hcNoContext, "Alt-F7") +
                newLine() +
-               *new TMenuItem("~E~xtension...", cmOpenExtension, kbCtrlX, hcNoContext, "Ctrl-X"));
+               *new TMenuItem("~W~indow List...", cmWindowList, kbNoKey, hcNoContext) +
+               *new TSubMenu("~T~ools", kbAltT) +
+               *new TMenuItem("~T~ranslate...", cmOpenTranslator, kbNoKey, hcNoContext) +
+               newLine() +
+               *new TMenuItem("~C~alculator", cmOpenCalculator, kbNoKey, hcNoContext) +
+               *new TMenuItem("Cale~n~dar", cmOpenCalendarWin, kbNoKey, hcNoContext) +
+               *new TMenuItem("~P~uzzle", cmOpenPuzzle, kbNoKey, hcNoContext) +
+               *new TMenuItem("C~h~ar Chart", cmOpenCharChart, kbNoKey, hcNoContext) +
+               *new TMenuItem("~E~vent Viewer", cmOpenEventViewer, kbNoKey, hcNoContext) +
+               newLine() +
+               *new TMenuItem("E~x~tension: Calculator (HTTP)...", cmOpenHttpCalculator, kbNoKey,
+                              hcNoContext));
 }
 
 BrowserWindow* Application::active_browser_window() {
@@ -438,65 +472,11 @@ void Application::show_window_list() {  // NOLINT(readability-convert-member-fun
     }
 }
 
-void Application::open_extension_window(const std::string& provider_name, const std::string& command) {
-    if (deskTop == nullptr) {
-        return;
-    }
-    const std::vector<std::string> argv = util::build_handler_argv(command, "");
-    if (argv.empty()) {
-        return;
-    }
-    const TRect bounds = next_window_bounds();
-    auto* win = new ExtensionWindow(bounds, provider_name.c_str(), argv);
-    deskTop->insert(win);
-}
-
-void Application::show_extension_picker() {  // NOLINT(readability-convert-member-functions-to-static)
-    if (deskTop == nullptr) {
-        return;
-    }
-    const util::Config cfg = util::load_config();
-    if (cfg.window_providers.empty()) {
-        messageBox("No window-provider-* entries configured in config.toml.\n"
-                  "Example: window-provider-calculator = \"bc -l\"",
-                  mfInformation | mfOKButton);
-        return;
-    }
-    if (cfg.window_providers.size() == 1) {
-        const auto& [provider_name, command] = cfg.window_providers.front();
-        open_extension_window(provider_name, command);
-        return;
-    }
-
-    std::vector<std::string> names;
-    names.reserve(cfg.window_providers.size());
-    for (const auto& [provider_name, command] : cfg.window_providers) { names.push_back(provider_name); }
-
-    constexpr int kDlgW = 40;
-    const int count = static_cast<int>(names.size());
-    const int h = std::min(count + 2, 14);
-    const TRect dlg_r((deskTop->size.x - kDlgW) / 2, (deskTop->size.y - h) / 2,
-                      (deskTop->size.x + kDlgW) / 2, (deskTop->size.y + h) / 2);
-    auto* dlg = new TDialog(dlg_r, "Open Extension");
-    const TRect list_r(1, 1, kDlgW - 2, h - 1);
-    auto* viewer = new WindowListViewer(list_r, &names);
-    dlg->insert(viewer);
-
-    const unsigned short res = deskTop->execView(dlg);
-    const short sel = viewer->focused;
-    TObject::destroy(dlg);
-
-    if (res == cmOK && sel >= 0 && sel < count) {
-        const auto& [provider_name, command] = cfg.window_providers[static_cast<size_t>(sel)];
-        open_extension_window(provider_name, command);
-    }
-}
-
 void Application::idle() {
     TProgram::idle();
     if (deskTop != nullptr) {
         deskTop->forEach(tick_loading_window, nullptr);
-        deskTop->forEach(poll_extension_window, nullptr);
+        deskTop->forEach(poll_translator_window, nullptr);
     }
 }
 
@@ -595,10 +575,52 @@ void Application::handleEvent(TEvent& event) {
         clearEvent(event);
         show_window_list();
         return;
-    case cmOpenExtension:
+    case cmOpenTranslator: {
         clearEvent(event);
-        show_extension_picker();
+        if (deskTop == nullptr) { return; }
+        const util::Config cfg = util::load_config();
+        auto* win = new TranslatorWindow(fixed_window_bounds(38, 12), cfg.translator_script);
+        deskTop->insert(win);
         return;
+    }
+    case cmOpenCalculator:
+        clearEvent(event);
+        if (deskTop != nullptr) {
+            deskTop->insert(new CalculatorWindow(fixed_window_bounds(26, 14)));
+        }
+        return;
+    case cmOpenCalendarWin:
+        clearEvent(event);
+        if (deskTop != nullptr) {
+            deskTop->insert(new CalendarWindow(fixed_window_bounds(22, 13)));
+        }
+        return;
+    case cmOpenPuzzle:
+        clearEvent(event);
+        if (deskTop != nullptr) { deskTop->insert(new PuzzleWindow(fixed_window_bounds(22, 12))); }
+        return;
+    case cmOpenCharChart:
+        clearEvent(event);
+        if (deskTop != nullptr) {
+            deskTop->insert(new CharChartWindow(fixed_window_bounds(64, 16)));
+        }
+        return;
+    case cmOpenEventViewer:
+        clearEvent(event);
+        if (deskTop != nullptr) {
+            deskTop->insert(new EventViewerWindow(fixed_window_bounds(60, 20)));
+        }
+        return;
+    case cmOpenHttpCalculator: {
+        clearEvent(event);
+        const int port = ensure_extension_server();
+        if (port == 0) {
+            messageBox("Extension server failed to start.", mfError | mfOKButton);
+            return;
+        }
+        open_url("http://127.0.0.1:" + std::to_string(port) + "/extensions/calculator/");
+        return;
+    }
     case cmSettings:
         clearEvent(event);
         show_settings_dialog(shared_browsing_state_);
@@ -614,7 +636,7 @@ void Application::handleEvent(TEvent& event) {
                              : (cmd == cmStyleLight)   ? ForcedStyle::Light
                              : (cmd == cmStyleDark)    ? ForcedStyle::Dark
                                                        : ForcedStyle::Auto;
-        set_forced_style(fs);
+        set_active_window_style(fs);
         return;
     }
     default:
@@ -649,6 +671,30 @@ TRect Application::next_window_bounds() {
     return {x0, y0, desk.b.x, desk.b.y};
 }
 
+TRect Application::fixed_window_bounds(int w, int h) {
+    constexpr int kCascadeCols = 2;
+    constexpr int kCascadeRows = 1;
+
+    const TRect desk = deskTop->getExtent();
+    const int dw = desk.b.x - desk.a.x;
+    const int dh = desk.b.y - desk.a.y;
+    w = std::min(w, dw);
+    h = std::min(h, dh);
+
+    const int base_x = desk.a.x + std::max(0, (dw - w) / 2);
+    const int base_y = desk.a.y + std::max(0, (dh - h) / 2);
+
+    const int max_steps_h = std::max(0, (dw - w) / kCascadeCols);
+    const int max_steps_v = std::max(0, (dh - h) / kCascadeRows);
+    const int max_steps = std::min(max_steps_h, max_steps_v);
+    const int step = (max_steps > 0) ? (cascade_step_ % max_steps) : 0;
+    ++cascade_step_;
+
+    const int x0 = std::min(base_x + step * kCascadeCols, desk.b.x - w);
+    const int y0 = std::min(base_y + step * kCascadeRows, desk.b.y - h);
+    return {x0, y0, x0 + w, y0 + h};
+}
+
 void Application::open_url(std::string_view url) {
     const layout::Viewport vp{std::max(1, deskTop->size.x), std::max(1, deskTop->size.y)};
     // Open the window immediately with a blank page so the spinner is visible,
@@ -658,11 +704,18 @@ void Application::open_url(std::string_view url) {
     blank->url = std::string(url);
 
     const TRect bounds = next_window_bounds();
-    auto* win = new BrowserWindow(bounds, mode_, std::move(*blank), &shared_browsing_state_);
+    auto* win = new BrowserWindow(bounds, mode_, std::move(*blank), &shared_browsing_state_,
+                                  shared_browsing_state_.forced_style);
     deskTop->insert(win);
     win->navigate(url);
 }
 
+// Sets the app-wide default forced style: seeds every *new* window opened
+// from now on (open_url() reads shared_browsing_state_.forced_style), and
+// — since this is the deliberate "change my persistent preference" path
+// (startup --style/config default-style, and the Settings dialog after
+// writing it to config.toml) — also re-applies it live to every window
+// already open, matching what changing a saved preference implies.
 void Application::set_forced_style(ForcedStyle fs) {
     shared_browsing_state_.forced_style = fs;
     if (deskTop == nullptr) {
@@ -673,6 +726,15 @@ void Application::set_forced_style(ForcedStyle fs) {
             bw->apply_forced_style();
         }
     }, nullptr);
+}
+
+// View > Style: a quick, ephemeral override for *this* window only — does
+// not touch shared_browsing_state_.forced_style, so it doesn't change what
+// future new tabs open with, and doesn't affect any other already-open tab.
+void Application::set_active_window_style(ForcedStyle fs) {
+    if (BrowserWindow* win = active_browser_window()) {
+        win->set_forced_style(fs);
+    }
 }
 
 }  // namespace tvshow::app

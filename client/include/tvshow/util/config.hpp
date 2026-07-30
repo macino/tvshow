@@ -24,6 +24,13 @@ struct Config {
     // entries, name -> shell-word-split command (no %s substitution -- input
     // goes over stdin once the window is open, not as an argv URL).
     std::vector<std::pair<std::string, std::string>> window_providers;
+    // adr-translator-native-window: absolute path to translator.py. Empty =
+    // Translate always shows a config-missing error, never spawns anything.
+    std::string translator_script;
+    // adr-extension-server: port for the internal per-request HTTP gateway
+    // that routes /extensions/<name>/ to a bundled or installed extension.
+    // Server starts lazily on first use, not at every launch.
+    int extension_server_port = 8765;
 };
 
 // Parse TOML content (pure — no I/O). Only supports the subset:

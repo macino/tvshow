@@ -6,6 +6,9 @@
 #define Uses_TInputLine
 #define Uses_TScrollBar
 #define Uses_TWindow
+#define Uses_TDialog
+#define Uses_TProgram
+#define Uses_TDeskTop
 #include <tvision/tv.h>
 
 #include <cstddef>
@@ -29,10 +32,12 @@ enum class AddressBarMode : std::uint8_t { Modal, Persistent };
 class BrowserWindow : public TWindow {
 public:
     BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page,
-                  SharedBrowsingState* shared = nullptr);
+                  SharedBrowsingState* shared = nullptr,
+                  ForcedStyle initial_style = ForcedStyle::Auto);
 
     void handleEvent(TEvent& event) override;
     void changeBounds(const TRect& bounds) override;
+    TPalette& getPalette() const override;
 
     // Select-all and focus the address bar (persistent mode only; no-op in modal).
     void focus_address_bar();
@@ -46,8 +51,12 @@ public:
     // Called from Application::idle() to animate spinner or apply a completed load.
     void tick_if_loading();
 
-    // Re-render all tabs using the current forced style.
+    // Re-render this window using its own current forced style.
     void apply_forced_style() { view_->apply_forced_style(); }
+    // Sets this window's own forced style (View > Style acts on the active
+    // window only, not every open tab).
+    void set_forced_style(ForcedStyle fs) { view_->set_forced_style(fs); }
+    [[nodiscard]] ForcedStyle forced_style() const { return view_->forced_style(); }
 
     // Returns the URL of the currently displayed page.
     [[nodiscard]] std::string_view current_url() const { return view_->page().url; }
@@ -59,6 +68,17 @@ private:
     TScrollBar* vscroll_{nullptr};  // non-owning; null until constructed
 
     void reposition(const TRect& inner);
+
+    // adr-sandboxed-scripting: a served page can request a size/color
+    // closer to a native TWindow's look via `<meta name="tvshow-window-
+    // size" content="WxH">` / `<meta name="tvshow-window-color" content=
+    // "gray|cyan|blue">` -- read once per page (tracked via
+    // view_->page_generation()), applies to any page, not just extension
+    // URLs (cosmetic-only, no security boundary crossed).
+    enum class PaletteHint : std::uint8_t { None, Gray, Cyan, Blue };
+    PaletteHint palette_hint_ = PaletteHint::None;
+    int last_page_generation_ = -1;
+    void apply_page_window_hints();
 
     // URL-bar Tab-completion state.
     std::string completion_prefix_;

@@ -14,30 +14,45 @@ q-extensions-api; the interactive half is `adr-external-window-provider`.
 
 ## Decision
 
-`config.toml` gains a `[handlers]` table mapping a trigger to a shell command template, `%s` =
-substituted target (URL or selected text):
+**As implemented** (revised from the original table-based sketch below — our `Config` parser is a
+flat `key = "value"` subset with no `[section]` support, so the design had to fit that):
+`config.toml` gains flat `handler-video`/`handler-audio` keys, `%s` = substituted absolute URL:
 ```toml
-[handlers]
-video = "mpv %s"
-iframe = "xdg-open %s"
+handler-video = "mpv %s"
+handler-audio = "mpv --no-video %s"
 ```
-On Enter over a media link-out token (Q-30) whose kind has a configured handler, `fork`+`exec`
-(not `system()` — avoids shell-injection on untrusted URLs) spawns the command with the URL as an
-argument; tvshow does not wait on it, does not manage its window, does not capture output. No
-handler configured for that kind → falls back to today's placeholder-link behavior (Q-30)
-unchanged. Missing/non-executable command → status-line error, same degrade-gracefully pattern as
-the rest of net/.
+Dispatch is by **URL file extension** (`util::classify_media_url` — `.mp4`/`.webm`/`.mkv`/`.avi`/
+`.mov` → Video, `.mp3`/`.wav`/`.ogg`/`.flac` → Audio), not by DOM tag/"kind" as first sketched:
+`layout::Link` carries only `href` + `spans`, no node/tag identity, and threading that through the
+whole layout pipeline was a much larger change than the extension-classification heuristic below.
+On Enter over a link whose resolved URL classifies as Video/Audio and has a configured handler,
+`fork`+`execvp` (not `system()` — avoids shell-injection on untrusted URLs; argv built by
+`util::build_handler_argv`, which splits the template on whitespace and substitutes the literal
+`%s` token, never interpolating through a shell) spawns the command; tvshow does not wait on it,
+does not manage its window, does not capture output. No handler configured, or URL doesn't
+classify as media → falls back to normal navigation (Q-30 placeholder behavior for iframe/other
+media types is unaffected — `iframe` has no reliable extension to classify by, so it's out of
+scope for this mechanism).
+
+**Autonomy note**: this mechanism assumes the configured command (`mpv`, etc.) is already
+installed — tvshow has no package manager and won't install one for you. If nothing is
+configured, or the command isn't found, the extension window shows a clear failure line rather
+than silently doing nothing (see `adr-external-window-provider`'s Autonomy note for the same
+principle applied to embedded extensions).
 
 ## Consequences
 
-- New `[handlers]` section in `Config` (Q-19) — string-keyed table, no schema beyond string
-  values.
-- New `spawn_handler()` in `input/` or `ui/` — `fork`+`execvp` with argument vector built from the
-  URL, not shell-interpolated (blocks command injection via a crafted `href`).
+- New `handler-video`/`handler-audio` string keys in `Config` (Q-19) — flat keys, not a table
+  (our TOML subset has no section syntax).
+- `util::build_handler_argv()` (pure, tested) does the template-splitting; `app::spawn_handler()`
+  does the actual `fork`+`execvp` (double-forked so the handler process is reparented to init on
+  exit — no zombie, no supervision needed).
 - No process supervision, no output capture — the external tool owns its own window/lifecycle
   entirely outside tvshow's process, consistent with `adr-multiprocess-sandboxing`'s stance that
   tvshow itself doesn't do cross-process supervision.
-- Zero new vendored dependencies.
+- Zero new vendored dependencies in tvshow itself — but the *handler* is an unvendored runtime
+  dependency the user must have installed separately (mpv, etc.). No handlers are configured by
+  default; a fresh `config.toml` has none, so this feature is fully opt-in.
 
 ## Alternatives Considered
 

@@ -100,6 +100,20 @@ void ExtensionProcess::write_line(std::string_view text) {
     (void)::write(stdin_fd_, line.data(), line.size());
 }
 
+void ExtensionProcess::write(std::string_view text) {
+    if (!alive() || stdin_fd_ < 0) {
+        return;
+    }
+    (void)::write(stdin_fd_, text.data(), text.size());
+}
+
+void ExtensionProcess::close_stdin() {
+    if (stdin_fd_ >= 0) {
+        ::close(stdin_fd_);
+        stdin_fd_ = -1;
+    }
+}
+
 std::string ExtensionProcess::read_available() {
     if (pid_ <= 0 || stdout_fd_ < 0) {
         return {};

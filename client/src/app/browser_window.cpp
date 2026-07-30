@@ -2,6 +2,7 @@
 
 #include "tvshow/app/browser_view.hpp"
 #include "tvshow/app/page.hpp"
+#include "tvshow/dom/node.hpp"
 
 #define Uses_TEvent
 #define Uses_TFrame
@@ -12,6 +13,7 @@
 #include <tvision/tv.h>
 
 #include <array>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -39,10 +41,31 @@ std::string normalize_url(const std::string& url) {
     }
     return "https://" + url;
 }
+
+constexpr int kMinHintWidth = 20;
+constexpr int kMinHintHeight = 8;
+
+// Parses "WxH" (e.g. "26x14"); returns {0, 0} on any malformed input, which
+// callers treat as "no hint" -- same degrade-gracefully stance as the rest
+// of this codebase rather than rejecting the whole page load over it.
+TPoint parse_size_hint(std::string_view s) {
+    const auto x_pos = s.find('x');
+    if (x_pos == std::string_view::npos) {
+        return {0, 0};
+    }
+    int w = 0;
+    int h = 0;
+    const auto w_res = std::from_chars(s.data(), s.data() + x_pos, w);
+    const auto h_res = std::from_chars(s.data() + x_pos + 1, s.data() + s.size(), h);
+    if (w_res.ec != std::errc{} || h_res.ec != std::errc{} || w <= 0 || h <= 0) {
+        return {0, 0};
+    }
+    return {w, h};
+}
 }  // namespace
 
 BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page,
-                             SharedBrowsingState* shared)
+                             SharedBrowsingState* shared, ForcedStyle initial_style)
     : TWindowInit(&TWindow::initFrame), TWindow(bounds, page.url.c_str(), wnNoNumber), mode_(mode) {
     options |= ofTileable;
     const TRect inner = getExtent().grow(-1, -1);
@@ -63,9 +86,77 @@ BrowserWindow::BrowserWindow(const TRect& bounds, AddressBarMode mode, Page page
     insert(vscroll_);
 
     const TRect view_rect{inner.a.x, view_top, inner.b.x - 1, inner.b.y};
-    view_ = new BrowserView(view_rect, std::move(page), shared);
+    view_ = new BrowserView(view_rect, std::move(page), shared, initial_style);
     view_->set_vscroll(vscroll_);
     insert(view_);
+    apply_page_window_hints();
+}
+
+void BrowserWindow::apply_page_window_hints() {
+    last_page_generation_ = view_->page_generation();
+    const dom::Document& doc = view_->page().doc;
+
+    const TPoint hint_size = parse_size_hint(dom::find_meta_content(doc, "tvshow-window-size"));
+    if (hint_size.x > 0 && hint_size.y > 0) {
+        const TPoint desk = TProgram::deskTop != nullptr ? TProgram::deskTop->size : hint_size;
+        const int w = std::clamp(hint_size.x, kMinHintWidth, std::max(kMinHintWidth, desk.x));
+        const int h = std::clamp(hint_size.y, kMinHintHeight, std::max(kMinHintHeight, desk.y));
+        TRect r = getBounds();
+        r.b.x = r.a.x + w;
+        r.b.y = r.a.y + h;
+        changeBounds(r);
+        // changeBounds() alone leaves stale pixels where the window used to
+        // extend -- shrinking a window doesn't repaint what's now behind it.
+        // Interactive resize (dragging the handle) gets this for free from
+        // tvision's own drag loop; a one-shot programmatic resize needs to
+        // ask the owner to repaint explicitly. TGroup::redraw() (a full
+        // drawSubViews() pass, not TView::drawView()) is the safe way to do
+        // that -- TGroup::drawUnderRect() looked like the more targeted
+        // tool but segfaulted here (likely a contract this call site
+        // doesn't satisfy, called mid- Application::idle()'s window
+        // iteration); redraw() is a small correctness/perf tradeoff
+        // (repaints everything, not just the exposed delta) for something
+        // that reliably doesn't crash.
+        if (owner != nullptr) {
+            owner->redraw();
+        }
+    }
+
+    const std::string_view color = dom::find_meta_content(doc, "tvshow-window-color");
+    if (color == "gray") {
+        palette_hint_ = PaletteHint::Gray;
+    } else if (color == "cyan") {
+        palette_hint_ = PaletteHint::Cyan;
+    } else if (color == "blue") {
+        palette_hint_ = PaletteHint::Blue;
+    } else {
+        palette_hint_ = PaletteHint::None;
+    }
+    drawView();
+}
+
+TPalette& BrowserWindow::getPalette() const {
+    // cpGrayDialog/cpCyanDialog/cpBlueDialog -- same 32-entry tables (and
+    // same reasoning) adr-native-demo-windows's native windows use; see
+    // CalculatorWindow::getPalette() for why the shorter default TWindow
+    // palette isn't enough once real TButton/TInputLine widgets are inside.
+    switch (palette_hint_) {
+    case PaletteHint::Gray: {
+        static TPalette pal(cpGrayDialog, sizeof(cpGrayDialog) - 1);
+        return pal;
+    }
+    case PaletteHint::Cyan: {
+        static TPalette pal(cpCyanDialog, sizeof(cpCyanDialog) - 1);
+        return pal;
+    }
+    case PaletteHint::Blue: {
+        static TPalette pal(cpBlueDialog, sizeof(cpBlueDialog) - 1);
+        return pal;
+    }
+    case PaletteHint::None:
+    default:
+        return TWindow::getPalette();
+    }
 }
 
 void BrowserWindow::reposition(const TRect& inner) {
@@ -221,6 +312,9 @@ void BrowserWindow::reload() {
 
 void BrowserWindow::tick_if_loading() {
     view_->tick_if_loading();
+    if (view_->page_generation() != last_page_generation_) {
+        apply_page_window_hints();
+    }
     // Sync title and address bar to the URL of the page that just landed.
     const std::string_view cur = current_url();
     if (title == nullptr || std::string_view(title) != cur) {

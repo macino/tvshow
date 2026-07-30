@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""tvshow window-provider example: a basic calendar.
+"""tvshow window-provider example: a calendar with a real navigable month grid.
 
-Speaks the adr-external-window-provider protocol (see calculator.py for the
-protocol description). Stdlib only -- no network, no dependencies.
+Speaks the adr-extension-ui-protocol structured UI mode (see calculator.py
+for the protocol description and extensions/README.md for the grammar).
+Stdlib only -- no network, no dependencies.
 
 Usage in ~/.config/tvshow/config.toml:
     window-provider-calendar = "/path/to/tvshow/extensions/calendar/calendar_provider.py"
 
-Commands (typed into the extension window's input line):
-    today                  -> today's date, weekday, ISO week number
-    YYYY-MM                -> text calendar for that month
-    YYYY-MM-DD              -> weekday name for that specific date
-    help                   -> usage
+Two buttons ("<" / ">") step the displayed month backward/forward; the text
+area shows that month's grid, today's cell wrapped in brackets when visible.
 """
 
 import calendar as cal_module
@@ -19,43 +17,61 @@ import datetime
 import re
 import sys
 
-_MONTH_RE = re.compile(r"^(\d{4})-(\d{1,2})$")
-_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
+_DISPLAY_ID = 100
+_PREV_ID = 1
+_NEXT_ID = 2
 
 
-def handle(cmd: str) -> str:
-    cmd = cmd.strip()
-    if not cmd or cmd == "help":
-        return "commands: today | YYYY-MM | YYYY-MM-DD"
+def esc(s: str) -> str:
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
-    if cmd == "today":
-        today = datetime.date.today()
-        iso_year, iso_week, iso_day = today.isocalendar()
-        return f"{today.isoformat()} ({today.strftime('%A')}), ISO week {iso_week}"
 
-    m = _DATE_RE.match(cmd)
-    if m:
-        year, month, day = (int(g) for g in m.groups())
-        try:
-            d = datetime.date(year, month, day)
-        except ValueError as exc:
-            return f"error: {exc}"
-        return f"{d.isoformat()} is a {d.strftime('%A')}"
-
-    m = _MONTH_RE.match(cmd)
-    if m:
-        year, month = int(m.group(1)), int(m.group(2))
-        if not 1 <= month <= 12:
-            return "error: month must be 1-12"
-        return cal_module.TextCalendar(firstweekday=0).formatmonth(year, month).rstrip("\n")
-
-    return "error: unrecognized command -- type 'help'"
+def month_grid(year: int, month: int) -> str:
+    text = cal_module.TextCalendar(firstweekday=0).formatmonth(year, month).rstrip("\n")
+    today = datetime.date.today()
+    if (year, month) == (today.year, today.month):
+        # Wrap today's day number in brackets. Bounded by non-digits on both
+        # sides so e.g. day 2 doesn't also match inside "20" or "12".
+        text = re.sub(rf"(?<!\d){today.day}(?!\d)", f"[{today.day}]", text, count=1)
+    return text
 
 
 def main() -> None:
-    print("calendar ready -- type 'today', 'YYYY-MM', or 'help'", flush=True)
+    today = datetime.date.today()
+    year, month = today.year, today.month
+
+    print("UI_INIT", flush=True)
+    print('TITLE value="Calendar"', flush=True)
+    print(f'BUTTON id={_PREV_ID} x=0 y=0 w=5 label="<"', flush=True)
+    print(f'BUTTON id={_NEXT_ID} x=30 y=0 w=5 label=">"', flush=True)
+
+    def emit_grid() -> None:
+        grid = month_grid(year, month)
+        rows = grid.count("\n") + 1
+        print(f'TEXT id={_DISPLAY_ID} x=0 y=2 w=36 h={rows} value="{esc(grid)}"', flush=True)
+
+    emit_grid()
+
     for line in sys.stdin:
-        print(handle(line), flush=True)
+        line = line.strip()
+        if not line.startswith("CLICK id="):
+            continue
+        try:
+            kid = int(line[len("CLICK id="):])
+        except ValueError:
+            continue
+
+        if kid == _PREV_ID:
+            month -= 1
+            if month < 1:
+                month, year = 12, year - 1
+        elif kid == _NEXT_ID:
+            month += 1
+            if month > 12:
+                month, year = 1, year + 1
+        else:
+            continue
+        emit_grid()
 
 
 if __name__ == "__main__":

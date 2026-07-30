@@ -53,6 +53,12 @@ bool save_config(const Config& cfg, std::string_view path) {
     for (const auto& [name, command] : cfg.window_providers) {
         out << "window-provider-" << name << " = \"" << command << "\"\n";
     }
+    if (!cfg.translator_script.empty()) {
+        out << "translator-script = \"" << cfg.translator_script << "\"\n";
+    }
+    if (cfg.extension_server_port != 8765) {
+        out << "extension-server-port = " << cfg.extension_server_port << "\n";
+    }
     return out.good();
 }
 

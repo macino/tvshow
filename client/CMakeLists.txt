@@ -5,8 +5,13 @@ add_library(tvshow_core STATIC
     src/util/charset.cpp
     src/util/config.cpp
     src/util/media_kind.cpp
+    src/util/arith_eval.cpp
+    src/util/month_grid.cpp
     src/app/bookmarks.cpp
+    src/app/extension_ui_protocol.cpp
+    src/net/extension_manifest.cpp
     src/net/cookie_jar.cpp
+    src/script/lua_engine.cpp
     src/net/blocklist.cpp
     src/net/request_log.cpp
     src/net/http_client.cpp
@@ -49,6 +54,7 @@ target_link_libraries(tvshow_core
     PUBLIC
         gumbo::gumbo
         katana::katana
+        lua::lua
     PRIVATE
         tvshow_warnings
         $<$<BOOL:${ICONV_LIB}>:${ICONV_LIB}>
@@ -147,11 +153,23 @@ add_executable(tvshow
     src/app/external_handler.cpp
     src/app/extension_process.cpp
     src/app/extension_window.cpp
+    src/net/extension_server.cpp
+    src/app/label_view.cpp
+    src/app/translator_window.cpp
+    src/app/calc_window.cpp
+    src/app/calendar_window.cpp
+    src/app/puzzle_window.cpp
+    src/app/char_chart_window.cpp
+    src/app/event_viewer_window.cpp
 )
 
 target_include_directories(tvshow
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(tvshow PRIVATE
+    TVSHOW_EXTENSIONS_DIR="${CMAKE_SOURCE_DIR}/extensions"
 )
 
 target_link_libraries(tvshow
@@ -160,6 +178,8 @@ target_link_libraries(tvshow
         tvshow_paint
         tvshow_io
         tvision
+        httplib::httplib
+        Threads::Threads
         tvshow_warnings
 )
 

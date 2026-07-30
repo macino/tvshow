@@ -166,16 +166,48 @@ hide: .ad-banner
 
 ## Extensions
 
-Press **Ctrl-X** ("Extension...") to open a 3rd-party extension in its own embedded window — a calculator, translator, or anything else that speaks plain text over stdin/stdout. Configure one or more in `config.toml`:
+Press **Ctrl-X** ("Extension...") to open a 3rd-party extension in its own embedded window — any
+external program, any language. Two modes: a structured mode where the extension describes real
+buttons/text areas that tvshow renders (used by the bundled calculator and calendar — real
+clickable keypads, not a text log), and a plain-scrollback mode (an input line + a log, for
+anything more naturally a REPL). Configure one or more in `config.toml`:
 
 ```toml
-window-provider-calculator = "/path/to/calculator.py"
-window-provider-translate  = "/path/to/translator.py"
+window-provider-calculator = "/path/to/extensions/calculator/calculator.py"
+window-provider-calendar   = "/path/to/extensions/calendar/calendar_provider.py"
 ```
 
-With one provider configured, Ctrl-X opens it directly; with several, it shows a picker first. See [`extensions/README.md`](../extensions/README.md) for working examples (calculator, calendar, DeepL translator) and the protocol extensions must follow.
+With one provider configured, Ctrl-X opens it directly; with several, it shows a picker first. See
+[`extensions/README.md`](../extensions/README.md) for both protocols and working examples.
 
 Related, fire-and-forget (no embedded window): `handler-video`/`handler-audio` in `config.toml` spawn an external player (e.g. `mpv %s`) when you press Enter on a video/audio link, instead of trying to navigate to it.
+
+## Translator
+
+**Tools → Translate...** opens a native translation window: source/target language fields, a text
+box, a Translate button, a result area. Not a window-provider extension — each click spawns
+`translator.py` fresh (one request, one response) via the `translator-script` key in
+`config.toml`:
+
+```toml
+translator-script = "/path/to/extensions/translator/translator.py"
+```
+
+Needs `DEEPL_API_KEY` exported in your shell before launching tvshow (never in `config.toml` —
+that file is plaintext on disk). Missing key or network failure shows an error in the result area
+rather than hanging.
+
+## Demo windows
+
+Five built-in native windows, reachable from **Tools**, no config needed:
+
+| Window | What it does |
+|---|---|
+| Calculator | Green keypad + display, standard `+ - * /` and parens |
+| Calendar | Month grid, today highlighted, "<"/">" to change month |
+| Puzzle | 4×4 sliding-tile puzzle (letters A–O), move counter |
+| ASCII Chart | Printable-character reference table; click a char to see its decimal/hex value |
+| Event Viewer | Live log of mouse/keyboard events received by that window |
 
 ---
 
@@ -188,6 +220,7 @@ Related, fire-and-forget (no embedded window): `handler-video`/`handler-audio` i
 | **Navigate** | Back (Alt-←), Forward (Alt-→), Reload (Ctrl-R), Stop (Esc), Home |
 | **View** | Toggle Address Bar, Toggle Status, Cascade, Tile |
 | **Window** | List of open tabs, Extension... (Ctrl-X) |
+| **Tools** | Translate..., Calculator, Calendar, Puzzle, ASCII Chart, Event Viewer |
 
 ---
 

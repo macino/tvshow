@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""tvshow window-provider example: DeepL-backed translator.
+"""tvshow's DeepL-backed translator backend (adr-translator-native-window).
 
-Speaks the adr-external-window-provider protocol (see calculator.py for the
-protocol description). Stdlib only (urllib) -- no third-party dependencies.
+Not a window-provider extension -- the Translator window (menu: Tools ->
+Translate..., no Ctrl-shortcut) is a native tvshow feature. It spawns this
+script fresh for each click: one line in (source/target + text), one line
+out (the translation), then the process is killed. Stdlib only (urllib) --
+no third-party dependencies.
 
 Usage in ~/.config/tvshow/config.toml:
-    window-provider-translate = "/path/to/tvshow/extensions/translator/translator.py"
+    translator-script = "/path/to/tvshow/extensions/translator/translator.py"
 
 Requires the DEEPL_API_KEY environment variable (get a free key at
 https://www.deepl.com/pro-api). The key never lives in this repo or in
 config.toml -- export it in your shell profile, e.g.:
     export DEEPL_API_KEY="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx"
-tvshow's window-provider spawn inherits the parent process's environment, so
-whatever shell launched tvshow is what this script sees.
+tvshow inherits the parent process's environment when it spawns this script,
+so whatever shell launched tvshow is what this script sees.
 
-Input line formats (typed into the extension window):
+Input line formats:
     <text>                 -> translate to TVSHOW_TRANSLATE_TARGET (default "EN")
     <TARGET>: <text>       -> translate to TARGET, e.g. "CS: Hello there"
     <SOURCE>>TARGET: <text> -> explicit source, e.g. "EN>CS: Hello there"
@@ -25,6 +28,12 @@ automatically). To use a different service (Google Cloud Translate,
 LibreTranslate, etc.) instead, replace translate() with a call to that
 service's REST endpoint -- the stdin/stdout loop in main() doesn't change.
 """
+
+# Lets `str | None` below evaluate as a string annotation instead of being
+# executed at import time -- without this, Python <3.10 raises TypeError on
+# module load and the script dies before printing anything. That silent
+# death was the actual cause of "can't type anything into translate".
+from __future__ import annotations
 
 import json
 import os

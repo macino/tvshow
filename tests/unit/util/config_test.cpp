@@ -89,3 +89,28 @@ TEST_CASE("parse_config: no window-provider entries yields empty vector") {
     const auto cfg = parse_config("log-level = \"info\"\n");
     CHECK(cfg.window_providers.empty());
 }
+
+TEST_CASE("parse_config: translator-script key (adr-translator-native-window)") {
+    const auto cfg = parse_config("translator-script = \"/path/to/translator.py\"\n");
+    CHECK(cfg.translator_script == "/path/to/translator.py");
+}
+
+TEST_CASE("parse_config: translator-script defaults to empty") {
+    const auto cfg = parse_config("");
+    CHECK(cfg.translator_script.empty());
+}
+
+TEST_CASE("parse_config: extension-server-port key (adr-extension-server)") {
+    const auto cfg = parse_config("extension-server-port = 9000\n");
+    CHECK(cfg.extension_server_port == 9000);
+}
+
+TEST_CASE("parse_config: extension-server-port defaults to 8765") {
+    const auto cfg = parse_config("");
+    CHECK(cfg.extension_server_port == 8765);
+}
+
+TEST_CASE("parse_config: extension-server-port ignores non-numeric value") {
+    const auto cfg = parse_config("extension-server-port = notanumber\n");
+    CHECK(cfg.extension_server_port == 8765);
+}

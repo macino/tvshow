@@ -32,6 +32,7 @@
 #include "tvshow/style/resolver.hpp"
 #include "tvshow/types.hpp"
 #include "tvshow/util/config.hpp"
+#include "tvshow/util/log.hpp"
 #include "tvshow/util/media_kind.hpp"
 #include "tvshow/util/url.hpp"
 
@@ -216,8 +217,9 @@ void osc52_copy(std::string_view text) {
 
 namespace tvshow::app {
 
-BrowserView::BrowserView(const TRect& bounds, Page page, SharedBrowsingState* shared)
-    : TView(bounds), page_(std::move(page)), shared_(shared) {
+BrowserView::BrowserView(const TRect& bounds, Page page, SharedBrowsingState* shared,
+                         ForcedStyle initial_style)
+    : TView(bounds), page_(std::move(page)), shared_(shared), forced_style_(initial_style) {
     growMode = gfGrowHiX | gfGrowHiY;
     options |= ofSelectable | ofFirstClick;
     eventMask |= evKeyDown | evMouseDown | evMouseWheel | evMouseMove;
@@ -225,6 +227,7 @@ BrowserView::BrowserView(const TRect& bounds, Page page, SharedBrowsingState* sh
     form_controls_ = layout::collect_form_controls(page_.box);
     history_.push_back(page_.url);
     record_visit(page_.url);
+    bind_lua_session();
 }
 
 BrowserView::~BrowserView() {
@@ -503,6 +506,15 @@ void BrowserView::sync_vscroll() {
     const int limit = scroll_limit();
     const int pg = std::max(1, size.y - 1);
     vscroll_->setParams(scroll_row_, 0, limit, pg, 1);
+    // Nothing to scroll -- hide the bar instead of showing a dead/inert
+    // track (a small tightly-sized page, e.g. the Lua calculator via its
+    // window-size hint, otherwise always shows a scrollbar with nowhere to
+    // go).
+    if (limit <= 0) {
+        vscroll_->hide();
+    } else {
+        vscroll_->show();
+    }
 
     // Update window title with scroll position and history position indicators.
     if (owner != nullptr) {
@@ -595,7 +607,7 @@ void BrowserView::navigate(const std::string& url, bool push_history) {
     const std::string fetch_url = base_url.empty() ? url : base_url;
     const Size vp{size.x, size.y};
 
-    const bool skip_css = (shared_ != nullptr && shared_->forced_style != ForcedStyle::Auto);
+    const bool skip_css = (forced_style_ != ForcedStyle::Auto);
     const bool fetch_images =
         (shared_ != nullptr && shared_->image_renderer != ImageRendererKind::Alt);
     loader_thread_ = std::thread([this, fetch_url, url, fragment, push_history, vp, skip_css,
@@ -660,9 +672,10 @@ void BrowserView::apply_loaded_page() {
     form_values_ = {};
     focused_ = -1;
     scroll_row_ = 0;
+    bind_lua_session();
     // If a forced style is active, re-resolve immediately so the new page
     // renders with the override rather than its own author CSS.
-    if (shared_ != nullptr && shared_->forced_style != ForcedStyle::Auto) {
+    if (forced_style_ != ForcedStyle::Auto) {
         forced_sheets_css_ = nullptr;  // invalidate cache for new page URL context
         forced_sheets_.clear();
         if (auto new_tree = style::resolve(page_.doc, effective_sheets())) {
@@ -957,6 +970,33 @@ std::optional<layout::FormFilePart> read_form_file(const layout::FormFileRef& re
     return layout::FormFilePart{ref.name, filename, "application/octet-stream", buf.str()};
 }
 
+void BrowserView::bind_lua_session() {
+    ++page_generation_;
+    const std::string lua_src = dom::collect_lua_scripts(page_.doc);
+    if (lua_src.empty()) {
+        lua_session_.reset();
+        return;
+    }
+    lua_session_.emplace(page_.doc, lua_src);
+    if (!lua_session_->ok()) {
+        util::log::error("script load error: " + lua_session_->error());
+    }
+}
+
+void BrowserView::run_onclick(std::string_view handler_name) {
+    if (!lua_session_ || !lua_session_->ok()) {
+        util::log::error("onclick=" + std::string(handler_name) + " but no script session");
+        return;
+    }
+    const auto outcome = lua_session_->call(handler_name);
+    if (!outcome.ok) {
+        util::log::error("script error in " + std::string(handler_name) + ": " + outcome.error);
+        return;
+    }
+    relayout();
+    drawView();
+}
+
 void BrowserView::submit_form() {
     const layout::FormFocus* fc = focused_fc();
     if (fc == nullptr || fc->form == nullptr) {
@@ -1004,6 +1044,7 @@ void BrowserView::submit_form() {
             return;
         }
         page_ = std::move(*page);
+        bind_lua_session();
         links_ = layout::collect_links(page_.box);
         form_controls_ = layout::collect_form_controls(page_.box);
         form_values_ = {};
@@ -1059,10 +1100,16 @@ bool BrowserView::handle_mouse_hit(Point pt, TEvent& event) {
         focused_ = static_cast<int>(links_.size() + i);
         const layout::FormFocus& fc = form_controls_[i];
         switch (fc.kind) {
-        case layout::FormControlKind::Submit:
+        case layout::FormControlKind::Submit: {
             clearEvent(event);
-            submit_form();
+            const std::string_view onclick = fc.node->attr("onclick");
+            if (!onclick.empty()) {
+                run_onclick(onclick);
+            } else {
+                submit_form();
+            }
             return true;
+        }
         case layout::FormControlKind::Checkbox: {
             const auto it = form_values_.checked.find(fc.node);
             const bool was = (it != form_values_.checked.end())
@@ -1160,6 +1207,60 @@ void BrowserView::handleEvent(TEvent& event) {
     }
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access) — TEvent is a tvision union.
     const unsigned keyCode = event.keyDown.keyCode;
+
+    // adr-sandboxed-scripting: typed digit/operator/backspace matching an
+    // onclick button's `value` anywhere on the page -- lets a scripted
+    // keypad (e.g. the Lua calculator) respond to direct typing the way
+    // the native Calculator window does, not just Tab-to-focus-then-Enter.
+    // Checked ahead of the switch/default below: none of the named keys
+    // handled there are plain printable characters or backspace, so this
+    // can't steal anything they'd otherwise consume. Without this check,
+    // a printable keypress while a Submit-kind control happens to be
+    // focused would fall into the `default:` case below and be swallowed
+    // by handle_form_input() (built for text/textarea editing, a no-op for
+    // Submit controls) -- that's the "keypress does nothing" symptom.
+    {
+        const unsigned raw_code = keyCode & 0xFFU;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access)
+        const std::string_view ktext(event.keyDown.text, event.keyDown.textLength);
+        std::array<char, 2> single_buf{};
+        std::string_view want;
+        // Enter always means "=" on a scripted keypad, not "activate
+        // whichever button last had Tab focus" -- but only when Enter
+        // wouldn't otherwise mean something real (a focused link/textarea/
+        // select/file all keep their normal Enter behavior below).
+        const layout::FormFocus* fc_for_enter = focused_fc();
+        const bool enter_needs_normal_handling =
+            is_link_focused() ||
+            (fc_for_enter != nullptr &&
+             (fc_for_enter->kind == layout::FormControlKind::Textarea ||
+              fc_for_enter->kind == layout::FormControlKind::Select ||
+              fc_for_enter->kind == layout::FormControlKind::File));
+        if (keyCode == kbEnter && !enter_needs_normal_handling) {
+            want = "=";
+        } else if (keyCode == kbBack) {
+            want = "<";
+        } else if (!ktext.empty()) {
+            want = ktext;
+        } else if (raw_code >= 0x20U && raw_code < 0x7FU) {
+            single_buf[0] = static_cast<char>(raw_code);
+            want = std::string_view(single_buf.data(), 1);
+        }
+        if (!want.empty()) {
+            for (const auto& fc : form_controls_) {
+                if (fc.kind == layout::FormControlKind::Submit && fc.node->attr("value") == want) {
+                    const std::string_view onclick = fc.node->attr("onclick");
+                    if (!onclick.empty()) {
+                        run_onclick(onclick);
+                        clearEvent(event);
+                        return;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     switch (keyCode) {
     case kbUp:
         if (const layout::FormFocus* fc = focused_fc();
@@ -1214,7 +1315,12 @@ void BrowserView::handleEvent(TEvent& event) {
             } else if (fc->kind == layout::FormControlKind::File) {
                 show_file_picker(*fc);
             } else {
-                submit_form();
+                const std::string_view onclick = fc->node->attr("onclick");
+                if (!onclick.empty()) {
+                    run_onclick(onclick);
+                } else {
+                    submit_form();
+                }
             }
         }
         clearEvent(event);
@@ -1576,11 +1682,11 @@ void BrowserView::update_hover(Point content_pt) {
 // Returns the stylesheet list to use for style resolution: the forced theme
 // overrides the page's own author sheets when ForcedStyle != Auto.
 const std::vector<css::Stylesheet>& BrowserView::effective_sheets() const {
-    if (shared_ == nullptr || shared_->forced_style == ForcedStyle::Auto) {
+    if (forced_style_ == ForcedStyle::Auto) {
         return page_.sheets;
     }
     const char* css_src = nullptr;
-    switch (shared_->forced_style) {
+    switch (forced_style_) {
         case ForcedStyle::Tvision: css_src = k_css_tvision; break;
         case ForcedStyle::Light:   css_src = k_css_light;   break;
         case ForcedStyle::Dark:    css_src = k_css_dark;    break;
@@ -1611,6 +1717,11 @@ void BrowserView::apply_forced_style() {
     forced_sheets_css_ = nullptr;  // invalidate cache so effective_sheets() re-parses
     forced_sheets_.clear();
     restyle_for_hover();           // re-resolves + relayout + drawView
+}
+
+void BrowserView::set_forced_style(ForcedStyle fs) {
+    forced_style_ = fs;
+    apply_forced_style();
 }
 
 }  // namespace tvshow::app

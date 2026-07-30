@@ -6,12 +6,18 @@ add_executable(tvshow-tests
     util/charset_test.cpp
     util/config_test.cpp
     util/media_kind_test.cpp
+    util/arith_eval_test.cpp
+    util/month_grid_test.cpp
+    net/extension_manifest_test.cpp
+    script/lua_engine_test.cpp
     net/http_client_test.cpp
     net/cookie_jar_test.cpp
     net/blocklist_test.cpp
     net/request_log_test.cpp
     app/bookmarks_test.cpp
+    app/extension_ui_protocol_test.cpp
     dom/parser_test.cpp
+    dom/node_test.cpp
     css/parser_test.cpp
     style/resolver_test.cpp
     layout/engine_test.cpp

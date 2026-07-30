@@ -31,6 +31,14 @@ public:
     // Appends `text` + '\n' to the child's stdin. No-op if not alive.
     void write_line(std::string_view text);
 
+    // Writes `text` verbatim (no trailing newline) to the child's stdin.
+    void write(std::string_view text);
+
+    // Closes the child's stdin, signalling EOF -- needed by anything that
+    // reads to completion (e.g. Python's `sys.stdin.read()`) rather than
+    // line-by-line. No-op if already closed.
+    void close_stdin();
+
     // Non-blocking read of whatever the child has written to stdout since
     // the last call. Returns "" if nothing new (or the child isn't alive).
     [[nodiscard]] std::string read_available();

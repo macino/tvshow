@@ -12,6 +12,7 @@ include(Gumbo)
 include(Katana)
 include(Doctest)
 include(HttpLib)
+include(Lua)
 
 find_package(Threads REQUIRED)
 

@@ -12,6 +12,7 @@
 #include "tvshow/net/request_log.hpp"
 #include "tvshow/render/chargrid.hpp"
 #include "tvshow/render/render.hpp"
+#include "tvshow/script/lua_engine.hpp"
 
 #include <tvision/tv.h>
 
@@ -53,8 +54,13 @@ struct SharedBrowsingState {
 // Enter-on-link, maintaining a simple per-window history stack.
 class BrowserView : public TView {
 public:
-    // shared may be null (e.g., in standalone/test contexts).
-    BrowserView(const TRect& bounds, Page page, SharedBrowsingState* shared = nullptr);
+    // shared may be null (e.g., in standalone/test contexts). initial_style
+    // seeds this window's own forced style (per-window, not shared — see
+    // forced_style_) from whatever the app-wide default was at the moment
+    // this window was opened; changing it later (View > Style) affects only
+    // this window, not other already-open tabs.
+    BrowserView(const TRect& bounds, Page page, SharedBrowsingState* shared = nullptr,
+               ForcedStyle initial_style = ForcedStyle::Auto);
 
     void draw() override;
     void handleEvent(TEvent& event) override;
@@ -79,6 +85,11 @@ public:
     void show_request_log_dialog();
 
     [[nodiscard]] const Page& page() const { return page_; }
+    // Bumped every time page_ is replaced (initial construction, async
+    // load, and submit_form()'s synchronous POST path). BrowserWindow polls
+    // this to know when to re-read window-size/color <meta> hints from the
+    // new page -- cheaper than a callback/observer for a single consumer.
+    [[nodiscard]] int page_generation() const noexcept { return page_generation_; }
     // History for URL-bar autocomplete: shared history when available, else per-window.
     [[nodiscard]] const std::vector<std::string>& history() const {
         return (shared_ != nullptr) ? shared_->history : history_;
@@ -97,9 +108,12 @@ public:
     // and apply a completed page load.
     void tick_if_loading();
 
-    // Re-resolve and re-render using the currently selected forced style.
-    // Called when shared_->forced_style changes.
+    // Re-resolve and re-render using forced_style_.
     void apply_forced_style();
+    // Sets this window's own forced style (not shared with other tabs) and
+    // re-renders immediately.
+    void set_forced_style(ForcedStyle fs);
+    [[nodiscard]] ForcedStyle forced_style() const noexcept { return forced_style_; }
 
     // Focus the first link or form control in the page (used when Tab is
     // pressed from the persistent address bar to move focus into the content).
@@ -119,6 +133,12 @@ private:
     std::vector<layout::Link> links_;
     std::vector<layout::FormFocus> form_controls_;
     render::FormValues form_values_;
+    // adr-sandboxed-scripting: one session per loaded page (not per click --
+    // see LuaSession's doc comment for why), (re)created in
+    // apply_loaded_page() right after page_.doc is replaced. Empty if the
+    // page has no <script type="text/lua"> blocks.
+    std::optional<script::LuaSession> lua_session_;
+    int page_generation_ = 0;
     int focused_ = -1;    // index into links_ + form_controls_ (0..n-1), or -1
     int scroll_row_ = 0;  // current vertical scroll offset in rows
 
@@ -134,6 +154,9 @@ private:
     size_t history_pos_ = 0;
 
     SharedBrowsingState* shared_{nullptr};  // non-owning; null in standalone mode
+    // Per-window, deliberately not read from shared_ -- View > Style should
+    // only affect the window it's changed in, not every open tab.
+    ForcedStyle forced_style_ = ForcedStyle::Auto;
 
     // Resize debounce: changeBounds records the time; tick_if_loading() fires
     // relayout after kResizeDebounceMs of no further resize events.
@@ -169,6 +192,12 @@ private:
 
     void relayout();
     void sync_vscroll();
+    // (Re)binds lua_session_ to the current page_.doc's <script type=
+    // "text/lua"> content, or clears it if there's none. Must run after
+    // every `page_ = std::move(...)` (apply_loaded_page() and
+    // submit_form()'s synchronous POST path both replace page_) -- an
+    // unbound/stale session would reference a destroyed Document.
+    void bind_lua_session();
     // Ensures display_grid_ is up-to-date. Rebuilds base_grid_ if base_dirty_,
     // then applies focus/search overlays if overlay state changed.
     void ensure_display_grid() const;
@@ -191,6 +220,12 @@ private:
     // (reusing the generic text-value store, same as file's render/encode path).
     void show_file_picker(const layout::FormFocus& fc);
     void submit_form();
+    // adr-sandboxed-scripting: called instead of submit_form() when the
+    // clicked/activated control has a non-empty onclick attribute. Calls
+    // the named handler on the page's LuaSession; on success, relayout()s
+    // in place (no navigation). Errors log and leave the page as-is --
+    // degrade gracefully, matching this codebase's stance elsewhere.
+    void run_onclick(std::string_view handler_name);
     // Ctrl-S over a focused link: fetches the target URL and writes the raw
     // response body to a user-picked path (adr-download-manager). Dialog is
     // pre-filled with the last-used save directory, persisted to config.toml.

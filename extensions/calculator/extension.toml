@@ -1,0 +1,6 @@
+# adr-extension-server manifest -- routes http://127.0.0.1:<port>/extensions/calculator/
+# to server.py per request. Unrelated to calculator.py (the window-provider
+# reference script next to this file); this is the HTML-forms proof of
+# concept for the internal extension HTTP server.
+name = "calculator"
+entry = "python3 server.py"

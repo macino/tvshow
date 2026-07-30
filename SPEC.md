@@ -16,7 +16,11 @@ Build a hostable application stack:
 The result must be a sound base for test-first development. Render path must be a pure function so layouts can be asserted by golden-grid tests without spawning a terminal.
 
 ### 1.2 Non-Goals (v1)
-- JavaScript execution.
+- Arbitrary/untrusted client-side execution (was "JavaScript execution" — narrowed by
+  `adr-sandboxed-scripting`: the non-goal was never about JS specifically, it was about running
+  page-supplied code with no sandbox. A *sandboxed* embedded Lua interpreter is implemented —
+  `<script type="text/lua">` + `onclick="fn"` — see q-sandboxed-scripting for what shipped vs. the
+  v1 scope still deferred.)
 - CSS Grid, animations, transitions, transforms, gradients, shadows.
 - Cookies, persistent sessions, auth (Open Q-9).
 - Real images. Only `alt` text in v1; ASCII-art renderer is an interface stub for later.
@@ -75,6 +79,7 @@ The result must be a sound base for test-first development. Render path must be 
 | `render` | Box Tree | CharGrid (cell = char + `TColorAttr`) | Yes |
 | `paint` | CharGrid + `TDrawBuffer` | drawn TWindow rows | No (tvision side effect) |
 | `input` | key/mouse event + focus state | Action (navigate, focus, submit) | Yes |
+| `script` | DOM + `onclick` event, sandboxed Lua source | mutated DOM (in place, existing text nodes/attrs only) | Yes (wraps a C VM the same way `dom`/`css` wrap gumbo/katana — see `adr-sandboxed-scripting`) |
 
 **Test seam:** every Yes-row is unit-tested with deterministic input/output. Golden tests assert on `CharGrid` snapshots (text + attribute map) — no terminal needed.
 
@@ -163,6 +168,12 @@ Test discipline: tests are written **before** the implementation for any pure mo
 ### 6.1 Document
 `<!doctype html>`, `<html>`, `<head>`, `<title>`, `<meta charset>`, `<link rel="stylesheet" href>`, `<style>`, `<body>`.
 
+`<meta name="tvshow-window-size" content="WxH">` / `<meta name="tvshow-window-color" content=
+"gray|cyan|blue">` (adr-sandboxed-scripting): tvshow-specific, not standard HTML semantics — a
+served page's hint for its own `BrowserWindow`'s size/frame-palette, read once per page load.
+Cosmetic only (window frame/chrome via `getPalette()`); a page's own content-area background/
+colors are ordinary CSS (`body { background: ...; }`), unaffected by this hint.
+
 ### 6.2 Block flow
 `div`, `p`, `h1`–`h6`, `hr`, `pre`, `blockquote`, `section`, `article`, `header`, `footer`, `nav`, `main`, `ul`, `ol`, `li`.
 
@@ -171,6 +182,19 @@ Test discipline: tests are written **before** the implementation for any pure mo
 
 ### 6.4 Forms
 `form` (action, method GET/POST, enctype `application/x-www-form-urlencoded`), `input` (type=text|password|checkbox|radio|submit|hidden), `textarea`, `select` + `option`, `button`, `label`.
+
+`onclick="handlerName"` (adr-sandboxed-scripting) on a `button`/submit-kind `input`: calls the
+named zero-argument Lua function (defined in a `<script type="text/lua">` block) instead of
+submitting a form — takes precedence over a `<form>` ancestor's normal submit behavior when
+present; no `<form>` ancestor is required at all.
+
+### 6.4.1 Scripting
+`<script type="text/lua">...</script>` (adr-sandboxed-scripting): a sandboxed Lua VM, one per
+loaded page, evaluated once at load (defining its top-level functions/locals) and re-entered per
+`onclick`. No filesystem/network/process access (`io`/`os`/`package`/`debug` never linked in;
+`load`/`loadstring`/`dofile`/`loadfile`/`require` stripped from `base`); an instruction-count
+budget bounds runaway loops. Mutation surface: `tv.set_text(id, str)` / `tv.get_text(id)`, scoped
+to existing elements' text content by `id` — no node insertion/removal.
 
 ### 6.5 Images
 `<img src alt width height>` — reserves `width × height` (mapped through px→cell ratio). Rendering
@@ -217,7 +241,7 @@ Cascade order, specificity, and `!important` follow CSS spec. Katana provides se
 ### 7.2 Honored Properties
 | Group | Properties |
 |-------|-----------|
-| Color | `color`, `background-color`, `background` (color shorthand only) |
+| Color | `color`, `background-color`, `background` (color shorthand only) — `background`/`background-color` only paints on block-level and form-control leaf boxes (each has its own `Box` in the layout tree); a plain inline element (`span`, `a`, ...) has no box of its own to paint a background onto and silently keeps its parent's/ancestor's fill instead — use a block element (`div`, etc.) if an inline-looking run of text needs its own background (found live via `adr-sandboxed-scripting`'s calculator display) |
 | Text | `font-weight` (normal/bold), `font-style` (normal/italic), `text-decoration` (none/underline), `text-align` (left/right/center), `white-space` (normal/pre/nowrap) |
 | Box | `width`, `height`, `min-width`, `max-width` (px, %, ch), `margin`, `padding`, `border`, `border-style`, `border-color`, `border-width`; individual longhands `border-{top,right,bottom,left}-{style,width,color}` (all 12) |
 | Display | `display: block | inline | inline-block | flex | none` |
@@ -468,9 +492,10 @@ Ctrl-D toggles the debug overlay: box outlines (`┌─┐│└┘`) drawn in m
 | q-download-manager | Download manager (save fetched resource to disk, progress, list) | **Implemented**: Ctrl-S "Save Link As" on focused link/media token via `TFileDialog`, pre-filled with last-used save dir (persisted to `config.toml`, `download-dir` key). Synchronous fetch, no progress bar, no history list — see `adr-download-manager`. |
 | q-ascii-art-renderer | `<img>` ASCII-art renderer | **Implemented**: extends Q-23 — `ascii` third `image-renderer` mode, 10-level luminance ramp (` .:-=+*#%@`), reuses the `stb_image` decode cache. See `adr-ascii-art-renderer`. |
 | q-dev-tools | Dev tools (console/network/DOM inspector) | **Implemented**: extends Q-12/Q-22 — Ctrl-N opens a Network Log dialog (method/URL/status/bytes/ms, ring-buffer of 50, newest-first) alongside the existing Ctrl-D box-outline overlay. No JS console (no JS engine), no live DOM tree (box-outline overlay already exposes box dims) — see `adr-dev-tools`. |
-| q-extensions-api | Extensions API | **Implemented**: no in-process plugin ABI (rejected — undercuts `adr-multiprocess-sandboxing`'s risk posture). Three process-boundary mechanisms instead: (1) `~/.config/tvshow/blocklist` (`block:`/`hide:` rules, no execution) — `adr-content-blocklist`; (2) `handler-video`/`handler-audio` config, double-fork+execvp on a matching media link, dispatched by URL file extension — `adr-external-handlers`; (3) Ctrl-X opens a `window-provider-*`-configured extension in an embedded `TWindow`, subprocess stdin/stdout piped to an input line + scrollback — `adr-external-window-provider`. |
+| q-extensions-api | Extensions API | **Implemented**: no in-process plugin ABI (rejected — undercuts `adr-multiprocess-sandboxing`'s risk posture). Four process-boundary mechanisms: (1) `~/.config/tvshow/blocklist` (`block:`/`hide:` rules, no execution) — `adr-content-blocklist`; (2) `handler-video`/`handler-audio` config, double-fork+execvp on a matching media link, dispatched by URL file extension — `adr-external-handlers`; (3) Ctrl-X opens a `window-provider-*`-configured extension in an embedded `TWindow`, either plain stdin/stdout scrollback or a structured `BUTTON`/`TEXT`/`CLICK` mode rendering real `TButton`s (child opts in by printing `UI_INIT` first) — `adr-external-window-provider` + `adr-extension-ui-protocol`; (4) an internal HTTP server (`extension-server-port`, default 8765, started lazily) routes `/extensions/<name>/` to a per-request CGI-style spawn of that extension's `entry` command, rendered as an ordinary `BrowserWindow` tab — plain HTML/forms instead of a bespoke widget protocol — `adr-extension-server`, proof of concept `extensions/calculator/server.py`. Translation (originally sketched as a fourth window-provider example) instead shipped as a bespoke native `TranslatorWindow` (Tools → Translate...), not a pluggable extension — a translation form needed widgets the text-pipe protocol wasn't built to describe — `adr-translator-native-window`. Calculator/calendar were likewise rebuilt native (Tools menu) once a reference screenshot of `tvision`'s own bundled `tvdemo` suite made the actual ask concrete — clean-room implementations, not a port of Borland's 1994 example source — alongside three further native demo windows in the same style: Puzzle, Char Chart (originally "ASCII Chart", renamed and extended to selectable Unicode blocks), Event Viewer — `adr-native-demo-windows`. The window-provider `calculator`/`calendar` scripts remain as protocol reference material, not what tvshow itself uses; the HTTP extension server is a third, additive track alongside both. |
 | q-persisted-cookies | Persisted cookies (disk-backed, survive restart) | **Implemented**: extends Q-9 — persistent (Max-Age/Expires) cookies serialize to `~/.config/tvshow/cookies`, pruned on load if expired, saved on every Set-Cookie + at shutdown. Secure/SameSite enforcement still out of scope. See `adr-persisted-cookies`. |
-| q-websocket-support | WebSocket support | **Resolved (decision)**: won't implement now — conditioned on a scripting layer entering scope (nothing today can consume a pushed message; §1.2 non-goal: no JS). Revisit trigger = scripting layer exists — see `adr-websocket-support`. |
+| q-sandboxed-scripting | Sandboxed embedded scripting (client-side interactivity beyond forms) | **Implemented**: reverses §1.2's old "no JavaScript execution" non-goal into "no arbitrary/*untrusted* execution" — a sandboxed embedded Lua VM (vendored `lua/lua` v5.4.7, `cmake/Lua.cmake`), one per loaded page, evaluated at load and re-entered per `onclick="fn"` (§6.4.1). Sandboxing is structural: only `base`/`string`/`math`/`table` opened (`io`/`os`/`package`/`debug` never linked in), `load`/`loadstring`/`dofile`/`loadfile`/`require` stripped from `base`, an instruction-count hook bounds runaway loops — all regression-tested (`tests/unit/script/lua_engine_test.cpp`), not just asserted. New `script` pipeline stage (§3.1) mutates the DOM in place (`tv.set_text`/`tv.get_text`, existing text nodes/attrs only — no insertion/removal); `BrowserView::relayout()` re-derives layout/render with no network round-trip, no page reload. Bundled in the same pass: `tvshow-window-size`/`tvshow-window-color` `<meta>` hints (§6.1) let a served page size/color its own window closer to a native `TWindow`'s look. `extensions/calculator/server.py` rewritten as a scripted, single-fetch page (accumulator-style, not an AST-walking expression evaluator — sidesteps needing any `load`/`eval`-shaped capability) — verified live, not just unit-tested (a multi-step calculation landed on the right answer with the URL bar never changing, i.e. no reload occurred). **Deferred, flagged not hidden**: only `onclick` (no general event model), no persistent state across navigations, no timers, no DOM node insertion/removal. Event Viewer (`adr-native-demo-windows`) stays native — a script-driven rewrite is a real option now, not done this pass. See `adr-sandboxed-scripting`. |
+| q-websocket-support | WebSocket support | **Resolved (decision)**: won't implement — conditioned on a scripting layer entering scope. **Update**: that trigger is now met (q-sandboxed-scripting shipped) — but WebSocket support itself remains unbuilt, a separate ask not taken on alongside scripting. See `adr-websocket-support`. |
 | q-multiprocess-sandboxing | Multi-process / sandboxing between tabs | **Resolved (decision): denied.** Disproportionate architecture change (IPC, process-per-tab) vs project mission (§1.1). Risk accepted — existing pure-pipeline/no-throw/degrade-gracefully design already narrows blast radius without process isolation — see `adr-multiprocess-sandboxing`. |
 
 ### 20.1 Milestone 1 (M1) Scope
